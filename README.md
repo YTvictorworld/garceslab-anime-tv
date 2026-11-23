@@ -36,7 +36,7 @@ your own network.
 
 ## Which server it needs
 
-- **[Garceslab Anime](https://github.com/YTvictorworld/garceslab-anime)** (recommended): it
+- **[Garceslab Anime](https://github.com/YTvictorworld/garceslab-anime-server)** (recommended): it
   serves streams to the TV's native player correctly (requests without an HTTP `Range`
   header), so no proxy is needed in front of it.
 - **Seanime v3.10.x** also works for now: today the app is Seanime Tenji plus TV fixes and
