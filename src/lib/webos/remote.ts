@@ -465,8 +465,11 @@ const wheelStep = createWheelStepper({ step: 100, interval: 120 })
  * arrow press jumps back. Instead it moves focus through the list around
  * the focused element, and does nothing outside one (the player).
  *
- * With the pointer, the browser scrolls as usual, except over a list that
- * only scrolls sideways (a rail), which the wheel would otherwise skip.
+ * With the pointer, the browser scrolls the page as usual. Over a list that
+ * only scrolls sideways (a rail), which the wheel would otherwise skip, it
+ * scrolls the rail once the page can't go further that way. Rails first made
+ * the page unscrollable wherever rows fill the screen (Discover): every notch
+ * slid the row under the pointer instead.
  */
 function onWheel(event: WheelEvent) {
     if (event.ctrlKey) return
@@ -485,6 +488,8 @@ function onWheel(event: WheelEvent) {
     if (!scroller || !scroller.x || scroller.y) return
     const { node } = scroller
     const delta = event.deltaMode === 0 ? event.deltaY : event.deltaY * 40
+    const page = scrollableAncestor(node, "y")
+    if (page && (delta > 0 ? page.scrollTop + page.clientHeight < page.scrollHeight - 1 : page.scrollTop > 0)) return
     const canScroll = delta > 0
         ? node.scrollLeft + node.clientWidth < node.scrollWidth - 1
         : node.scrollLeft > 0

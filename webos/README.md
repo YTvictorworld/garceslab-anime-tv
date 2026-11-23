@@ -437,7 +437,9 @@ arrow key or tapping it quickly extends that one movement rather than starting a
 animation for every step.
 
 **Wheel.** With the pointer showing, the wheel scrolls the page; over a row that only
-scrolls sideways it scrolls the row, and the page again once the row reaches its end.
+scrolls sideways it scrolls the row once the page can't scroll further that way (at its
+end, or on a screen that doesn't scroll). Rows used to come first, and on Discover, where
+rows fill most of the screen, the wheel slid rows sideways instead of scrolling down.
 Without the pointer (after an arrow key), each notch moves focus one step up or down
 through the list, as LG asks apps to keep the wheel working in 5-way mode. In the player
 it does nothing.

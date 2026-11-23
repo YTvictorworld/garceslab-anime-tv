@@ -72,16 +72,20 @@ function insideUnfocusableGuide(el: HTMLElement, root: Element) {
 
 /**
  * Navigators keep inactive screens mounted under the active one (inactive tabs
- * stay laid out at z-index -1) and mark them `aria-hidden`. The arrow keys must
- * not walk into them, though an explicit focus request still may.
+ * stay laid out at z-index -1) and mark them `aria-hidden`, or on the web
+ * (Expo Router's React Navigation since SDK 58) `inert`. The arrow keys must
+ * not walk into them, though an explicit focus request still may (except into
+ * an inert one, which the browser refuses).
  */
 function inHiddenScreen(el: Element) {
-    return el.closest("[aria-hidden=\"true\"]") !== null
+    return el.closest("[aria-hidden=\"true\"],[inert]") !== null
 }
 
 export function isFocusable(el: unknown, root: Element = document.body): el is HTMLElement {
     if (!isElement(el) || !el.matches(FOCUSABLE_SELECTOR)) return false
     if (el.getAttribute("aria-disabled") === "true") return false
+    // focus() does nothing inside an inert screen: picking it would leave focus where it was.
+    if (el.closest("[inert]") !== null) return false
     return isRendered(el) && !insideUnfocusableGuide(el, root)
 }
 
