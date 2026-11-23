@@ -15,9 +15,9 @@ import type {
     Anime_PlaylistEpisode,
     ChapterDownloader_DownloadID,
     Continuity_UpdateWatchHistoryItemOptions,
-    Debrid_TorrentItem,
     DebridClient_CancelStreamOptions,
     DebridClient_StreamPlaybackType,
+    Debrid_TorrentItem,
     HibikeTorrent_AnimeTorrent,
     HibikeTorrent_BatchEpisodeFiles,
     LibraryExplorer_SuperUpdateFileOptions,
@@ -1445,6 +1445,10 @@ export type PreloadMediastreamMediaContainer_Variables = {
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// mediastream_test
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // metadata
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1783,6 +1787,192 @@ export type GetPlaylistEpisodes_Variables = {
      */
     progress: number
 }
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// profiles
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/**
+ * - Filepath: internal/handlers/profiles.go
+ * - Filename: profiles.go
+ * - Endpoint: /api/v1/profiles/{id}
+ * @description
+ * Route updates a profile (name, avatar, color, order, score format, title language).
+ */
+export type UpdateProfile_Variables = {
+    /**
+     *  The profile ID
+     */
+    id: number
+}
+
+/**
+ * - Filepath: internal/handlers/profiles.go
+ * - Filename: profiles.go
+ * - Endpoint: /api/v1/profiles/{id}
+ * @description
+ * Route moves a profile to the trash.
+ */
+export type DeleteProfile_Variables = {
+    /**
+     *  The profile ID
+     */
+    id: number
+}
+
+/**
+ * - Filepath: internal/handlers/profiles.go
+ * - Filename: profiles.go
+ * - Endpoint: /api/v1/profiles/{id}/restore
+ * @description
+ * Route restores a profile from the trash.
+ */
+export type RestoreProfile_Variables = {
+    /**
+     *  The profile ID
+     */
+    id: number
+}
+
+/**
+ * - Filepath: internal/handlers/profiles.go
+ * - Filename: profiles.go
+ * - Endpoint: /api/v1/profiles/{id}/pin
+ * @description
+ * Route sets, changes or removes (pin: null) a profile's PIN.
+ */
+export type SetProfilePin_Variables = {
+    pin?: string
+}
+
+/**
+ * - Filepath: internal/handlers/profiles.go
+ * - Filename: profiles.go
+ * - Endpoint: /api/v1/profiles/{id}/select
+ * @description
+ * Route enters a profile on this device and returns its session token.
+ */
+export type SelectProfile_Variables = {
+    pin: string
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// profiles_data
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/**
+ * - Filepath: internal/handlers/profiles_data.go
+ * - Filename: profiles_data.go
+ * - Endpoint: /api/v1/profiles/me/lists/{listId}
+ * @description
+ * Route deletes a custom list of the current profile (the entries stay in the list).
+ */
+export type DeleteMyCustomList_Variables = {
+    /**
+     *  The custom list ID
+     */
+    listId: number
+}
+
+/**
+ * - Filepath: internal/handlers/profiles_data.go
+ * - Filename: profiles_data.go
+ * - Endpoint: /api/v1/profiles/me/lists/{listId}/items/{mediaId}
+ * @description
+ * Route adds a media of the current profile's list to one of its custom lists.
+ */
+export type AddToMyCustomList_Variables = {
+    /**
+     *  The custom list ID
+     */
+    listId: number
+    /**
+     *  The AniList media ID
+     */
+    mediaId: number
+}
+
+/**
+ * - Filepath: internal/handlers/profiles_data.go
+ * - Filename: profiles_data.go
+ * - Endpoint: /api/v1/profiles/me/lists/{listId}/items/{mediaId}
+ * @description
+ * Route removes a media from one of the current profile's custom lists.
+ */
+export type RemoveFromMyCustomList_Variables = {
+    /**
+     *  The custom list ID
+     */
+    listId: number
+    /**
+     *  The AniList media ID
+     */
+    mediaId: number
+}
+
+/**
+ * - Filepath: internal/handlers/profiles_data.go
+ * - Filename: profiles_data.go
+ * - Endpoint: /api/v1/profiles/{id}/import/anilist
+ * @description
+ * Route imports the public AniList anime list of a user into a profile (anonymous, no token).
+ */
+export type ImportProfileAnilist_Variables = {
+    /**
+     *  The profile ID
+     */
+    id: number
+}
+
+/**
+ * - Filepath: internal/handlers/profiles_data.go
+ * - Filename: profiles_data.go
+ * - Endpoint: /api/v1/profiles/{id}/import/server-account
+ * @description
+ * Route imports the server's existing AniList account list (its cached collection or its public list) into a profile.
+ */
+export type ImportProfileServerAccount_Variables = {
+    /**
+     *  The profile ID
+     */
+    id: number
+}
+
+/**
+ * - Filepath: internal/handlers/profiles_data.go
+ * - Filename: profiles_data.go
+ * - Endpoint: /api/v1/profiles/{id}/import/json
+ * @description
+ * Route imports a profile export (or an AniList-shaped anime collection) into a profile.
+ */
+export type ImportProfileJSON_Variables = {
+    /**
+     *  The profile ID
+     */
+    id: number
+}
+
+/**
+ * - Filepath: internal/handlers/profiles_data.go
+ * - Filename: profiles_data.go
+ * - Endpoint: /api/v1/profiles/{id}/export
+ * @description
+ * Route exports everything a profile owns as JSON (lists, custom lists, favourites, history, settings, activity).
+ */
+export type ExportProfile_Variables = {
+    /**
+     *  The profile ID
+     */
+    id: number
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// profiles_m2_test
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// profiles_test
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // releases

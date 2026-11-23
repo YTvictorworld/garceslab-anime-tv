@@ -59,6 +59,7 @@ export type AL_AnimeCollection_MediaListCollection_Lists = {
  */
 export type AL_AnimeCollection_MediaListCollection_Lists_Entries = {
     completedAt?: AL_AnimeCollection_MediaListCollection_Lists_Entries_CompletedAt
+    createdAt?: number
     id: number
     media?: AL_BaseAnime
     notes?: string
@@ -68,6 +69,7 @@ export type AL_AnimeCollection_MediaListCollection_Lists_Entries = {
     score?: number
     startedAt?: AL_AnimeCollection_MediaListCollection_Lists_Entries_StartedAt
     status?: AL_MediaListStatus
+    updatedAt?: number
 }
 
 /**
@@ -808,6 +810,7 @@ export type AL_MangaCollection_MediaListCollection_Lists = {
  */
 export type AL_MangaCollection_MediaListCollection_Lists_Entries = {
     completedAt?: AL_MangaCollection_MediaListCollection_Lists_Entries_CompletedAt
+    createdAt?: number
     id: number
     media?: AL_BaseManga
     notes?: string
@@ -817,6 +820,7 @@ export type AL_MangaCollection_MediaListCollection_Lists_Entries = {
     score?: number
     startedAt?: AL_MangaCollection_MediaListCollection_Lists_Entries_StartedAt
     status?: AL_MediaListStatus
+    updatedAt?: number
 }
 
 /**
@@ -1543,6 +1547,8 @@ export type Anime_EntryListData = {
     repeat?: number
     startedAt?: string
     completedAt?: string
+    createdAt?: number
+    updatedAt?: number
 }
 
 /**
@@ -1946,6 +1952,33 @@ export type StreamAutoSelectStatusPayload = {
     stepDetail: string
     candidates?: Array<AutoSelectCandidate>
     selectedFile: string
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Avatars
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/**
+ * - Filepath: internal/profiles/avatars/avatars.go
+ * - Filename: avatars.go
+ * - Package: avatars
+ * @description
+ *  Avatar is one entry of catalog.json.
+ */
+export type Avatar = {
+    id: string
+    file: string
+    category: string
+    label: string
+    license: string
+    licenseUrl: string
+    creator: string
+    source: string
+    origin: string
+    /**
+     * Filled at load time: URLPrefix + File
+     */
+    url: string
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2416,7 +2449,7 @@ export type Extension_Language = "javascript" | "typescript" | "go"
  * - Package: extension
  * @description
  *  PluginAllowlist is a list of system permissions that the plugin is asking for.
- *
+ *  
  *  The user must acknowledge these permissions before the plugin can be loaded.
  */
 export type Extension_PluginAllowlist = {
@@ -2876,6 +2909,38 @@ export type MemoryStatsResponse = {
 }
 
 /**
+ * - Filepath: internal/handlers/profiles_data.go
+ * - Filename: profiles_data.go
+ * - Package: handlers
+ * @description
+ *  ProfileActivity is a row of the current profile's activity log.
+ */
+export type ProfileActivity = {
+    id: number
+    mediaType: string
+    mediaId: number
+    kind: string
+    episode?: number
+    oldValue?: string
+    newValue?: string
+    createdAt: number
+}
+
+/**
+ * - Filepath: internal/handlers/profiles_data.go
+ * - Filename: profiles_data.go
+ * - Package: handlers
+ * @description
+ *  ProfileSettingsResponse is the current profile's settings.
+ */
+export type ProfileSettingsResponse = {
+    profile?: ProfileSettings
+    effective?: Models_Settings
+    markWatchingOnStart: boolean
+    completedAction: string
+}
+
+/**
  * - Filepath: internal/handlers/docs.go
  * - Filename: docs.go
  * - Package: handlers
@@ -2967,6 +3032,8 @@ export type Status = {
     serverReady: boolean
     serverHasPassword: boolean
     showChangelogTour: string
+    profiles?: ProfilesStatus
+    currentProfile?: Profile
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -3179,6 +3246,120 @@ export type HibikeTorrent_BatchEpisodeFiles = {
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// History
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/**
+ * - Filepath: internal/profiles/history/history.go
+ * - Filename: history.go
+ * - Package: history
+ * @description
+ *  EpisodeProgressRow is a row of episode_progress.
+ */
+export type EpisodeProgressRow = {
+    mediaId: number
+    episodeNumber: number
+    positionSec: number
+    duration: number
+    completed: boolean
+    updatedAt: number
+}
+
+/**
+ * - Filepath: internal/profiles/history/history.go
+ * - Filename: history.go
+ * - Package: history
+ * @description
+ *  WatchHistoryRow is a row of watch_history.
+ */
+export type WatchHistoryRow = {
+    mediaId: number
+    episodeNumber: number
+    kind: string
+    filepath?: string
+    positionSec: number
+    duration: number
+    timeAdded: number
+    timeUpdated: number
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Importer
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/**
+ * - Filepath: internal/profiles/importer/importer.go
+ * - Filename: importer.go
+ * - Package: importer
+ * @description
+ *  ProfileExport is the profile export JSON (plan §3.5).
+ */
+export type ProfileExport = {
+    format: string
+    version: number
+    exportedAt: number
+    profile: ProfileExportInfo
+    settings?: ProfileSettings
+    theme?: Record<string, any>
+    autoselect?: Record<string, any>
+    entries?: Array<ProfileImportEntry>
+    customLists?: Array<ProfileExportCustomList>
+    favourites?: Array<ProfileExportFavourite>
+    watchHistory?: Array<WatchHistoryRow>
+    episodeProgress?: Array<EpisodeProgressRow>
+    activity?: Array<ProfileExportActivity>
+}
+
+/**
+ * - Filepath: internal/profiles/importer/importer.go
+ * - Filename: importer.go
+ * - Package: importer
+ */
+export type ProfileExportActivity = {
+    mediaType: string
+    mediaId: number
+    kind: string
+    episode?: number
+    oldValue?: string
+    newValue?: string
+    createdAt: number
+}
+
+/**
+ * - Filepath: internal/profiles/importer/importer.go
+ * - Filename: importer.go
+ * - Package: importer
+ */
+export type ProfileExportCustomList = {
+    name: string
+    mediaIds?: Array<number>
+}
+
+/**
+ * - Filepath: internal/profiles/importer/importer.go
+ * - Filename: importer.go
+ * - Package: importer
+ */
+export type ProfileExportFavourite = {
+    kind: string
+    refId: number
+    position: number
+}
+
+/**
+ * - Filepath: internal/profiles/importer/importer.go
+ * - Filename: importer.go
+ * - Package: importer
+ */
+export type ProfileExportInfo = {
+    name: string
+    avatarId: string
+    color?: string
+    scoreFormat: string
+    titleLanguage: string
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // LibraryExplorer
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -3267,6 +3448,74 @@ export type Local_TrackedMediaItem = {
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Localplatform
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/**
+ * - Filepath: internal/profiles/localplatform/customlists.go
+ * - Filename: customlists.go
+ * - Package: localplatform
+ * @description
+ *  ProfileCustomList is a custom list with the media ids it holds.
+ */
+export type ProfileCustomList = {
+    id: number
+    name: string
+    position: number
+    mediaIds?: Array<number>
+}
+
+/**
+ * - Filepath: internal/profiles/localplatform/model.go
+ * - Filename: model.go
+ * - Package: localplatform
+ * @description
+ *  ProfileFuzzyDate is AniList's partial date (any part may be missing).
+ */
+export type ProfileFuzzyDate = {
+    year?: number
+    month?: number
+    day?: number
+}
+
+/**
+ * - Filepath: internal/profiles/localplatform/import.go
+ * - Filename: import.go
+ * - Package: localplatform
+ * @description
+ *  ProfileImportEntry is one list entry to import (AniList list, JSON export...).
+ */
+export type ProfileImportEntry = {
+    mediaId: number
+    status: string
+    progress: number
+    scoreRaw?: number
+    repeat: number
+    private: boolean
+    hiddenFromStatusLists?: boolean
+    notes?: string
+    startedAt: ProfileFuzzyDate
+    completedAt: ProfileFuzzyDate
+    createdAt?: number
+    updatedAt?: number
+    customLists?: Array<string>
+}
+
+/**
+ * - Filepath: internal/profiles/localplatform/import.go
+ * - Filename: import.go
+ * - Package: localplatform
+ * @description
+ *  ProfileImportResult summarizes an import.
+ */
+export type ProfileImportResult = {
+    imported: number
+    updated: number
+    skipped: number
+    errors?: Array<string>
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Manga
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -3349,6 +3598,8 @@ export type Manga_EntryListData = {
     repeat?: number
     startedAt?: string
     completedAt?: string
+    createdAt?: number
+    updatedAt?: number
 }
 
 /**
@@ -5157,6 +5408,79 @@ export type PluginUI_WebviewWindowOptions = {
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Profiles
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/**
+ * - Filepath: internal/profiles/model.go
+ * - Filename: model.go
+ * - Package: profiles
+ * @description
+ *  Profile is a row of the profiles table. The PIN hash never leaves the server.
+ */
+export type Profile = {
+    id: number
+    name: string
+    avatarId: string
+    color?: string
+    sortOrder: number
+    scoreFormat: string
+    titleLanguage: string
+    deletedAt?: number
+    createdAt: number
+    updatedAt: number
+    lastUsedAt?: number
+    hasPin: boolean
+    avatarUrl: string
+}
+
+/**
+ * - Filepath: internal/profiles/model.go
+ * - Filename: model.go
+ * - Package: profiles
+ * @description
+ *  ProfileAuditEntry is a row of profile_audit.
+ */
+export type ProfileAuditEntry = {
+    id: number
+    actorProfileId?: number
+    targetProfileId: number
+    targetName: string
+    action: string
+    createdAt: number
+}
+
+/**
+ * - Filepath: internal/profiles/service.go
+ * - Filename: service.go
+ * - Package: profiles
+ * @description
+ *  ProfileSession is the result of selecting a profile.
+ */
+export type ProfileSession = {
+    profileToken: string
+    /**
+     * unix seconds
+     */
+    expiresAt: number
+    profile?: Profile
+}
+
+/**
+ * - Filepath: internal/profiles/model.go
+ * - Filename: model.go
+ * - Package: profiles
+ * @description
+ *  ProfilesStatus is what /api/v1/status exposes about profiles.
+ */
+export type ProfilesStatus = {
+    enabled: boolean
+    needsSetup: boolean
+    maxLanes: number
+    enforced: boolean
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Report
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -5299,6 +5623,52 @@ export type Report_WebSocketLog = {
     eventType: string
     payload?: Record<string, any>
     timestamp?: string
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Settings
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/**
+ * - Filepath: internal/profiles/settings/settings.go
+ * - Filename: settings.go
+ * - Package: settings
+ * @description
+ *  Anilist overrides (display preferences; AniList itself is anonymous).
+ */
+export type ProfileAnilistOverrides = {
+    hideAudienceScore?: boolean
+    enableAdultContent?: boolean
+    blurAdultContent?: boolean
+}
+
+/**
+ * - Filepath: internal/profiles/settings/settings.go
+ * - Filename: settings.go
+ * - Package: settings
+ * @description
+ *  Library overrides (nil = use the global value).
+ */
+export type ProfileLibraryOverrides = {
+    autoUpdateProgress?: boolean
+    autoPlayNextEpisode?: boolean
+    enableWatchContinuity?: boolean
+    defaultPlaybackSource?: string
+}
+
+/**
+ * - Filepath: internal/profiles/settings/settings.go
+ * - Filename: settings.go
+ * - Package: settings
+ * @description
+ *  ProfileSettings is the JSON stored in profile_settings.value.
+ */
+export type ProfileSettings = {
+    library?: ProfileLibraryOverrides
+    anilist?: ProfileAnilistOverrides
+    markWatchingOnStart?: boolean
+    completedAction?: string
+    player?: Record<string, any>
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -6155,3 +6525,4 @@ export type Video = {
     colorTransfer: string
     colorPrimaries: string
 }
+

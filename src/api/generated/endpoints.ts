@@ -1741,8 +1741,8 @@ export const API_ENDPOINTS = {
          *  Route returns the episode list for the given media and provider.
          *  It returns the episode list for the given media and provider.
          *  The episodes are cached using a file cache.
-         *  The episode list is just a list of episodes with no video sources, it's what the client uses to display the episodes and subsequently
-         *     fetch the sources. The episode list might be nil or empty if nothing could be found, but the media will always be returned.
+         *  The episode list is just a list of episodes with no video sources, it's what the client uses to display the episodes and subsequently fetch the sources.
+         *  The episode list might be nil or empty if nothing could be found, but the media will always be returned.
          */
         GetOnlineStreamEpisodeList: {
             key: "ONLINESTREAM-get-online-stream-episode-list",
@@ -1958,6 +1958,161 @@ export const API_ENDPOINTS = {
             key: "PLAYLIST-get-playlist-episodes",
             methods: ["GET"],
             endpoint: "/api/v1/playlist/episodes/{id}",
+        },
+    },
+    PROFILES: {
+        GetAvatarCatalog: {
+            key: "PROFILES-get-avatar-catalog",
+            methods: ["GET"],
+            endpoint: "/api/v1/avatars",
+        },
+        /**
+         *  @description
+         *  Route returns the profiles for the "Who's watching?" screen.
+         *  Pass ?deleted=true to include the profiles in the trash (restorable for 30 days).
+         */
+        GetProfiles: {
+            key: "PROFILES-get-profiles",
+            methods: ["GET"],
+            endpoint: "/api/v1/profiles",
+        },
+        /**
+         *  @description
+         *  Route creates a profile.
+         *  The avatar must be an id from /api/v1/avatars. The PIN is optional (4-6 digits).
+         */
+        CreateProfile: {
+            key: "PROFILES-create-profile",
+            methods: ["POST"],
+            endpoint: "/api/v1/profiles",
+        },
+        /**
+         *  @description
+         *  Route updates a profile (name, avatar, color, order, score format, title language).
+         *  Any profile can edit any profile (no roles).
+         */
+        UpdateProfile: {
+            key: "PROFILES-update-profile",
+            methods: ["PATCH"],
+            endpoint: "/api/v1/profiles/{id}",
+        },
+        /**
+         *  @description
+         *  Route moves a profile to the trash.
+         *  It can be restored for 30 days; then it is purged with all its data.
+         */
+        DeleteProfile: {
+            key: "PROFILES-delete-profile",
+            methods: ["DELETE"],
+            endpoint: "/api/v1/profiles/{id}",
+        },
+        RestoreProfile: {
+            key: "PROFILES-restore-profile",
+            methods: ["POST"],
+            endpoint: "/api/v1/profiles/{id}/restore",
+        },
+        /**
+         *  @description
+         *  Route sets, changes or removes (pin: null) a profile's PIN.
+         *  Any change closes the profile's open sessions.
+         */
+        SetProfilePin: {
+            key: "PROFILES-set-profile-pin",
+            methods: ["PUT"],
+            endpoint: "/api/v1/profiles/{id}/pin",
+        },
+        /**
+         *  @description
+         *  Route enters a profile on this device and returns its session token.
+         *  Send the token in X-Seanime-Profile (or rely on the HttpOnly Seanime-Profile cookie on the web).
+         *  It lasts 24 h at most, is bound to this client id and must not be persisted by clients.
+         */
+        SelectProfile: {
+            key: "PROFILES-select-profile",
+            methods: ["POST"],
+            endpoint: "/api/v1/profiles/{id}/select",
+        },
+        ProfileLogout: {
+            key: "PROFILES-profile-logout",
+            methods: ["POST"],
+            endpoint: "/api/v1/profiles/logout",
+        },
+        GetProfileAudit: {
+            key: "PROFILES-get-profile-audit",
+            methods: ["GET"],
+            endpoint: "/api/v1/profiles/audit",
+        },
+    },
+    PROFILES_DATA: {
+        GetMyProfileSettings: {
+            key: "PROFILES-DATA-get-my-profile-settings",
+            methods: ["GET"],
+            endpoint: "/api/v1/profiles/me/settings",
+        },
+        PatchMyProfileSettings: {
+            key: "PROFILES-DATA-patch-my-profile-settings",
+            methods: ["PATCH"],
+            endpoint: "/api/v1/profiles/me/settings",
+        },
+        GetMyCustomLists: {
+            key: "PROFILES-DATA-get-my-custom-lists",
+            methods: ["GET"],
+            endpoint: "/api/v1/profiles/me/lists",
+        },
+        CreateMyCustomList: {
+            key: "PROFILES-DATA-create-my-custom-list",
+            methods: ["POST"],
+            endpoint: "/api/v1/profiles/me/lists",
+        },
+        DeleteMyCustomList: {
+            key: "PROFILES-DATA-delete-my-custom-list",
+            methods: ["DELETE"],
+            endpoint: "/api/v1/profiles/me/lists/{listId}",
+        },
+        AddToMyCustomList: {
+            key: "PROFILES-DATA-add-to-my-custom-list",
+            methods: ["POST"],
+            endpoint: "/api/v1/profiles/me/lists/{listId}/items/{mediaId}",
+        },
+        RemoveFromMyCustomList: {
+            key: "PROFILES-DATA-remove-from-my-custom-list",
+            methods: ["DELETE"],
+            endpoint: "/api/v1/profiles/me/lists/{listId}/items/{mediaId}",
+        },
+        GetMyActivity: {
+            key: "PROFILES-DATA-get-my-activity",
+            methods: ["GET"],
+            endpoint: "/api/v1/profiles/me/activity",
+        },
+        ImportProfileAnilist: {
+            key: "PROFILES-DATA-import-profile-anilist",
+            methods: ["POST"],
+            endpoint: "/api/v1/profiles/{id}/import/anilist",
+        },
+        /**
+         *  @description
+         *  Route imports the server's existing AniList account list (its cached collection or its public list) into a profile.
+         *  The account's token is never used. After the import the token can be removed (plan: one-time migration).
+         */
+        ImportProfileServerAccount: {
+            key: "PROFILES-DATA-import-profile-server-account",
+            methods: ["POST"],
+            endpoint: "/api/v1/profiles/{id}/import/server-account",
+        },
+        /**
+         *  @description
+         *  Route imports a profile export (or an AniList-shaped anime collection) into a profile.
+         *  Body: {"mode": "merge"|"replace", "data": <export JSON>}.
+         */
+        ImportProfileJSON: {
+            key: "PROFILES-DATA-import-profile-j-s-o-n",
+            methods: ["POST"],
+            endpoint: "/api/v1/profiles/{id}/import/json",
+        },
+        ExportProfile: {
+            key: "PROFILES-DATA-export-profile",
+            methods: ["GET"],
+            endpoint: "/api/v1/profiles/{id}/export",
         },
     },
     RELEASES: {
