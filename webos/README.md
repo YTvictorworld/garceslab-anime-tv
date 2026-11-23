@@ -107,6 +107,12 @@ before the library lists:
   on its release list. Library files and online streams still open the show and start
   there. To open the show without playing, use the slide's *View details* button or
   its card in the *Currently watching* row.
+- **Progress bars on continue cards** (and the slide's *Resume* button and "Nm left")
+  follow the same rule as resuming: the server's watch history has a position for that
+  episode between 2 % and 90 % in (about 29 s into a 24-minute episode). Below that the
+  episode starts over, and the card shows no bar. Resuming lands on the keyframe at or
+  before the saved position: the TV's player can only start decoding there, so with
+  these streams it can be a few seconds early, and a position under ~4 s restarts at 0:00.
 - **Next episodes.** A show in *Currently watching* that is still airing and whose
   AniList progress is its last aired episode gets an *Upcoming* card at the end of
   *Continue watching*: "Next: Episode 8", when it airs in the TV's time zone and a

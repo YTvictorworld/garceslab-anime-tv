@@ -1,4 +1,4 @@
-import type { AL_BaseAnime } from "@/api/generated/types"
+import type { AL_BaseAnime, Anime_Episode, Continuity_WatchHistory } from "@/api/generated/types"
 import { getEpisodeMinutesRemaining, getEpisodePercentageComplete, useGetContinuityWatchHistory } from "@/api/hooks/continuity.hooks"
 import { type AnimeEntryPlaybackIntent, animeEntryPlaybackIntentAtom, createAnimeEntryPlaybackIntent } from "@/atoms/anime-entry.atoms"
 import type { AnimeEntryView } from "@/components/features/media/anime-entry-view-switcher"
@@ -35,6 +35,7 @@ import { pickUpcomingEpisodes, type UpcomingEpisode } from "@/components/tv/tv-u
 import { type ContinueStartResult, streamStartStatusAtom, TVContinueStreamStarter } from "@/components/tv/tv-continue-stream-starter"
 import type { TVEpisodeCardStatus } from "@/components/tv/tv-episode-card"
 import { toast } from "@/lib/utils/toast"
+import { getWatchHistoryResumePercent } from "@/lib/player/resume-position"
 import { ContinueWatchingItem, useAnimeLibraryCollection } from "@/hooks/use-anime-library-collection"
 import { getContinueWatchingSpoilerActive, getEpisodeSpoilerState, getSpoilerSafeAnimeImage } from "@/lib/anime-spoilers"
 import { Ionicons } from "@/lib/icons/Ionicons"
@@ -70,6 +71,17 @@ const NO_UPCOMING: UpcomingEpisode<AL_BaseAnime>[] = []
 const CONTINUE_PLAYS = Platform.OS === "web"
 
 const FAILED_SHOWN_MS = 15_000
+
+/**
+ * The card's progress bar. webOS: shown exactly when playing the card
+ * resumes (the watch history's position, 2 % to 90 % in, see
+ * resume-position.ts); elsewhere as before (5 % to 90 %).
+ */
+function continuePercent(history: Continuity_WatchHistory | undefined, mediaId: number, episode: Anime_Episode) {
+    return CONTINUE_PLAYS
+        ? getWatchHistoryResumePercent(history, { mediaId, episodeNumber: episode.episodeNumber })
+        : getEpisodePercentageComplete(history, mediaId, episode.progressNumber)
+}
 
 type StreamStart =
     | { id: number; mediaId: number; episodeNumber: number; phase: "starting" }
@@ -387,7 +399,7 @@ export function TVLibraryScreen() {
                     episodeNumber: episode.progressNumber || episode.episodeNumber,
                     spoilerActive,
                 })
-                const progressPercent = getEpisodePercentageComplete(watchHistory, media.id, episode.progressNumber)
+                const progressPercent = continuePercent(watchHistory, media.id, episode)
                 const minutesLeft = getEpisodeMinutesRemaining(watchHistory, media.id, episode.progressNumber)
                 return {
                     key: `${media.id}-${episode.progressNumber}`,
@@ -443,7 +455,7 @@ export function TVLibraryScreen() {
                 item={item}
                 preferred={index === 0}
                 progressPercent={item.episode.baseAnime?.id
-                    ? getEpisodePercentageComplete(watchHistory, item.episode.baseAnime.id, item.episode.progressNumber)
+                    ? continuePercent(watchHistory, item.episode.baseAnime.id, item.episode)
                     : 0}
                 onPressItem={openContinue}
                 status={status}
