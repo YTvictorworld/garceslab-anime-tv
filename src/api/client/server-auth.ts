@@ -1,5 +1,6 @@
 import { getClientHeaders } from "@/api/client/client-identity"
 import { getStoredServerAuthToken } from "@/atoms/server.atoms"
+import { getProfileToken } from "@/lib/profile/profile-session"
 import * as CryptoJS from "crypto-js"
 
 type TokenClaims = {
@@ -52,6 +53,9 @@ export function hashServerPassword(password: string) {
 export function getServerAuthHeaders(authToken?: string | null): Record<string, string> {
     const resolvedToken = resolveAuthToken(authToken)
     const headers = getClientHeaders()
+    // Garceslab Anime: the selected profile (in memory only, see profile-session.ts).
+    const profileToken = getProfileToken()
+    if (profileToken) headers["X-Seanime-Profile"] = profileToken
 
     if (!resolvedToken) return headers
 

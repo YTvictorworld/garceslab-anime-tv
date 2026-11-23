@@ -3,7 +3,7 @@ import { getAllDownloadedAnime } from "@/lib/downloads/download-store"
 import { QueryClient } from "@tanstack/react-query"
 import { createMMKV } from "react-native-mmkv"
 import { getAllDownloadedManga } from "./downloads"
-import { type PersistedQueries, shouldPersistQuery } from "./query-persistence-policy"
+import { type PersistedQueries, parseScopedCacheKey, profileCacheScope, scopedCacheKey, shouldPersistQuery } from "./query-persistence-policy"
 
 /**
  * - On each successful query, the response JSON is written to MMKV under a stable key
@@ -37,6 +37,17 @@ export const OFFLINE_QUERY_KEYS: readonly (readonly string[])[] = [
     [API_ENDPOINTS.CONTINUITY.GetContinuityWatchHistory.key],
 ]
 
+/**
+ * Garceslab Anime: the profile whose responses are read and written (see
+ * profileCacheScope). Empty until a profile is selected, and always on
+ * servers without profiles.
+ */
+let cacheScope = ""
+
+function storageKey(queryKey: readonly unknown[]): string {
+    return CACHE_KEY_PREFIX + scopedCacheKey(cacheScope, serializeQueryKey(queryKey))
+}
+
 /** Startup restores OFFLINE_QUERY_KEYS; downloaded media's entry pages are restored by id. */
 const PERSISTED_QUERIES: PersistedQueries = {
     keys: new Set(OFFLINE_QUERY_KEYS.map(serializeQueryKey)),
@@ -48,9 +59,8 @@ const PERSISTED_QUERIES: PersistedQueries = {
  * Call this from the QueryClient's onSuccess global callback or from individual hooks.
  */
 export function persistQueryData(queryKey: readonly unknown[], data: unknown): void {
-    const key = serializeQueryKey(queryKey)
     try {
-        cacheStorage.set(CACHE_KEY_PREFIX + key, JSON.stringify(data))
+        cacheStorage.set(storageKey(queryKey), JSON.stringify(data))
     }
     catch {
 
@@ -62,8 +72,7 @@ export function persistQueryData(queryKey: readonly unknown[], data: unknown): v
  * Returns undefined if no cached data exists.
  */
 export function restoreQueryData<T = unknown>(queryKey: readonly unknown[]): T | undefined {
-    const key = serializeQueryKey(queryKey)
-    const raw = cacheStorage.getString(CACHE_KEY_PREFIX + key)
+    const raw = cacheStorage.getString(storageKey(queryKey))
     if (raw === undefined) return undefined
     try {
         return JSON.parse(raw) as T
@@ -151,7 +160,7 @@ function removeUnreadQueries(): void {
         if (!key.startsWith(CACHE_KEY_PREFIX) || key === CACHE_VERSION_KEY) continue
         let queryKey: unknown
         try {
-            queryKey = JSON.parse(key.slice(CACHE_KEY_PREFIX.length))
+            queryKey = JSON.parse(parseScopedCacheKey(key.slice(CACHE_KEY_PREFIX.length)).serializedQueryKey)
         }
         catch {
             queryKey = null
@@ -160,6 +169,27 @@ function removeUnreadQueries(): void {
             cacheStorage.remove(key)
         }
     }
+}
+
+/**
+ * Garceslab Anime: switches the cache to a profile (or to none). What is in
+ * memory belongs to the previous profile and is dropped; the new profile's
+ * saved responses are restored. Only one profile's responses are kept on the
+ * TV (webOS' localStorage is small), so the others' are removed.
+ */
+export function switchQueryCacheProfile(queryClient: QueryClient, profileId: number | null): void {
+    const scope = profileCacheScope(profileId)
+    void queryClient.cancelQueries()
+    queryClient.clear()
+    cacheScope = scope
+    if (scope) {
+        for (const key of cacheStorage.getAllKeys()) {
+            if (!key.startsWith(CACHE_KEY_PREFIX) || key === CACHE_VERSION_KEY) continue
+            const keyScope = parseScopedCacheKey(key.slice(CACHE_KEY_PREFIX.length)).scope
+            if (keyScope && keyScope !== scope) cacheStorage.remove(key)
+        }
+    }
+    hydrateQueryClient(queryClient, OFFLINE_QUERY_KEYS)
 }
 
 export function setupQueryPersistence(queryClient: QueryClient): void {

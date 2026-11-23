@@ -3,6 +3,7 @@ import { getServerBaseUrl } from "@/api/client/server-url"
 import { useWebsocketEventRouter } from "@/api/components/websocket-event-router"
 import { publishWsMessage, setWsSender, type WebsocketMessage } from "@/api/components/websocket-hub"
 import type { Status } from "@/api/generated/types"
+import { useProfileToken } from "@/atoms/profile.atoms"
 import { useServerAuthToken, useServerStatus, useServerUrl, useServerUrlProtocol } from "@/atoms/server.atoms"
 import { degradeServerReachability, markServerReachable } from "@/lib/connection-state"
 import { manualOfflineModeAtom } from "@/lib/offline/manual-offline-mode"
@@ -76,6 +77,8 @@ function parseMessage(data: unknown): WebsocketMessage | null {
 export function WebsocketProvider({ children }: { children: React.ReactNode }) {
     const serverUrl = useServerUrl()
     const serverAuthToken = useServerAuthToken()
+    // Garceslab Anime: the socket is the selected profile's (?profile=); a switch reconnects it.
+    const profileToken = useProfileToken()
     const serverUrlProtocol = useServerUrlProtocol()
     const manualOffline = useAtomValue(manualOfflineModeAtom)
     const [, setIsConnected] = useAtom(websocketConnectedAtom)
@@ -118,6 +121,7 @@ export function WebsocketProvider({ children }: { children: React.ReactNode }) {
             const params = new URLSearchParams()
             addClientQueryParams(params)
             if (serverAuthToken) params.set("token", serverAuthToken)
+            if (profileToken) params.set("profile", profileToken)
 
             const scheme = serverUrlProtocol === "https:" ? "wss" : "ws"
             const url = `${scheme}://${getServerBaseUrl(serverUrl, true)}/events?${params.toString()}`
@@ -136,7 +140,7 @@ export function WebsocketProvider({ children }: { children: React.ReactNode }) {
             }
             const { socket: nextSocket, via } = opened
             socket = nextSocket
-            log.info(`Connecting to WebSocket #${socketId}`, url, {
+            log.info(`Connecting to WebSocket #${socketId}`, url.replace(/([?&]profile=)[^&]*/, "$1<profile>"), {
                 attempt: retryCount + 1,
                 hasToken: Boolean(serverAuthToken),
                 via,
@@ -250,7 +254,7 @@ export function WebsocketProvider({ children }: { children: React.ReactNode }) {
             setWsSender(null)
             socket?.close()
         }
-    }, [manualOffline, serverAuthToken, serverUrl, serverUrlProtocol, setConnectionState, setIsConnected, setLastClose, setTransport])
+    }, [manualOffline, profileToken, serverAuthToken, serverUrl, serverUrlProtocol, setConnectionState, setIsConnected, setLastClose, setTransport])
 
     return children
 }

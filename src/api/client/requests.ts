@@ -4,6 +4,8 @@ import { getServerAuthHeaders } from "@/api/client/server-auth"
 import { getServerBaseUrl } from "@/api/client/server-url"
 import { getStoredServerAuthToken, useServerAuthToken, useServerUrl, useSetServerAuthToken } from "@/atoms/server.atoms"
 import { isGlobalConnected, isManualOfflineModeEnabled, markServerReachable, markServerUnreachable } from "@/lib/connection-state"
+import { isProfileRequiredError, profileErrorMessage } from "@/lib/profile/profile-errors"
+import { endProfileSession, getProfileToken } from "@/lib/profile/profile-session"
 import { logger } from "@/lib/utils/logger"
 import { toast } from "@/lib/utils/toast"
 import { useMutation, UseMutationOptions, useQuery, UseQueryOptions } from "@tanstack/react-query"
@@ -13,6 +15,8 @@ import { useEffect } from "react"
 export type SeaError = Error & {
     error: string
     status?: number
+    /** Seconds, from a Retry-After header (a locked profile PIN). */
+    retryAfter?: number
 }
 
 const log = logger("requests")
@@ -109,6 +113,8 @@ export async function buildSeaQuery<T, D = unknown>(
     const url = new URL(getServerBaseUrl(serverUrl) + endpoint)
     const resolvedAuthToken = authToken ?? getStoredServerAuthToken()
     const startedAt = Date.now()
+    // The profile this request is sent as: a refusal ends only that session, not one selected since.
+    const requestProfileToken = getProfileToken()
 
     // append params to the url if they exist and it's a GET request
     if (params && method === "GET") {
@@ -171,7 +177,10 @@ export async function buildSeaQuery<T, D = unknown>(
 
         if (!response.ok) {
             // Handle error by returning a rejected promise with the error message
-            throw createSeaError(responseData?.error || "Unknown error occurred", response.status)
+            const seaError = createSeaError(responseData?.error || "Unknown error occurred", response.status)
+            const retryAfter = Number(response.headers.get("Retry-After"))
+            if (retryAfter > 0) seaError.retryAfter = retryAfter
+            throw seaError
         }
 
         return responseData?.data as T
@@ -190,6 +199,13 @@ export async function buildSeaQuery<T, D = unknown>(
             markServerUnreachable(`${method} ${endpoint} failed: ${seaError.error}`)
         }
 
+        // Garceslab Anime: the profile session expired or was closed (PIN changed,
+        // profile deleted): the app goes back to "Who's watching?", no toast.
+        const profileRequired = isProfileRequiredError(seaError.error)
+        if (profileRequired && requestProfileToken && getProfileToken() === requestProfileToken) {
+            endProfileSession("rejected")
+        }
+
         log.warning(`${method} ${endpoint} failed`, {
             status: seaError.status ?? null,
             connectivityFailure,
@@ -197,7 +213,7 @@ export async function buildSeaQuery<T, D = unknown>(
         }, seaError)
         // only show toast when we believe the device is online, avoids
         // spamming "Network request failed" toasts while offline
-        if (!muteError && isGlobalConnected()) {
+        if (!muteError && !profileRequired && isGlobalConnected()) {
             toast.error(_handleSeaError(seaError.error), {
                 visibilityTime: 5000,
             })
@@ -319,6 +335,8 @@ export function useServerQuery<R, V = any>(
 //----------------------------------------------------------------------------------------------------------------------
 
 function _handleSeaError(data: any): string {
+    const profileMessage = typeof data === "string" ? profileErrorMessage(data) : null
+    if (profileMessage) return profileMessage
     if (typeof data === "string") return "Server Error: " + data
 
     const err = data?.error as string
