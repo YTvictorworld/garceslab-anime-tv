@@ -93,14 +93,20 @@ before the library lists:
 - With an empty library, the trending slides and row are shown instead of "Your anime
   library is empty".
 - **Continue watching plays.** OK on a card in the *Continue watching* row, or on a
-  continue slide's *Play*/*Resume* button, opens the show and starts that episode at
-  once, the same way pressing it in the show's episode list does: a library file plays;
-  a torrent or debrid stream uses the server's auto-select (or the previous batch, or
-  the release list, per the stream settings) and picks up a stream the player left
-  running; an online stream starts with the saved provider. Resume positions apply as
-  they do there. Back from the player returns to the show's page. To open the show
-  without playing, use the slide's *View details* button or its card in the
-  *Currently watching* row, which still opens the show.
+  continue slide's *Play*/*Resume* button, starts that episode without leaving the
+  start screen. For a torrent or debrid stream the card (and the slide's button) shows
+  the server's steps as they come ("Selecting best torrent...", "Awaiting stream: 100%",
+  "Loading metadata...") with *Back to cancel*, and the player opens when the stream is
+  ready; Back from the player comes back here. The start is the show page's own: the
+  same press as in its episode list, so auto-select (or the previous batch), a stream
+  the player left running, the TV's audio checks and resume positions all apply. While
+  one card is starting, other cards don't start anything. Back cancels the start and
+  ends the server's stream. If it fails (no release, a server error, no news from the
+  server for 2 minutes), the card shows why for 15 seconds; OK on it then opens the
+  show to pick the episode or release by hand. With auto-select off, the show opens
+  on its release list. Library files and online streams still open the show and start
+  there. To open the show without playing, use the slide's *View details* button or
+  its card in the *Currently watching* row.
 - **Next episodes.** A show in *Currently watching* that is still airing and whose
   AniList progress is its last aired episode gets an *Upcoming* card at the end of
   *Continue watching*: "Next: Episode 8", when it airs in the TV's time zone and a

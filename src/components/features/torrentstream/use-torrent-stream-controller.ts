@@ -29,6 +29,7 @@ import {
     activeStreamSessionAtom,
     debridStreamStateAtom,
     directStreamLoadingMessageAtom,
+    streamStartErrorAtom,
     streamSessionModeAtom,
     torrentStreamIsPreparingAtom,
     torrentStreamLoadingStateAtom,
@@ -72,6 +73,12 @@ type PreviousBatchSelection = {
 type UseTorrentStreamControllerParams = {
     entry: Anime_Entry
     mode?: "stream" | "download"
+}
+
+/** The message of a failed stream request, for the TV start screen's card. */
+function streamErrorMessage(error: unknown) {
+    const message = error instanceof Error ? error.message : typeof error === "string" ? error : ""
+    return message || "The server couldn't start the stream"
 }
 
 export function useTorrentStreamController({ entry, mode = "stream" }: UseTorrentStreamControllerParams) {
@@ -380,6 +387,7 @@ export function useTorrentStreamController({ entry, mode = "stream" }: UseTorren
     }, [isEpisodeSelectionLocked])
 
     const setDirectStreamLoadingMessage = useSetAtom(directStreamLoadingMessageAtom)
+    const setStreamStartError = useSetAtom(streamStartErrorAtom)
     const clearPendingStreamState = React.useCallback(() => {
         setDirectStreamLoadingMessage(null)
         setPendingInfo(null)
@@ -542,6 +550,7 @@ export function useTorrentStreamController({ entry, mode = "stream" }: UseTorren
                             mediaId,
                             episodeNumber: episode.episodeNumber,
                         }, error)
+                        setStreamStartError(streamErrorMessage(error))
                         clearPendingStreamState()
                     },
                 },
@@ -572,6 +581,7 @@ export function useTorrentStreamController({ entry, mode = "stream" }: UseTorren
                         mediaId,
                         episodeNumber: episode.episodeNumber,
                     }, error)
+                    setStreamStartError(streamErrorMessage(error))
                     clearPendingStreamState()
                 },
             },
@@ -658,6 +668,7 @@ export function useTorrentStreamController({ entry, mode = "stream" }: UseTorren
                             mediaId,
                             episodeNumber: params.episode.episodeNumber,
                         }, error)
+                        setStreamStartError(streamErrorMessage(error))
                         clearPendingStreamState()
                     },
                 },
@@ -694,6 +705,7 @@ export function useTorrentStreamController({ entry, mode = "stream" }: UseTorren
                         mediaId,
                         episodeNumber: params.episode.episodeNumber,
                     }, error)
+                    setStreamStartError(streamErrorMessage(error))
                     clearPendingStreamState()
                 },
             },
@@ -996,6 +1008,7 @@ export function useTorrentStreamController({ entry, mode = "stream" }: UseTorren
 
     return {
         availableModes,
+        clearPendingStreamState,
         autoSelect,
         autoSelectFile,
         batchHistory,

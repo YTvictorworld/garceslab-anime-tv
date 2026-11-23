@@ -201,6 +201,11 @@ export const activeStreamSessionAtom = atom<ActiveStreamSession | null>(null)
 export const torrentStreamIsPreparingAtom = atom(false)
 /** The server's own loading step for a direct stream (web build), e.g. "Downloading metadata...". */
 export const directStreamLoadingMessageAtom = atom<string | null>(null)
+/**
+ * Why the last stream start failed, as the server or the request said (webOS
+ * start screen: the card that started it shows it). Null until one fails.
+ */
+export const streamStartErrorAtom = atom<string | null>(null)
 
 export type TorrentStreamLoadingState =
     | "LOADING"
@@ -457,6 +462,7 @@ export function usePlayerEventListener() {
     const [, setDebridStreamState] = useAtom(debridStreamStateAtom)
     const [, setActiveStreamSession] = useAtom(activeStreamSessionAtom)
     const [, setDirectStreamLoadingMessage] = useAtom(directStreamLoadingMessageAtom)
+    const setStreamStartError = useSetAtom(streamStartErrorAtom)
 
     const { mutate: cancelManualTracking } = usePlaybackCancelManualTracking({})
 
@@ -673,6 +679,7 @@ export function usePlayerEventListener() {
                         if (event.payload) {
                             log.error("The server could not open the stream", event.payload)
                             setError(`Could not start the stream: ${event.payload}`)
+                            setStreamStartError(String(event.payload))
                         }
                         resetTorrentStreamState()
                         return
@@ -682,6 +689,7 @@ export function usePlayerEventListener() {
                         forgetKeptStream()
                         const message = event.payload?.error || "The stream failed"
                         setError(message)
+                        setStreamStartError(message)
                         // Debrid sends nothing after this, so the entry would keep "preparing".
                         resetTorrentStreamState()
                         toast.error(message)
@@ -733,6 +741,7 @@ export function usePlayerEventListener() {
 
                         case "loading-failed":
                             logStreamState("torrent", payload.state, true, payload.data)
+                            setStreamStartError(typeof payload.data === "string" && payload.data ? payload.data : "The torrent couldn't be loaded")
                             resetTorrentStreamState()
                             return
 
@@ -814,6 +823,7 @@ export function usePlayerEventListener() {
 
                         case "failed":
                             logStreamState("debrid", payload.status, true, payload.message)
+                            setStreamStartError(payload.message || "The debrid stream failed")
                             forgetKeptStream("debrid")
                             resetTorrentStreamState()
                             return

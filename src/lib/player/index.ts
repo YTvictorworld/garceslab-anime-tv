@@ -24,6 +24,7 @@ export {
     currentPlaybackSourceAtom,
     debridStreamStateAtom,
     directStreamLoadingMessageAtom,
+    streamStartErrorAtom,
     playerOpenAtom,
     playerLoadingMessageAtom,
     playerErrorAtom,

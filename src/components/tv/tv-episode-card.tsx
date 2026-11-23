@@ -5,7 +5,7 @@ import { TV, tvSize } from "@/components/tv/tv-scale"
 import { LinearGradient } from "expo-linear-gradient"
 import { Ionicons } from "@/lib/icons/Ionicons"
 import * as React from "react"
-import { Platform, Pressable, type PressableProps, Text, View } from "react-native"
+import { ActivityIndicator, Platform, Pressable, type PressableProps, Text, View } from "react-native"
 
 /**
  * webOS: expo-image's `blurRadius` becomes a CSS `filter: blur()`, which the
@@ -37,6 +37,15 @@ export interface TVEpisodeCardProps extends Omit<PressableProps, "onPress"> {
     blurredImage?: string
     /** A chip in the corner ("Upcoming"); the art is dimmed while `dimmed`. */
     tag?: { label: string; icon: React.ComponentProps<typeof Ionicons>["name"]; dimmed?: boolean }
+    /** Covers the art: a stream starting for this card (with a spinner) or why it failed. */
+    status?: TVEpisodeCardStatus
+}
+
+export type TVEpisodeCardStatus = {
+    message: string
+    /** What the remote does now ("Back to cancel"). */
+    hint?: string
+    error?: boolean
 }
 
 export const TVEpisodeCard = React.memo(
@@ -58,6 +67,7 @@ export const TVEpisodeCard = React.memo(
             blurred,
             blurredImage,
             tag,
+            status,
             ...props
         }, ref) {
             const focus = useTVFocus(1.05, title)
@@ -79,7 +89,7 @@ export const TVEpisodeCard = React.memo(
                     hasTVPreferredFocus={isPreferred}
                     scrollSnapAlign="start"
                     accessibilityRole="button"
-                    accessibilityLabel={`${title}${subtitle ? `, ${subtitle}` : ""}`}
+                    accessibilityLabel={`${title}${subtitle ? `, ${subtitle}` : ""}${status ? `, ${status.message}${status.hint ? `. ${status.hint}` : ""}` : ""}`}
                     style={{ width }}
                     {...props}
                 >
@@ -207,7 +217,37 @@ export const TVEpisodeCard = React.memo(
                                     </Text>
                                 ) : null}
                             </View>
-                            {progressPercent !== undefined && progressPercent > 0 && !completed ? (
+                            {status ? (
+                                <View
+                                    accessibilityLiveRegion="polite"
+                                    style={{
+                                        position: "absolute",
+                                        inset: 0,
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        gap: tvSize(10),
+                                        paddingHorizontal: tvSize(20),
+                                        backgroundColor: status.error ? "rgba(40,8,8,0.86)" : "rgba(8,8,16,0.82)",
+                                    }}
+                                >
+                                    {status.error
+                                        ? <Ionicons name="alert-circle-outline" size={tvSize(34)} color="#f87171" />
+                                        : <ActivityIndicator size="large" color="#a5a0f5" />}
+                                    <Text
+                                        className="font-semibold text-white"
+                                        numberOfLines={2}
+                                        style={{ fontSize: tvSize(19), textAlign: "center" }}
+                                    >
+                                        {status.message}
+                                    </Text>
+                                    {status.hint ? (
+                                        <Text className="text-white/60" numberOfLines={1} style={{ fontSize: tvSize(15) }}>
+                                            {status.hint}
+                                        </Text>
+                                    ) : null}
+                                </View>
+                            ) : null}
+                            {progressPercent !== undefined && progressPercent > 0 && !completed && !status ? (
                                 <View
                                     style={{
                                         position: "absolute",

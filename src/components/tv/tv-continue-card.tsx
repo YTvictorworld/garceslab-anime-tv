@@ -4,7 +4,7 @@ import type { ContinueWatchingItem } from "@/hooks/use-anime-library-collection"
 import { getContinueWatchingSpoilerActive, getEpisodeSpoilerState, getSpoilerSafeAnimeImage } from "@/lib/anime-spoilers"
 import { atom, useAtomValue } from "jotai"
 import * as React from "react"
-import { TVEpisodeCard } from "./tv-episode-card"
+import { TVEpisodeCard, type TVEpisodeCardStatus } from "./tv-episode-card"
 import { formatAiringTime, formatTimeUntil, hasAired, nextLabelUpdateDelay, type UpcomingEpisode } from "./tv-upcoming-episodes"
 import { Pressable } from "react-native"
 
@@ -34,6 +34,7 @@ type Props = {
     onPressItem?: (item: ContinueWatchingItem) => void
     preferred?: boolean
     progressPercent?: number
+    status?: TVEpisodeCardStatus
 }
 
 export const TVContinueCard = React.memo(
@@ -44,6 +45,7 @@ export const TVContinueCard = React.memo(
             onPressItem,
             preferred,
             progressPercent,
+            status,
             ...props
         }, ref) {
             const hideThumbnail = useAtomValue(hideThumbnailAtom)
@@ -77,6 +79,7 @@ export const TVContinueCard = React.memo(
                     blurred={hideThumbnail}
                     blurredImage={getSpoilerSafeAnimeImage(media)}
                     recyclingKey={`${media?.id ?? "episode"}-${episode.episodeNumber}`}
+                    status={status}
                     {...props}
                 />
             )
@@ -91,13 +94,14 @@ type UpcomingProps = {
     /** Called once when the airing time passes while the card is on screen. */
     onAired?: () => void
     preferred?: boolean
+    status?: TVEpisodeCardStatus
 }
 
 /**
  * webOS: the next episode of a show the user is caught up with, with when it
  * airs and a countdown. Once that time passes it reads like a card to continue.
  */
-export const TVUpcomingCard = React.memo(function TVUpcomingCard({ item, onPressItem, onAired, preferred }: UpcomingProps) {
+export const TVUpcomingCard = React.memo(function TVUpcomingCard({ item, onPressItem, onAired, preferred, status }: UpcomingProps) {
     const [now, setNow] = React.useState(() => Date.now())
     const aired = hasAired(item.airingAt, now)
     const onAiredRef = React.useRef(onAired)
@@ -133,6 +137,7 @@ export const TVUpcomingCard = React.memo(function TVUpcomingCard({ item, onPress
             onPress={() => onPressItem(item, hasAired(item.airingAt, Date.now()))}
             preferred={preferred}
             recyclingKey={`upcoming-${media.id}-${item.episodeNumber}`}
+            status={status}
             accessibilityLabel={aired
                 ? `${title}, episode ${item.episodeNumber}, new, aired ${when}`
                 : `${title}, next episode ${item.episodeNumber}, airs ${when}, ${formatTimeUntil(item.airingAt, now)}`}

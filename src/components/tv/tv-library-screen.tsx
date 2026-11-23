@@ -1,6 +1,6 @@
 import type { AL_BaseAnime } from "@/api/generated/types"
 import { getEpisodeMinutesRemaining, getEpisodePercentageComplete, useGetContinuityWatchHistory } from "@/api/hooks/continuity.hooks"
-import { animeEntryPlaybackIntentAtom, createAnimeEntryPlaybackIntent } from "@/atoms/anime-entry.atoms"
+import { type AnimeEntryPlaybackIntent, animeEntryPlaybackIntentAtom, createAnimeEntryPlaybackIntent } from "@/atoms/anime-entry.atoms"
 import type { AnimeEntryView } from "@/components/features/media/anime-entry-view-switcher"
 import { defaultEntryView } from "@/components/features/media/anime-entry-view-utils"
 import { useServerStatus } from "@/atoms/server.atoms"
@@ -32,6 +32,9 @@ import {
 import { SCRIM_SCROLL_THRESHOLD, TVNavScrim, useScrolledPast } from "@/components/tv/tv-nav-scrim"
 import type { TVMediaMeta } from "@/components/tv/tv-shelf"
 import { pickUpcomingEpisodes, type UpcomingEpisode } from "@/components/tv/tv-upcoming-episodes"
+import { type ContinueStartResult, streamStartStatusAtom, TVContinueStreamStarter } from "@/components/tv/tv-continue-stream-starter"
+import type { TVEpisodeCardStatus } from "@/components/tv/tv-episode-card"
+import { toast } from "@/lib/utils/toast"
 import { ContinueWatchingItem, useAnimeLibraryCollection } from "@/hooks/use-anime-library-collection"
 import { getContinueWatchingSpoilerActive, getEpisodeSpoilerState, getSpoilerSafeAnimeImage } from "@/lib/anime-spoilers"
 import { Ionicons } from "@/lib/icons/Ionicons"
@@ -39,9 +42,9 @@ import { cleanHtml, mediaTitle } from "@/lib/media-metadata"
 import { getServerLocalEpisodeCount, parseServerLocalAnimeEntry, useIsServerConnected, useServerLocalAnimeRecords } from "@/lib/offline"
 import { filterEntriesByTitle } from "@/lib/utils/filtering"
 import { router, useFocusEffect, useIsFocused } from "expo-router"
-import { useSetAtom } from "jotai"
+import { useAtomValue, useSetAtom } from "jotai"
 import * as React from "react"
-import { FlatList, Platform, ScrollView, Text, TVFocusGuideView, View } from "react-native"
+import { BackHandler, FlatList, Platform, ScrollView, Text, TVFocusGuideView, View } from "react-native"
 import Animated, { Extrapolation, interpolate, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue } from "react-native-reanimated"
 
 type Shelf = {
@@ -65,6 +68,12 @@ const NO_UPCOMING: UpcomingEpisode<AL_BaseAnime>[] = []
  * watching" row still open the show.
  */
 const CONTINUE_PLAYS = Platform.OS === "web"
+
+const FAILED_SHOWN_MS = 15_000
+
+type StreamStart =
+    | { id: number; mediaId: number; episodeNumber: number; phase: "starting" }
+    | { id: number; mediaId: number; episodeNumber: number; phase: "failed"; message: string }
 
 /** A row of episodes to continue, then the next episodes of shows the user is caught up with (webOS). */
 type ContinueRowItem =
@@ -233,24 +242,21 @@ export function TVLibraryScreen() {
     }, [])
 
     /**
-     * Opens the show and has its page start the episode, the same way pressing
-     * the episode there does (webOS; elsewhere only library files start).
+     * webOS: a torrent/debrid episode starts right here (TVContinueStreamStarter)
+     * and its card shows how it goes; the player opens on top of this screen,
+     * so Back from it comes here. One start at a time; Back cancels it.
      */
-    const playEpisode = React.useCallback((mediaId: number, episodeNumber: number, view: AnimeEntryView, hasLocalFile: boolean) => {
-        if (view === "library" && hasLocalFile) {
-            setPlaybackIntent(createAnimeEntryPlaybackIntent({
-                kind: "play-local-episode",
-                mediaId,
-                episodeNumber,
-            }))
-        } else if (CONTINUE_PLAYS && (view === "torrentstream" || view === "onlinestream")) {
-            setPlaybackIntent(createAnimeEntryPlaybackIntent({
-                kind: view === "torrentstream" ? "stream-episode-press" : "onlinestream-play",
-                mediaId,
-                episodeNumber,
-            }))
-        }
+    const [streamStart, setStreamStart] = React.useState<StreamStart | null>(null)
+    const streamStartRef = React.useRef(streamStart)
+    streamStartRef.current = streamStart
+    const cancelStartRef = React.useRef<(() => void) | null>(null)
+    const startStatus = useAtomValue(streamStartStatusAtom)
 
+    /** The show's page, with the episode started there as if pressed (or nothing started). */
+    const openEntry = React.useCallback((mediaId: number, view: AnimeEntryView, intent?: AnimeEntryPlaybackIntent["kind"], episodeNumber?: number) => {
+        if (intent && episodeNumber !== undefined) {
+            setPlaybackIntent(createAnimeEntryPlaybackIntent({ kind: intent, mediaId, episodeNumber }))
+        }
         router.push({
             pathname: "/(app)/entry/anime/[id]",
             params: {
@@ -259,6 +265,69 @@ export function TVLibraryScreen() {
             },
         })
     }, [setPlaybackIntent])
+
+    /** Plays the episode: here for streams on webOS, otherwise through the show's page. */
+    const playEpisode = React.useCallback((mediaId: number, episodeNumber: number, view: AnimeEntryView, hasLocalFile: boolean) => {
+        if (CONTINUE_PLAYS && view === "torrentstream") {
+            const current = streamStartRef.current
+            if (current?.phase === "starting") {
+                if (current.mediaId !== mediaId) toast.info("An episode is starting. Press Back to cancel it first.")
+                return
+            }
+            // Pressed again after it failed: the show's page, to pick the episode or release by hand.
+            if (current?.phase === "failed" && current.mediaId === mediaId) {
+                setStreamStart(null)
+                openEntry(mediaId, view)
+                return
+            }
+            setStreamStart({ id: Date.now(), mediaId, episodeNumber, phase: "starting" })
+            return
+        }
+        if (view === "library" && hasLocalFile) {
+            openEntry(mediaId, view, "play-local-episode", episodeNumber)
+        } else if (CONTINUE_PLAYS && view === "onlinestream") {
+            openEntry(mediaId, view, "onlinestream-play", episodeNumber)
+        } else {
+            openEntry(mediaId, view)
+        }
+    }, [openEntry])
+
+    const onStartResult = React.useCallback((result: ContinueStartResult) => {
+        const current = streamStartRef.current
+        if (!current || current.phase !== "starting") return
+        if (result.kind === "failed") {
+            setStreamStart({ ...current, phase: "failed", message: result.message })
+            return
+        }
+        setStreamStart(null)
+        // Auto-select is off: the show's page presses the episode again and lists the releases.
+        if (result.kind === "needs-page") openEntry(current.mediaId, "torrentstream", "stream-episode-press", current.episodeNumber)
+    }, [openEntry])
+
+    // Back cancels a start; a failure message goes away after a while.
+    React.useEffect(() => {
+        if (streamStart?.phase === "failed") {
+            const timer = setTimeout(() => setStreamStart(current => current?.id === streamStart.id ? null : current), FAILED_SHOWN_MS)
+            return () => clearTimeout(timer)
+        }
+        if (streamStart?.phase !== "starting" || !isFocused) return
+        const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
+            cancelStartRef.current?.()
+            setStreamStart(null)
+            return true
+        })
+        return () => subscription.remove()
+    }, [isFocused, streamStart])
+
+    const startCardStatus = React.useMemo<{ mediaId: number; status: TVEpisodeCardStatus } | null>(() => {
+        if (!streamStart) return null
+        return {
+            mediaId: streamStart.mediaId,
+            status: streamStart.phase === "failed"
+                ? { message: streamStart.message, hint: "OK: choose the episode or release", error: true }
+                : { message: startStatus, hint: "Back to cancel" },
+        }
+    }, [startStatus, streamStart])
 
     // A string, so the handlers below don't change on every server status refetch.
     const streamView = defaultEntryView(serverStatus, false)
@@ -295,6 +364,10 @@ export function TVLibraryScreen() {
     const pressUpcoming = React.useCallback((item: UpcomingEpisode<AL_BaseAnime>, aired: boolean) => {
         // Not out yet: the show's page, where the next episode isn't listed yet either.
         if (!aired) {
+            if (streamStartRef.current?.phase === "starting") {
+                toast.info("An episode is starting. Press Back to cancel it first.")
+                return
+            }
             router.push(`/(app)/entry/anime/${item.media.id}`)
             return
         }
@@ -337,7 +410,9 @@ export function TVLibraryScreen() {
                     progressPercent,
                     // The hero falls back to a percentage without it.
                     progressLabel: progressPercent > 0 && minutesLeft > 0 ? `${minutesLeft}m left` : undefined,
-                    actionLabel: progressPercent > 0 ? `Resume ${episode.displayTitle}` : `Play ${episode.displayTitle}`,
+                    actionLabel: startCardStatus?.mediaId === media.id
+                        ? `${startCardStatus.status.message}  ·  ${startCardStatus.status.hint}`
+                        : progressPercent > 0 ? `Resume ${episode.displayTitle}` : `Play ${episode.displayTitle}`,
                     onAction: () => openContinue(item),
                     secondaryLabel: "View details",
                     onSecondary: () => openMedia(media.id),
@@ -352,13 +427,15 @@ export function TVLibraryScreen() {
             }))
 
         return trendingSlides.length > 0 ? [...continueItems, ...trendingSlides] : continueItems
-    }, [continueWatchingList, hideScore, openContinue, openMedia, serverStatus, trendingItems, watchHistory])
+    }, [continueWatchingList, hideScore, openContinue, openMedia, serverStatus, startCardStatus, trendingItems, watchHistory])
     const heroLoading = isLoading || (showTrending && continueWatchingList.length === 0 && trending.isLoading)
 
     const renderContinue = React.useCallback(({ item: row, index }: { item: ContinueRowItem; index: number }) => {
+        const mediaId = row.kind === "upcoming" ? row.item.media.id : row.item.episode.baseAnime?.id
+        const status = startCardStatus && startCardStatus.mediaId === mediaId ? startCardStatus.status : undefined
         if (row.kind === "upcoming") {
             // The server lists the episode to continue once its AniList data shows it aired.
-            return <TVUpcomingCard item={row.item} preferred={index === 0} onPressItem={pressUpcoming} onAired={refetch} />
+            return <TVUpcomingCard item={row.item} preferred={index === 0} onPressItem={pressUpcoming} onAired={refetch} status={status} />
         }
         const item = row.item
         return (
@@ -369,9 +446,10 @@ export function TVLibraryScreen() {
                     ? getEpisodePercentageComplete(watchHistory, item.episode.baseAnime.id, item.episode.progressNumber)
                     : 0}
                 onPressItem={openContinue}
+                status={status}
             />
         )
-    }, [openContinue, pressUpcoming, refetch, watchHistory])
+    }, [openContinue, pressUpcoming, refetch, startCardStatus, watchHistory])
 
     if (isLoading && isConnected) {
         return <TVPageSkeleton hero />
@@ -488,6 +566,7 @@ export function TVLibraryScreen() {
                                     <FlatList
                                         horizontal
                                         data={continueRow}
+                                        extraData={startCardStatus}
                                         renderItem={renderContinue}
                                         getItemLayout={EPISODE_ROW_LAYOUT}
                                         keyExtractor={(row, index) => {
@@ -532,6 +611,15 @@ export function TVLibraryScreen() {
                 </LibraryScrollView>
             )}
             {!searching ? <TVNavScrim shown={scrolled} /> : null}
+            {streamStart?.phase === "starting" ? (
+                <TVContinueStreamStarter
+                    key={streamStart.id}
+                    mediaId={streamStart.mediaId}
+                    episodeNumber={streamStart.episodeNumber}
+                    onResult={onStartResult}
+                    cancelRef={cancelStartRef}
+                />
+            ) : null}
         </View>
     )
 }
