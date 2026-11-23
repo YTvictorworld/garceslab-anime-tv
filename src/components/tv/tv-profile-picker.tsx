@@ -175,17 +175,15 @@ export function TVProfilePicker({ serverUrl, profiles, loading, busyProfileId, m
                                 imageUri={avatarImageUrl(serverUrl, profile.avatarUrl)}
                                 locked={profile.hasPin}
                                 preferred={index === 0}
-                                disabled={busyProfileId !== null}
                                 busy={busyProfileId === profile.id}
-                                onPress={() => onSelect(profile)}
+                                onPress={() => busyProfileId === null && onSelect(profile)}
                             />
                         ))}
                         <ProfileTile
                             label="Add profile"
                             icon="add"
                             preferred={profiles.length === 0}
-                            disabled={busyProfileId !== null}
-                            onPress={onAdd}
+                            onPress={() => busyProfileId === null && onAdd()}
                         />
                     </ScrollView>
                 </TVFocusGuideView>
@@ -273,9 +271,10 @@ export function TVPinPad({ title, subtitle, error, busy, submitLabel = "OK", onS
                                 key={key}
                                 value={key}
                                 preferred={key === "1"}
-                                disabled={busy || (key === "ok" && pin.length < PIN_MIN_LENGTH)}
+                                // Keys stay enabled (busy is checked on press): a disabled key would drop the remote's focus.
                                 label={key === "ok" ? submitLabel : undefined}
                                 onPress={() => {
+                                    if (busy) return
                                     if (key === "delete") setPin(current => current.slice(0, -1))
                                     else if (key === "ok") submit(pinRef.current)
                                     else typeDigit(key)
@@ -502,33 +501,29 @@ export function TVCreateProfile({ serverUrl, avatars, avatarsLoading, firstRun, 
                     label={pin ? "PIN: set" : "Add a PIN"}
                     detail={pin ? "Press OK to remove it" : "Optional: asked before entering this profile"}
                     icon={<Ionicons name={pin ? "lock-closed" : "lock-open-outline"} size={tvSize(22)} color="white" />}
-                    disabled={busy}
-                    onPress={() => pin ? setPin(null) : setStep("pin")}
+                    onPress={() => !busy && (pin ? setPin(null) : setStep("pin"))}
                 />
                 <TVButton
                     label={username ? `Import AniList list: ${username}` : "Import an AniList list"}
                     detail={username ? "Press OK to change it" : "Optional: a public list, by user name"}
                     icon={<Ionicons name="cloud-download-outline" size={tvSize(22)} color="white" />}
-                    disabled={busy}
-                    onPress={() => setStep("username")}
+                    onPress={() => !busy && setStep("username")}
                 />
                 {firstRun ? (
                     <TVButton
                         label={importServerAccount ? "Import this server's AniList list: yes" : "Import this server's AniList list: no"}
                         detail="If the server was signed in to AniList before profiles"
                         icon={<Ionicons name={importServerAccount ? "checkbox" : "square-outline"} size={tvSize(22)} color="white" />}
-                        disabled={busy}
-                        onPress={() => setImportServerAccount(current => !current)}
+                        onPress={() => !busy && setImportServerAccount(current => !current)}
                     />
                 ) : null}
                 <TVButton
                     label={busy ? "Creating…" : "Create profile"}
                     variant="primary"
                     preferred
-                    disabled={busy || !avatarId}
                     icon={busy ? <ActivityIndicator size="small" color="white" /> : <Ionicons name="checkmark" size={tvSize(22)} color="white" />}
                     onPress={() => {
-                        if (!avatarId) return
+                        if (busy || !avatarId) return
                         onCreate({
                             name: name.trim(),
                             avatarId,
