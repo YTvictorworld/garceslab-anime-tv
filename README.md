@@ -1,3 +1,33 @@
+# Garceslab Anime TV
+
+> **Garceslab Anime** está basado en [Seanime](https://github.com/5rahim/seanime) (de 5rahim) y
+> en [Seanime Tenji](https://github.com/AlkindiX/seanime-tv) (de AlkindiX). Es un proyecto
+> independiente y no oficial, centrado en televisores LG con webOS (probado en webOS 23). Su objetivo es añadir perfiles locales sin
+> cuenta de AniList y hasta 3 reproducciones simultáneas con TorBox (en desarrollo). No está
+> afiliado ni respaldado por Seanime ni por Seanime Tenji: por favor, **no reportes problemas de
+> Garceslab Anime en sus repositorios**. Licencia GPL-3.0, como los proyectos originales (algunos
+> módulos nativos son MPL-2.0, ver [LICENSES.md](LICENSES.md)).
+>
+> *English:* based on Seanime and Seanime Tenji (GPL-3.0). An independent, unofficial project
+> focused on LG webOS TVs (tested on webOS 23). Not affiliated with or endorsed by either
+> project; please don't report Garceslab Anime issues to them.
+
+Este repositorio contiene la **app de TV**, derivada de
+[AlkindiX/seanime-tv](https://github.com/AlkindiX/seanime-tv) a partir de la v0.4.0 (commit
+`0df9c6d`; se conserva su historial de git). El servidor y la web están en
+[garceslab-anime](https://github.com/YTvictorworld/garceslab-anime).
+
+- Se mantiene **de forma independiente**: no sigue a los proyectos originales de forma automática. Los cambios están en
+  [MODIFICATIONS.md](MODIFICATIONS.md) y el aviso de licencia en [NOTICE](NOTICE).
+- **Compilar para webOS:** `npm ci && npm run build:webos` → `dist/webos/*.ipk`. Instrucciones de
+  instalación en [webos/README.md](webos/README.md). El CI publica el `.ipk` como artefacto.
+- Si la zona horaria de la TV está mal, se puede fijar al compilar con
+  `EXPO_PUBLIC_TV_TIME_ZONE=<zona IANA>` (opción local; el CI no la fija).
+
+---
+
+*Lo que sigue es el README original de Seanime Tenji, sin cambios.*
+
 <p align="center">
 <a href="https://seanime.app/">
 <img src="src/assets/images/logo_2.png" alt="preview" width="70px"/>

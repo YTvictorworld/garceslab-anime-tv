@@ -108,6 +108,7 @@ tools/*
 .github/*
 !.github/workflows/
 !.github/ISSUE_TEMPLATE/
+!.github/dependabot.yml
 latest-version.txt
 
 # npm run debug:logs output

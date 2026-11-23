@@ -1,0 +1,21 @@
+Garceslab Anime TV
+Copyright (C) 2026 YTvictorworld and Garceslab Anime contributors
+
+This program is a modified version of Seanime Tenji: the fork by AlkindiX
+(https://github.com/AlkindiX/seanime-tv) of Seanime Tenji by 5rahim
+(https://github.com/5rahim/seanime-tenji), based on version 0.4.0 (commit
+0df9c6d). It is distributed under the GNU General Public License, version 3
+(see LICENSE); some native modules are under the Mozilla Public License 2.0, as
+listed in LICENSES.md. All original copyright and license notices are kept.
+
+Garceslab Anime TV is an independent, unofficial project. It is not affiliated with, endorsed
+by or supported by Seanime, Seanime Tenji or their authors. "Seanime" and its
+logo belong to their owners and are used only to describe where this program
+comes from.
+
+The modifications, and when they were made, are listed in MODIFICATIONS.md
+(GPL-3.0, section 5a). The full history is in the git log.
+
+This program is distributed in the hope that it will be useful, but WITHOUT
+ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
