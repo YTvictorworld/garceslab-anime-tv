@@ -163,7 +163,48 @@ content partners, and toasts and alerts only for system apps. Tenji doesn't try 
 trending and continue-watching shows are on its own start screen instead. This has not been
 tested on the C3 (see Not yet verified).
 
+## Profiles (Garceslab Anime)
+
+On a Garceslab Anime server with local profiles (`/api/v1/status` has a `profiles` block),
+the app asks **"Who's watching?"** on every cold launch, after the server connection:
+
+- A row of large profile cards. OK on a profile without a PIN enters it; a profile with a
+  PIN opens a numeric keypad (the remote's number keys type too). A wrong PIN (403) says
+  so and clears the digits; after five the server locks the profile for a few minutes
+  (429), and the keypad says how long. *Add profile* creates another one.
+- A server without profiles yet shows **"Create your profile"**: a name typed on the
+  on-screen keyboard, an avatar from the server's catalog (`GET /api/v1/avatars`, images
+  from `/profile-avatars/<file>`), then an optional PIN and two optional imports: a public
+  AniList list by user name, and the list of the AniList account the server used before
+  profiles.
+- The profile's session token is kept **in memory only** (never in localStorage): coming
+  back to the app from another one keeps the profile, closing it forgets it. When the
+  session expires or the server answers `PROFILE_REQUIRED` (the PIN changed, the profile
+  was deleted), the app goes back to the picker.
+- Requests carry `X-Seanime-Profile`, the live connection `?profile=`. Saved responses
+  (the instant start screen) are kept per profile; entering another profile clears them.
+- Settings has **Switch profile**. `PLAYBACK_BUSY` (another profile is playing) shows
+  "Another playback is in progress".
+- A stock Seanime server doesn't advertise profiles, and nothing changes.
+
+## Search as you type
+
+The LG system keyboard hands its text to the page only when it closes, so Discover ›
+Search has its own keyboard: a letter grid for the remote (A–Z, 0–9, Space, Delete,
+Clear), with suggestions next to it and results below that update as you type (250 ms
+after the last key, from two letters on; a newer query cancels the older one). A keyboard
+plugged into the TV types too. OK on the search field still opens the system keyboard.
+AniList matches whole words, so a lone partial word ("blea") finds nothing until it is
+complete ("bleach"); after a first word the last one can be partial ("one pi").
+
 ## Playback
+
+**Episode cards start in place.** On a show's *Torrents* tab, OK on an episode shows the
+server's steps on that card at once ("Selecting best torrent...", "Loading...") with *Back
+to cancel*. While it starts, OK on another episode only says "Episode N is already starting.
+Press Back to cancel it first."; a failure turns the card red with the reason (OK tries
+again). It is the same start as Continue watching's, with the page's own stream mode and
+auto-select toggles.
 
 The built-in player is the TV's HTML5 video engine, not libmpv.
 
@@ -532,6 +573,12 @@ are released, so a long seek doesn't continue when you come back.
   calls to its own service; a refused call counts as a missing service.
 - Launch parameters (see Start screen): that the TV fills `launchParams` and the events'
   `detail` as LG documents, on the first launch and on a relaunch.
+- Profiles: the picker, the PIN keypad with the remote's number keys, the on-screen
+  keyboard and the episode cards' start were driven in desktop Chromium (arrows, Enter,
+  digits, keyCode 461) against a local server, with the stream start stubbed. Still to see
+  on a TV: the number keys of a real LG remote, how the avatars (SVG) look, that resuming
+  the app from the background keeps the profile and a cold launch asks again, and a real
+  stream start from an episode card.
 - Whether a sideloaded app really can't show a toast or put cards on the home screen of
   the C3. That is what LG's docs and staff say (see Start screen); it was not tried.
 
