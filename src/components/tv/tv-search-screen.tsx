@@ -1,4 +1,5 @@
 import type { AL_BaseAnime } from "@/api/generated/types"
+import { useSearchSuggestions } from "@/api/hooks/search-suggestions.hooks"
 import { useInfiniteAnimeSearch } from "@/api/hooks/search.hooks"
 import {
     TVButton,
@@ -30,8 +31,6 @@ import {
     TVFocusGuideView,
     View,
 } from "react-native"
-
-const SUGGESTIONS = 6
 
 /**
  * Search as you type: the on-screen keyboard changes the text with every
@@ -66,7 +65,8 @@ export function TVSearchScreen() {
     const activeFilters = getActiveFiltersCount(params)
     const typed = input.trim()
     const waitingForLetters = typed.length > 0 && !searchQueryFor(input)
-    const searching = shouldQuery && (search.isFetching && !search.isFetchingNextPage)
+    // Suggestions come from one hook, so their source can change (a server title index) without this screen.
+    const { suggestions, isFetching: searching } = useSearchSuggestions(params.title, params)
 
     const loadMore = React.useCallback(() => {
         if (search.hasNextPage && !search.isFetchingNextPage) {
@@ -81,8 +81,6 @@ export function TVSearchScreen() {
     const openMedia = React.useCallback((item: AL_BaseAnime) => {
         router.push(`/(app)/entry/anime/${item.id}`)
     }, [])
-
-    const suggestions = media.slice(0, SUGGESTIONS)
 
     return (
         <View className="flex-1 bg-background">
@@ -161,7 +159,8 @@ export function TVSearchScreen() {
                                         {waitingForLetters
                                             ? "Keep typing: suggestions start at 2 letters."
                                             : shouldQuery && !searching
-                                                ? (params.title ? `No results for “${params.title}”` : "No titles match these filters")
+                                                // AniList matches whole words (a lone "blea" finds nothing, "bleach" does).
+                                                ? (params.title ? `No results for “${params.title}” yet. Keep typing the whole word.` : "No titles match these filters")
                                                 : !typed ? "Type with the keyboard: results appear as you go." : ""}
                                     </Text>
                                 )}
