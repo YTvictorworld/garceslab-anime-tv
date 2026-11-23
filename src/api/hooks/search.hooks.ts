@@ -4,7 +4,7 @@ import { AL_ListAnime, AL_ListManga } from "@/api/generated/types"
 import { useServerUrl } from "@/atoms/server.atoms"
 import { getAnimeSearchVariables, getMangaSearchVariables, SearchParams } from "@/lib/search/search.atoms"
 import { logger } from "@/lib/utils/logger"
-import { useInfiniteQuery } from "@tanstack/react-query"
+import { keepPreviousData, useInfiniteQuery } from "@tanstack/react-query"
 
 const log = logger("search-pagination")
 
@@ -12,13 +12,16 @@ function logPage(kind: "anime" | "manga", page: number, count: number, hasNext: 
     log.info(`Loaded ${kind} search page ${page}`, { count, hasNext: !!hasNext })
 }
 
-export function useInfiniteAnimeSearch(params: SearchParams, enabled: boolean) {
+export function useInfiniteAnimeSearch(params: SearchParams, enabled: boolean, options?: { keepPrevious?: boolean }) {
     const serverUrl = useServerUrl()
 
     return useInfiniteQuery({
         queryKey: ["infinite-anime-search", params, serverUrl],
         initialPageParam: 1,
-        queryFn: async ({ pageParam }) => {
+        // Search as you type (TV): the last results stay up while the next query runs.
+        placeholderData: options?.keepPrevious ? keepPreviousData : undefined,
+        // The signal lets React Query cancel a query that a newer letter made stale.
+        queryFn: async ({ pageParam, signal }) => {
             const page = Number(pageParam)
             log.info(`Loading anime search page ${page}`)
             const result = await buildSeaQuery<AL_ListAnime>({
@@ -26,6 +29,7 @@ export function useInfiniteAnimeSearch(params: SearchParams, enabled: boolean) {
                 endpoint: API_ENDPOINTS.ANILIST.AnilistListAnime.endpoint,
                 method: API_ENDPOINTS.ANILIST.AnilistListAnime.methods[0],
                 data: getAnimeSearchVariables(params, page),
+                signal,
             })
             logPage("anime", page, result?.Page?.media?.length ?? 0, result?.Page?.pageInfo?.hasNextPage)
             return result
