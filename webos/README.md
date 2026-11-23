@@ -92,6 +92,29 @@ before the library lists:
   that row). Its cards open the show, as on Discover.
 - With an empty library, the trending slides and row are shown instead of "Your anime
   library is empty".
+- **Continue watching plays.** OK on a card in the *Continue watching* row, or on a
+  continue slide's *Play*/*Resume* button, opens the show and starts that episode at
+  once, the same way pressing it in the show's episode list does: a library file plays;
+  a torrent or debrid stream uses the server's auto-select (or the previous batch, or
+  the release list, per the stream settings) and picks up a stream the player left
+  running; an online stream starts with the saved provider. Resume positions apply as
+  they do there. Back from the player returns to the show's page. To open the show
+  without playing, use the slide's *View details* button or its card in the
+  *Currently watching* row, which still opens the show.
+- **Next episodes.** A show in *Currently watching* that is still airing and whose
+  AniList progress is its last aired episode gets an *Upcoming* card at the end of
+  *Continue watching*: "Next: Episode 8", when it airs in the TV's time zone and a
+  countdown ("Mon, Nov 30, 9:30 AM (in 6 days)"), soonest first. OK opens the show.
+  When the airing time passes, the card turns into a *New episode* card that plays the
+  episode like the cards before it, and the library is reloaded so the server's own
+  continue-watching entry replaces it once its AniList data has the episode. A debrid
+  or torrent release may take a while to appear after the episode airs; until then
+  the show's page says the episode isn't available to stream yet, or auto-select finds
+  nothing. The times come from AniList's `nextAiringEpisode`, which the library already
+  has. (The phone schedule screen isn't part of the TV app, so the cards are here.)
+  The times use the TV's time zone (Settings › General › Time & Date). The app can't
+  read the TV's setting other than through the browser, so for a TV whose zone is set
+  wrong, build with `EXPO_PUBLIC_TV_TIME_ZONE=Europe/Madrid` (any IANA name).
 
 Trending is the same AniList query as Discover's first row (fetched through the server),
 so the two screens share one result. If AniList fails, the start screen just leaves the

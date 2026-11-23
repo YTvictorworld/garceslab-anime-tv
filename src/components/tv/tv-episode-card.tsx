@@ -35,6 +35,8 @@ export interface TVEpisodeCardProps extends Omit<PressableProps, "onPress"> {
     blurred?: boolean
     /** webOS: shown dimmed in place of a blurred `image` (see CSS_BLUR). */
     blurredImage?: string
+    /** A chip in the corner ("Upcoming"); the art is dimmed while `dimmed`. */
+    tag?: { label: string; icon: React.ComponentProps<typeof Ionicons>["name"]; dimmed?: boolean }
 }
 
 export const TVEpisodeCard = React.memo(
@@ -55,6 +57,7 @@ export const TVEpisodeCard = React.memo(
             filler,
             blurred,
             blurredImage,
+            tag,
             ...props
         }, ref) {
             const focus = useTVFocus(1.05, title)
@@ -111,7 +114,7 @@ export const TVEpisodeCard = React.memo(
                                     }}
                                 />
                             ) : null}
-                            {completed ? (
+                            {completed || tag?.dimmed ? (
                                 <View
                                     pointerEvents="none"
                                     style={{
@@ -145,6 +148,26 @@ export const TVEpisodeCard = React.memo(
                                     <Ionicons name="checkmark" size={tvSize(15)} color="#ffffff" />
                                     <Text className="font-semibold text-white" style={{ fontSize: tvSize(15) }}>
                                         Completed
+                                    </Text>
+                                </View>
+                            ) : tag ? (
+                                <View
+                                    style={{
+                                        position: "absolute",
+                                        top: tvSize(12),
+                                        left: tvSize(12),
+                                        minHeight: tvSize(30),
+                                        borderRadius: tvSize(16),
+                                        paddingHorizontal: tvSize(10),
+                                        backgroundColor: "rgba(129,118,239,0.9)",
+                                        flexDirection: "row",
+                                        alignItems: "center",
+                                        gap: tvSize(5),
+                                    }}
+                                >
+                                    <Ionicons name={tag.icon} size={tvSize(15)} color="#ffffff" />
+                                    <Text className="font-semibold text-white" style={{ fontSize: tvSize(15) }}>
+                                        {tag.label}
                                     </Text>
                                 </View>
                             ) : filler ? (

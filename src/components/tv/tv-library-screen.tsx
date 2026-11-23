@@ -1,6 +1,8 @@
 import type { AL_BaseAnime } from "@/api/generated/types"
 import { getEpisodeMinutesRemaining, getEpisodePercentageComplete, useGetContinuityWatchHistory } from "@/api/hooks/continuity.hooks"
 import { animeEntryPlaybackIntentAtom, createAnimeEntryPlaybackIntent } from "@/atoms/anime-entry.atoms"
+import type { AnimeEntryView } from "@/components/features/media/anime-entry-view-switcher"
+import { defaultEntryView } from "@/components/features/media/anime-entry-view-utils"
 import { useServerStatus } from "@/atoms/server.atoms"
 import { useDiscoverTrendingAnime } from "@/components/features/discover/discover-queries"
 import {
@@ -17,6 +19,7 @@ import {
     TVSectionHeader,
     TVShelf,
     tvSize,
+    TVUpcomingCard,
 } from "@/components/tv"
 import { trendingHeroItem } from "@/components/tv/tv-hero-items"
 import {
@@ -28,6 +31,7 @@ import {
 } from "@/components/tv/tv-home-feed"
 import { SCRIM_SCROLL_THRESHOLD, TVNavScrim, useScrolledPast } from "@/components/tv/tv-nav-scrim"
 import type { TVMediaMeta } from "@/components/tv/tv-shelf"
+import { pickUpcomingEpisodes, type UpcomingEpisode } from "@/components/tv/tv-upcoming-episodes"
 import { ContinueWatchingItem, useAnimeLibraryCollection } from "@/hooks/use-anime-library-collection"
 import { getContinueWatchingSpoilerActive, getEpisodeSpoilerState, getSpoilerSafeAnimeImage } from "@/lib/anime-spoilers"
 import { Ionicons } from "@/lib/icons/Ionicons"
@@ -53,6 +57,19 @@ type Shelf = {
 }
 
 const NO_TRENDING: HomeTrendingItem<AL_BaseAnime>[] = []
+const NO_UPCOMING: UpcomingEpisode<AL_BaseAnime>[] = []
+
+/**
+ * webOS: continue watching plays the episode straight away instead of opening
+ * the show on its episode list. The hero's "View details" and the "Currently
+ * watching" row still open the show.
+ */
+const CONTINUE_PLAYS = Platform.OS === "web"
+
+/** A row of episodes to continue, then the next episodes of shows the user is caught up with (webOS). */
+type ContinueRowItem =
+    | { kind: "continue"; item: ContinueWatchingItem }
+    | { kind: "upcoming"; item: UpcomingEpisode<AL_BaseAnime> }
 
 /**
  * webOS: the search box and the nav scrim fade with CSS transitions when the
@@ -215,16 +232,22 @@ export function TVLibraryScreen() {
         router.push(`/(app)/entry/anime/${id}`)
     }, [])
 
-    const openContinue = React.useCallback((item: ContinueWatchingItem) => {
-        const episode = item.episode
-        const mediaId = episode.baseAnime?.id
-        if (!mediaId) return
-
-        if (item.sourceView === "library" && episode.localFile?.path) {
+    /**
+     * Opens the show and has its page start the episode, the same way pressing
+     * the episode there does (webOS; elsewhere only library files start).
+     */
+    const playEpisode = React.useCallback((mediaId: number, episodeNumber: number, view: AnimeEntryView, hasLocalFile: boolean) => {
+        if (view === "library" && hasLocalFile) {
             setPlaybackIntent(createAnimeEntryPlaybackIntent({
                 kind: "play-local-episode",
                 mediaId,
-                episodeNumber: episode.episodeNumber,
+                episodeNumber,
+            }))
+        } else if (CONTINUE_PLAYS && (view === "torrentstream" || view === "onlinestream")) {
+            setPlaybackIntent(createAnimeEntryPlaybackIntent({
+                kind: view === "torrentstream" ? "stream-episode-press" : "onlinestream-play",
+                mediaId,
+                episodeNumber,
             }))
         }
 
@@ -232,10 +255,51 @@ export function TVLibraryScreen() {
             pathname: "/(app)/entry/anime/[id]",
             params: {
                 id: String(mediaId),
-                initialView: item.sourceView,
+                initialView: view,
             },
         })
     }, [setPlaybackIntent])
+
+    // A string, so the handlers below don't change on every server status refetch.
+    const streamView = defaultEntryView(serverStatus, false)
+
+    const openContinue = React.useCallback((item: ContinueWatchingItem) => {
+        const episode = item.episode
+        const mediaId = episode.baseAnime?.id
+        if (!mediaId) return
+        const hasLocalFile = !!episode.localFile?.path
+        // An episode to continue without a file to play is streamed the way the server prefers.
+        const view = CONTINUE_PLAYS && item.sourceView === "library" && !hasLocalFile
+            ? streamView
+            : item.sourceView
+        playEpisode(mediaId, episode.episodeNumber, view, hasLocalFile)
+    }, [playEpisode, streamView])
+
+    // webOS: shows caught up with what has aired get a card for their next episode.
+    const upcoming = React.useMemo(() => {
+        if (!CONTINUE_PLAYS || !isConnected) return NO_UPCOMING
+        const continueIds = new Set(continueWatchingList
+            .map(item => item.episode.baseAnime?.id)
+            .filter((id): id is number => typeof id === "number"))
+        const items = pickUpcomingEpisodes(libraryCollectionList, continueIds, {
+            allowAdult: !!serverStatus?.settings?.anilist?.enableAdultContent,
+        })
+        return items.length > 0 ? items : NO_UPCOMING
+    }, [continueWatchingList, isConnected, libraryCollectionList, serverStatus?.settings?.anilist?.enableAdultContent])
+
+    const continueRow = React.useMemo<ContinueRowItem[]>(() => [
+        ...continueWatchingList.map(item => ({ kind: "continue" as const, item })),
+        ...upcoming.map(item => ({ kind: "upcoming" as const, item })),
+    ], [continueWatchingList, upcoming])
+
+    const pressUpcoming = React.useCallback((item: UpcomingEpisode<AL_BaseAnime>, aired: boolean) => {
+        // Not out yet: the show's page, where the next episode isn't listed yet either.
+        if (!aired) {
+            router.push(`/(app)/entry/anime/${item.media.id}`)
+            return
+        }
+        playEpisode(item.media.id, item.episodeNumber, streamView, false)
+    }, [playEpisode, streamView])
 
     const heroItems = React.useMemo<TVHeroItem[]>(() => {
         const spoilerActive = getContinueWatchingSpoilerActive(serverStatus)
@@ -291,22 +355,29 @@ export function TVLibraryScreen() {
     }, [continueWatchingList, hideScore, openContinue, openMedia, serverStatus, trendingItems, watchHistory])
     const heroLoading = isLoading || (showTrending && continueWatchingList.length === 0 && trending.isLoading)
 
-    const renderContinue = React.useCallback(({ item, index }: { item: ContinueWatchingItem; index: number }) => (
-        <TVContinueCard
-            item={item}
-            preferred={index === 0}
-            progressPercent={item.episode.baseAnime?.id
-                ? getEpisodePercentageComplete(watchHistory, item.episode.baseAnime.id, item.episode.progressNumber)
-                : 0}
-            onPressItem={openContinue}
-        />
-    ), [openContinue, watchHistory])
+    const renderContinue = React.useCallback(({ item: row, index }: { item: ContinueRowItem; index: number }) => {
+        if (row.kind === "upcoming") {
+            // The server lists the episode to continue once its AniList data shows it aired.
+            return <TVUpcomingCard item={row.item} preferred={index === 0} onPressItem={pressUpcoming} onAired={refetch} />
+        }
+        const item = row.item
+        return (
+            <TVContinueCard
+                item={item}
+                preferred={index === 0}
+                progressPercent={item.episode.baseAnime?.id
+                    ? getEpisodePercentageComplete(watchHistory, item.episode.baseAnime.id, item.episode.progressNumber)
+                    : 0}
+                onPressItem={openContinue}
+            />
+        )
+    }, [openContinue, pressUpcoming, refetch, watchHistory])
 
     if (isLoading && isConnected) {
         return <TVPageSkeleton hero />
     }
 
-    if (!shelves.length && !continueWatchingList.length && !searching) {
+    if (!shelves.length && !continueRow.length && !searching) {
         // webOS: trending is still loading and will fill the screen.
         if (showTrending && trending.isLoading) {
             return <TVPageSkeleton hero />
@@ -407,21 +478,23 @@ export function TVLibraryScreen() {
                             <TVHeroCarousel items={heroItems} active={isFocused} preferred loading={heroLoading} />
                         </View>
 
-                        {continueWatchingList.length > 0 ? (
+                        {continueRow.length > 0 ? (
                             <View style={{ gap: tvSize(12) }}>
                                 <TVSectionHeader
                                     title="Continue watching"
-                                    count={continueWatchingList.length}
+                                    count={continueRow.length}
                                 />
                                 <TVFocusGuideView trapFocusLeft trapFocusRight>
                                     <FlatList
                                         horizontal
-                                        data={continueWatchingList}
+                                        data={continueRow}
                                         renderItem={renderContinue}
                                         getItemLayout={EPISODE_ROW_LAYOUT}
-                                        keyExtractor={(item,
-                                            index,
-                                        ) => item.episode.localFile?.path || `${item.episode.baseAnime?.id ?? "episode"}-${item.episode.type}-${item.episode.episodeNumber}-${index}`}
+                                        keyExtractor={(row, index) => {
+                                            if (row.kind === "upcoming") return `upcoming-${row.item.media.id}-${row.item.episodeNumber}`
+                                            const item = row.item
+                                            return item.episode.localFile?.path || `${item.episode.baseAnime?.id ?? "episode"}-${item.episode.type}-${item.episode.episodeNumber}-${index}`
+                                        }}
                                         snapToAlignment="item"
                                         snapToItemPadding={TV.gutter}
                                         style={[{ flexGrow: 0 }, ROW_OVERFLOW]}

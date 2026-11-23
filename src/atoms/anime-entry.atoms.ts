@@ -8,6 +8,8 @@ export type AnimeEntryPlaybackIntentKind =
     | "debridstream-auto-select"
     | "debridstream-previous-batch"
     | "onlinestream-play"
+    /** Torrent/debrid: as if the episode were pressed on the show's page (auto-select, previous batch or picker, per the settings). */
+    | "stream-episode-press"
 
 export type AnimeEntryPlaybackIntent = {
     id: string

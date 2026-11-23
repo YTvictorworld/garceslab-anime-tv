@@ -6,6 +6,7 @@ import { LuffyError } from "@/components/shared/luffy-error"
 import { Button } from "@/components/ui/button"
 import { formatTime } from "@/components/features/player/helpers"
 import { endKeptStream, useKeptStream } from "@/lib/player/kept-direct-stream"
+import { toast } from "@/lib/utils/toast"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import {
     debridStreamStateAtom,
@@ -178,9 +179,22 @@ export function AnimeEntryTorrentStreamSection({ entry, resumeRef }: AnimeEntryT
             && playbackIntent.kind !== "torrentstream-previous-batch"
             && playbackIntent.kind !== "debridstream-auto-select"
             && playbackIntent.kind !== "debridstream-previous-batch"
+            && playbackIntent.kind !== "stream-episode-press"
         ) return
         if (torrentStream.isLoadingEpisodeCollection || torrentStream.episodes.length === 0) return
         if (handledPlaybackIntentRef.current === playbackIntent.id) return
+
+        if (playbackIntent.kind === "stream-episode-press") {
+            // Continue watching on the TV start screen: the same press as on this page's
+            // episode list, in the default stream mode, so a kept stream, auto-select and
+            // the TV's audio checks all apply as they do here.
+            handledPlaybackIntentRef.current = playbackIntent.id
+            setPlaybackIntent(current => current?.id === playbackIntent.id ? null : current)
+            const episode = torrentStream.episodes.find(item => item.episodeNumber === playbackIntent.episodeNumber)
+            if (episode) torrentStream.handleEpisodePress(episode)
+            else toast.info(`Episode ${playbackIntent.episodeNumber} isn't available to stream yet.`)
+            return
+        }
 
         const playbackMode = playbackIntent.kind.startsWith("debridstream") ? "debrid" : "torrent"
         handledPlaybackIntentRef.current = playbackIntent.id
