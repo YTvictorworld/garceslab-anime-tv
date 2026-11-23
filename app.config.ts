@@ -1,5 +1,10 @@
 import type { ConfigContext, ExpoConfig } from "expo/config"
 
+// Garceslab Anime: OTA updates are off. The manifest URLs below are Seanime Tenji's own
+// update service, which would replace this app's code with Seanime Tenji's.
+// (The webOS build doesn't use expo-updates either way.)
+const OTA_UPDATES_ENABLED = false
+
 export default ({ config }: ConfigContext): ExpoConfig => {
     const isTV = process.env.EXPO_TV === "1"
     const isTVDev = isTV && process.env.SEANIME_TV_DEV === "1"
@@ -11,7 +16,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
 
     return {
         ...config,
-        name: isTV ? "Seanime Tenji" : "Seanime",
+        name: "Garceslab Anime",
         slug: "seanime-app",
         version,
         orientation: isTV ? "default" : "portrait",
@@ -19,7 +24,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         scheme: "seanime",
         userInterfaceStyle: "automatic",
         runtimeVersion: isTV ? `${version}-tv` : { policy: "appVersion" },
-        updates: isTVDev ? {
+        updates: !OTA_UPDATES_ENABLED || isTVDev ? {
             enabled: false,
         } : {
             enabled: true,

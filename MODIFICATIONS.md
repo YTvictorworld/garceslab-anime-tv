@@ -22,7 +22,25 @@ All for the LG webOS build:
 - **Resume rule:** on the web TV builds an episode resumes, and its card shows progress, from
   10 seconds in up to 90 % (`src/lib/player/resume-position.ts` and its callers).
 - Tests for the above in `tests/`, and notes in `webos/README.md`.
-- **Project files:** this file, `NOTICE`, a header at the top of `README.md`, and a
-  GitHub Actions workflow that builds the webOS `.ipk` (`.github/workflows/webos.yml`).
+- **Branding:** a placeholder Garceslab Anime logo and splash (`branding/*.svg`, exported by
+  `branding/export.sh`) replace Seanime Tenji's webOS icons and splash and the logo inside the
+  app; the webOS title, vendor and description, and the Expo app name, say "Garceslab Anime".
+  The webOS app id stays `app.seanime.tenji` for now.
+- **OTA updates off** (`app.config.ts`): native builds no longer fetch Seanime Tenji's
+  over-the-air updates, which would replace this app's code. The webOS build never used them.
+- **Project files:** this file, `NOTICE`, a new `README.md`, issue templates, GitHub Actions
+  workflows that build the webOS `.ipk` on every change (`webos.yml`) and attach it to a
+  GitHub Release on version tags (`release.yml`), Dependabot, and the tracked
+  `package-lock.json`.
 
-The app id, title and icons are still Seanime Tenji's; they will change in a later version.
+## GPL-3.0 compliance checklist
+
+- [x] **Prominent modification notices with dates (§5a):** this file, `NOTICE`, the README's
+      "Credits & License", and the git history (every change is a dated commit).
+- [x] **License files untouched:** `LICENSE` (GPL-3.0) and `LICENSES.md` (MPL-2.0 modules) are
+      unchanged, and so are the copyright and license notices in the sources. No MPL-2.0 file
+      has been modified; if one is, it stays MPL-2.0 and its source stays available here.
+- [x] **Same license, no additional restrictions.**
+- [ ] **Source for every `.ipk` we distribute (§6):** releases are built only from a version
+      tag by `.github/workflows/release.yml`, and each GitHub Release links that tag's source.
+      Ticked when the first release is published.

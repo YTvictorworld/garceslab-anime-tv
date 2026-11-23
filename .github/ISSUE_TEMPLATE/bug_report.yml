@@ -1,108 +1,43 @@
 name: Bug report
-description: Report a bug you encountered
-title: 'bug: '
-labels:
-  - bug
-  - needs triage
+description: Something in Garceslab Anime doesn't work
+labels: [bug]
 body:
-  - type: checkboxes
-    id: '1'
+  - type: markdown
     attributes:
-      label: Checklist
-      description: Please follow the general troubleshooting steps first
-      options:
-        - label: >-
-            My version of the app is the latest available
-          required: true
-        - label: >-
-            I have checked open and closed [issues](https://github.com/5rahim/seanime-tenji/issues)
-          required: true
-        - label: >-
-            I have checked the [docs](https://seanime.app/docs) for a fix
-          required: true
-  - type: dropdown
-    id: '2'
+      value: |
+        This is the Garceslab Anime tracker. Please don't report Garceslab Anime problems to Seanime or Seanime Tenji.
+        Don't paste passwords, API keys, tokens or your server's public address.
+  - type: input
+    id: version
     attributes:
-      label: Bug Severity
-      description: Select the severity of the bug. Anything below "Panic" means the app doesn't crash.
-      options:
-        - Not sure
-        - Panic / Crash
-        - Usability is affected
-        - Low
+      label: Version
+      description: App version (Settings, or the .ipk file name), your TV model and webOS version, and the server version.
     validations:
       required: true
   - type: dropdown
-    id: '3'
+    id: client
     attributes:
-      label: Bug Area
-      description: Select the general area of the app during which the bug occurred.
+      label: Where does it happen?
       options:
+        - LG webOS TV app
+        - Web interface
+        - Server / Docker
         - Other
-        - Authentication / Connection
-        - Built-in Player
-        - External Player
-        - Anime Library
-        - Torrent / Debrid Streaming
-        - Online Streaming
-        - Manga Reader
-        - Downloads / Offline Mode
-        - Settings
-        - AniList
-        - User Interface
     validations:
       required: true
   - type: textarea
-    id: '4'
+    id: what
     attributes:
-      label: Bug Description / Steps to Reproduce
-      description: Precisely describe the bug you encountered and the steps to reproduce it. Avoid vague descriptions.
+      label: What happened, and what did you expect?
     validations:
       required: true
   - type: textarea
-    id: '5'
+    id: steps
     attributes:
-      label: Expected Behavior
-      description: Describe what you expected to happen.
+      label: Steps to reproduce
   - type: textarea
-    id: '6'
-    attributes:
-      label: Screenshots
-      description: If applicable, add screenshots or screen recordings of the bug
-  - type: textarea
-    id: '7'
+    id: logs
     attributes:
       label: Logs
-      description: Add logs or crash logs. Make sure to enable logging.
-  - type: checkboxes
-    id: '8'
-    attributes:
-      label: Debugging Checklist
-      description: Confirm you have included at least some of the following debugging information. If you haven't, please do so before submitting the issue.
-      options:
-        - label: >-
-            I have included error messages
-          required: false
-        - label: >-
-            I have included server logs (if applicable)
-          required: false
-        - label: >-
-            I have included device / crash logs
-          required: false
-  - type: input
-    id: '9'
-    attributes:
-      label: App Version
-      description: Enter the version of Seanime Tenji you are using.
-      placeholder: v0.1.0
-    validations:
-      required: true
-  - type: dropdown
-    id: '10'
-    attributes:
-      label: Operating System
-      options:
-        - Android
-        - iOS
-    validations:
-      required: true
+      description: Relevant log lines, with secrets removed.
+      render: text

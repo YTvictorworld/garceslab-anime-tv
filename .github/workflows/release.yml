@@ -1,0 +1,45 @@
+# Builds the webOS .ipk and attaches it, with its SHA-256, to a GitHub Release.
+# Runs only when a version tag (vX.Y.Z, matching package.json) is pushed.
+name: Release (webOS .ipk)
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - name: Tag matches package.json
+        run: |
+          version="$(node -p 'require("./package.json").version')"
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "Tag $GITHUB_REF_NAME doesn't match package.json version $version" >&2
+            exit 1
+          fi
+      - run: npm ci --no-fund
+      - run: npm test
+      # EXPO_PUBLIC_TV_TIME_ZONE is a local build option and is not set here.
+      - run: npm run build:webos
+      - name: Checksums
+        working-directory: dist/webos
+        run: sha256sum *.ipk > SHA256SUMS.txt && cat SHA256SUMS.txt
+      - name: GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/webos/*.ipk dist/webos/SHA256SUMS.txt \
+            --title "Garceslab Anime TV $GITHUB_REF_NAME" \
+            --notes "webOS package for LG TVs. Install it as described in the README (Developer Mode); verify the download with SHA256SUMS.txt.
+          Source: https://github.com/$GITHUB_REPOSITORY/tree/$GITHUB_REF_NAME (commit $GITHUB_SHA)
+          Derived from Seanime Tenji (AlkindiX) and Seanime (5rahim); GPL-3.0, see NOTICE and MODIFICATIONS.md." \
+            --verify-tag

@@ -64,7 +64,7 @@ ways:
 package them with `ares-package dist/webos/app dist/webos/service`. Every way of installing
 above installs the service with the app.
 
-The launcher shows the app on a `#1c154a` tile (`iconColor`) with a short description, and
+The launcher shows the app on a `#5b3df5` tile (`iconColor`) with a short description, and
 the TV shows `splash.png` while the app loads. The build checks that every image named in
 `appinfo.json` exists and has the size LG asks for (icon 80×80, large icon 130×130, splash
 1920×1080).

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Garceslab Anime placeholder logo: "GA" monogram drawn with plain strokes (no font).
+     Original artwork, GPL-3.0 like the rest of the repository. Edit this file and run
+     branding/export.sh to regenerate every icon. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" rx="112" fill="#5b3df5"/>
+  <g fill="none" stroke="#ffffff" stroke-width="40" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M 243.4 199.4 A 88 88 0 1 0 264 256 L 200 256"/>
+    <path d="M 296 352 L 360 160 L 424 352"/>
+    <path d="M 320 290 L 400 290"/>
+  </g>
+</svg>
