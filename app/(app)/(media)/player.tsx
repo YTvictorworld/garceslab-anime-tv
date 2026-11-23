@@ -56,7 +56,7 @@ import type { PlayerChapter } from "@/lib/player"
 import { getLocalEpisodePlaybackSource } from "@/lib/player"
 import { endKeptStream } from "@/lib/player/kept-direct-stream"
 import { usePlayerPreferences } from "@/lib/player/player-preferences"
-import { getWatchHistoryResumePosition } from "@/lib/player/resume-position"
+import { DEFAULT_RESUME_RULE, getWatchHistoryResumePosition, WEB_TV_RESUME_RULE } from "@/lib/player/resume-position"
 import type { MobilePlaybackSource } from "@/lib/player/types"
 import { useContinuitySync } from "@/lib/player/use-continuity-sync"
 import { useMpvPlayer } from "@/lib/player/use-mpv-player"
@@ -293,7 +293,7 @@ function PlayerScreenInner() {
             : null
 
         if (resumeTarget === null) {
-            resumeTarget = getWatchHistoryResumePosition(watchHistory, source)
+            resumeTarget = getWatchHistoryResumePosition(watchHistory, source, Platform.OS === "web" ? WEB_TV_RESUME_RULE : DEFAULT_RESUME_RULE)
         }
 
         if (resumeTarget === null) {

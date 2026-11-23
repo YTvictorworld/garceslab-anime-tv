@@ -109,8 +109,8 @@ before the library lists:
   its card in the *Currently watching* row.
 - **Progress bars on continue cards** (and the slide's *Resume* button and "Nm left")
   follow the same rule as resuming: the server's watch history has a position for that
-  episode between 2 % and 90 % in (about 29 s into a 24-minute episode). Below that the
-  episode starts over, and the card shows no bar. Resuming lands on the keyframe at or
+  episode from 10 seconds in up to 90 % (phones and Android TV keep 2 % to 90 %). Before
+  10 seconds the episode starts over and the card shows no bar. Resuming lands on the keyframe at or
   before the saved position: the TV's player can only start decoding there, so with
   these streams it can be a few seconds early, and a position under ~4 s restarts at 0:00.
 - **Next episodes.** A show in *Currently watching* that is still airing and whose

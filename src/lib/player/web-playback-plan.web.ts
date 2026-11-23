@@ -25,7 +25,7 @@ import { createDirectStreamSession, describeStreamCodecs, type DirectStreamSessi
 import { streamAudioWarning, streamFailureMessage } from "./direct-stream-format"
 import { endKeptStream, keptDirectStreams } from "./kept-direct-stream"
 import { proxiedUrl } from "./online-proxy"
-import { getWatchHistoryResumePosition } from "./resume-position"
+import { getWatchHistoryResumePosition, WEB_TV_RESUME_RULE } from "./resume-position"
 import type { MobilePlaybackSource, WebPlaybackPlan } from "./types"
 
 const log = logger("web-playback-plan")
@@ -342,7 +342,7 @@ export function useWebPlaybackPlan(source: MobilePlaybackSource | null): WebPlay
         // instead of seeking once playback has begun.
         const startPosition = forceTranscode
             ? fallback?.position
-            : (source.resumePositionSec ?? getWatchHistoryResumePosition(watchHistory, source) ?? undefined)
+            : (source.resumePositionSec ?? getWatchHistoryResumePosition(watchHistory, source, WEB_TV_RESUME_RULE) ?? undefined)
 
         resolveLibraryPlan(source, forceTranscode, startPosition)
             .catch((error): Omit<Resolved, "key"> => {

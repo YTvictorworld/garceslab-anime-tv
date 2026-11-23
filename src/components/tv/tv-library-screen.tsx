@@ -35,7 +35,7 @@ import { pickUpcomingEpisodes, type UpcomingEpisode } from "@/components/tv/tv-u
 import { type ContinueStartResult, streamStartStatusAtom, TVContinueStreamStarter } from "@/components/tv/tv-continue-stream-starter"
 import type { TVEpisodeCardStatus } from "@/components/tv/tv-episode-card"
 import { toast } from "@/lib/utils/toast"
-import { getWatchHistoryResumePercent } from "@/lib/player/resume-position"
+import { getWatchHistoryResumePercent, WEB_TV_RESUME_RULE } from "@/lib/player/resume-position"
 import { ContinueWatchingItem, useAnimeLibraryCollection } from "@/hooks/use-anime-library-collection"
 import { getContinueWatchingSpoilerActive, getEpisodeSpoilerState, getSpoilerSafeAnimeImage } from "@/lib/anime-spoilers"
 import { Ionicons } from "@/lib/icons/Ionicons"
@@ -74,12 +74,12 @@ const FAILED_SHOWN_MS = 15_000
 
 /**
  * The card's progress bar. webOS: shown exactly when playing the card
- * resumes (the watch history's position, 2 % to 90 % in, see
- * resume-position.ts); elsewhere as before (5 % to 90 %).
+ * resumes (the watch history's position, from 10 s in to 90 %, see
+ * WEB_TV_RESUME_RULE in resume-position.ts); elsewhere as before (5 % to 90 %).
  */
 function continuePercent(history: Continuity_WatchHistory | undefined, mediaId: number, episode: Anime_Episode) {
     return CONTINUE_PLAYS
-        ? getWatchHistoryResumePercent(history, { mediaId, episodeNumber: episode.episodeNumber })
+        ? getWatchHistoryResumePercent(history, { mediaId, episodeNumber: episode.episodeNumber }, WEB_TV_RESUME_RULE)
         : getEpisodePercentageComplete(history, mediaId, episode.progressNumber)
 }
 
