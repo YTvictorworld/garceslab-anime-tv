@@ -7,7 +7,10 @@ import {
     websocketTransportAtom,
 } from "@/api/components/websocket-provider"
 import { API_ENDPOINTS } from "@/api/generated/endpoints"
+import { avatarImageUrl } from "@/api/hooks/profiles.hooks"
+import { useProfileSession } from "@/atoms/profile.atoms"
 import { useCurrentUser, useServerStatus, useServerUrl } from "@/atoms/server.atoms"
+import { useProfileSwitch } from "@/lib/profile/use-profile-switch"
 import { TVConfirmDrawer } from "@/components/tv/tv-confirm-drawer"
 import { TVDebugLogReceiverDrawer } from "@/components/tv/tv-debug-log-receiver-drawer"
 import { usePreferredFocus, useTVFocus } from "@/components/tv/tv-focus"
@@ -406,6 +409,12 @@ function DiagnosticsSection({ onClearLogs }: { onClearLogs: () => void }) {
 export function TVSettingsScreen() {
     const serverUrl = useServerUrl()
     const viewer = useCurrentUser()?.viewer
+    // Garceslab Anime: on a server with local profiles this is the profile, not an AniList account.
+    const profileSession = useProfileSession()
+    const { switchProfile } = useProfileSwitch()
+    const profileAvatar = avatarImageUrl(serverUrl, profileSession?.profile.avatarUrl)
+    const headerAvatar = profileSession ? profileAvatar : viewer?.avatar?.large
+    const headerName = profileSession?.profile.name || viewer?.name || "User"
     const connection = useServerConnectionState()
     const [confirm, setConfirm] = React.useState<Confirm>(null)
     const [clearing, setClearing] = React.useState(false)
@@ -492,9 +501,9 @@ export function TVSettingsScreen() {
                             backgroundColor: "rgba(255,255,255,0.03)",
                         }}
                     >
-                        {viewer?.avatar?.large ? (
+                        {headerAvatar ? (
                             <Image
-                                source={{ uri: viewer.avatar.large }}
+                                source={{ uri: headerAvatar }}
                                 style={{
                                     width: tvSize(72),
                                     height: tvSize(72),
@@ -519,7 +528,7 @@ export function TVSettingsScreen() {
                         )}
                         <View style={{ flex: 1, gap: tvSize(4) }}>
                             <Text className="font-bold text-white" style={{ fontSize: tvSize(26) }}>
-                                {viewer?.name || "User"}
+                                {headerName}
                             </Text>
                             <View style={{ flexDirection: "row", alignItems: "center", gap: tvSize(8) }}>
                                 <View
@@ -546,13 +555,25 @@ export function TVSettingsScreen() {
                         </Text>
                     </View>
 
+                    {profileSession ? (
+                        <SectionCard title="Profile">
+                            <SettingsRow
+                                label="Switch profile"
+                                detail={`Signed in as ${profileSession.profile.name}. Back to "Who's watching?"`}
+                                icon="people-outline"
+                                preferred
+                                onPress={switchProfile}
+                            />
+                        </SectionCard>
+                    ) : null}
+
                     <SectionCard title="App">
                         <SettingsRow
                             ref={cacheRef}
                             label={clearing ? "Clearing Image Cache…" : "Clear Image Cache"}
                             detail="Purge cached posters, banners, and avatars"
                             icon="images-outline"
-                            preferred
+                            preferred={!profileSession}
                             disabled={clearing}
                             onPress={() => setConfirm("cache")}
                             trailing={clearing ? <ActivityIndicator size="small" color="white" /> : undefined}

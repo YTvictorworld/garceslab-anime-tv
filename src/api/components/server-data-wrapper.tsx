@@ -2,11 +2,14 @@ import { isUntrustedOriginError } from "@/api/client/requests"
 import { ApiLoaders } from "@/api/components/api-loaders"
 import { useGetSettings } from "@/api/hooks/settings.hooks"
 import { useGetStatus } from "@/api/hooks/status.hooks"
+import { useProfileSession } from "@/atoms/profile.atoms"
 import { useServerAuthToken, useServerStatus, useServerUrl, useSetServerStatus, useSetServerUrl } from "@/atoms/server.atoms"
 import { Button } from "@/components/ui/button"
 import { Text } from "@/components/ui/text"
 import { IMAGES } from "@/constants/images"
 import { useManualOfflineMode } from "@/lib/offline"
+import { serverHasProfiles } from "@/lib/profile/profile-errors"
+import { endProfileSession } from "@/lib/profile/profile-session"
 import { isServerVersionSupported, MIN_SERVER_VERSION } from "@/lib/server-version"
 import { router, usePathname } from "expo-router"
 import React from "react"
@@ -20,7 +23,7 @@ export function ServerUrlWrapper({ children }: { children: React.ReactNode }) {
     React.useEffect(() => {
         async function checkServerUrl() {
             if (serverUrl) {
-                if (pathname === "/set-server-url") return
+                if (pathname === "/set-server-url" || pathname === "/select-profile") return
                 router.replace("/(app)/(tabs)/(library)")
             } else {
                 if (pathname === "/set-server-url") return
@@ -50,7 +53,7 @@ export function ServerDataWrapper({ children }: { children: React.ReactNode }) {
 
     const [manualOffline, setManualOffline] = useManualOfflineMode()
 
-    const { data: _serverStatus, isLoading, isFetchedAfterMount, isError, error: statusError } = useGetStatus({ enabled: !manualOffline })
+    const { data: _serverStatus, isLoading, isFetchedAfterMount, isError, error: statusError, dataUpdatedAt } = useGetStatus({ enabled: !manualOffline })
     // A server without a password may refuse the webOS app (Origin: null), whatever is cached
     const serverRefusesClient = !manualOffline && !_serverStatus && isUntrustedOriginError(statusError)
 
@@ -77,6 +80,27 @@ export function ServerDataWrapper({ children }: { children: React.ReactNode }) {
         (isLoading && !effectiveStatus) ||
         (requiresServerAuth && (!serverAuthToken || authVerification.isLoading || isInvalidServerAuth))
     )
+
+    /**
+     * Garceslab Anime: a server with local profiles needs one picked first
+     * ("Who's watching?"). The session is in memory only, so a cold launch
+     * always lands there; a stock server doesn't advertise profiles and
+     * nothing changes. TV only: the phone app has no picker yet.
+     */
+    const profileSession = useProfileSession()
+    const needsProfile = Platform.isTV && !manualOffline && serverHasProfiles(effectiveStatus) && !profileSession
+
+    React.useEffect(() => {
+        if (needsProfile) router.replace("/(out)/select-profile")
+    }, [needsProfile])
+
+    // The server answered without our profile (its session ended, e.g. the PIN changed) on a route that
+    // doesn't refuse: back to the picker as well.
+    React.useEffect(() => {
+        if (!profileSession || !freshStatus || !serverHasProfiles(freshStatus)) return
+        if (freshStatus.currentProfile || dataUpdatedAt <= profileSession.selectedAt) return
+        endProfileSession("rejected")
+    }, [dataUpdatedAt, freshStatus, profileSession])
 
     const [showOfflineFallback, setShowOfflineFallback] = React.useState(false)
 
@@ -223,6 +247,10 @@ export function ServerDataWrapper({ children }: { children: React.ReactNode }) {
                 <Text>Change URL</Text>
             </Button>
         </View>
+    }
+
+    if (needsProfile) {
+        return <View className="bg-background flex-1" />
     }
 
     return (

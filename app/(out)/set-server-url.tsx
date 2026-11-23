@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { IMAGES } from "@/constants/images"
 import { endKeptStream } from "@/lib/player/kept-direct-stream"
+import { isProfileRequiredError } from "@/lib/profile/profile-errors"
 import { logger } from "@/lib/utils/logger"
 import { toast } from "@/lib/utils/toast"
 import { useQueryClient } from "@tanstack/react-query"
@@ -77,6 +78,11 @@ export default function Screen() {
                     authToken: hashedPassword,
                     muteError: true,
                     bypassOfflineCheck: true,
+                }).catch((error: unknown) => {
+                    // Garceslab Anime: a server with local profiles took the password and wants a
+                    // profile next; "Who's watching?" follows.
+                    if (isProfileRequiredError((error as { error?: string } | null)?.error)) return undefined
+                    throw error
                 })
 
                 // A stream kept from the old server (webOS) can't be resumed from the new one
