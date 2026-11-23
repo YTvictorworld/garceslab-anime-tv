@@ -12,6 +12,7 @@ import Ionicons from "@expo/vector-icons/Ionicons"
 import type { StreamMode } from "./use-torrent-stream-controller"
 
 import { TVEpisodeCard, TVEpisodeGrid, TVEpisodePlayButton, TVPillButton, tvSize } from "@/components/tv"
+import type { TVEpisodeCardStatus } from "@/components/tv/tv-episode-card"
 
 const TV_PAGE_SIZE = 24
 
@@ -37,6 +38,8 @@ type TorrentStreamViewProps = {
     playRef?: React.Ref<React.ElementRef<typeof Pressable>>
     /** webOS: the episode whose stream the player left running; playing it resumes. */
     keptEpisodeNumber?: number | null
+    /** webOS: the episode starting on its card (or that failed to), and what the card says. */
+    episodeCardStatus?: { episodeNumber: number; status: TVEpisodeCardStatus } | null
 }
 
 export function TorrentStreamView(props: TorrentStreamViewProps) {
@@ -67,6 +70,7 @@ function TVTorrentStreamView({
     hasMappingError,
     playRef,
     keptEpisodeNumber,
+    episodeCardStatus,
 }: TorrentStreamViewProps) {
     const serverStatus = useServerStatus()
     const handleAvailableEpisodePress = React.useMemo(() => {
@@ -110,9 +114,11 @@ function TVTorrentStreamView({
                 disabled={isEpisodeSelectionLocked}
                 onPress={() => handleAvailableEpisodePress?.(ep)}
                 recyclingKey={ep.localFile?.path || `tv-torrent-ep-${ep.episodeNumber}-${idx}`}
+                status={episodeCardStatus?.episodeNumber === ep.episodeNumber ? episodeCardStatus.status : undefined}
             />
         )
     }, [
+        episodeCardStatus,
         handleAvailableEpisodePress,
         isEpisodeSelectionLocked,
         keptEpisodeNumber,

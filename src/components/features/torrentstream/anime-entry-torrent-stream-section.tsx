@@ -23,11 +23,28 @@ import {
 import { useAtom } from "jotai"
 import { useAtomValue, useSetAtom } from "jotai/react"
 import * as React from "react"
-import { ActivityIndicator, Platform, Pressable, Text, View } from "react-native"
+import { ActivityIndicator, BackHandler, Platform, Pressable, Text, View } from "react-native"
 import { TorrentStreamPickerSheet } from "./torrent-stream-picker-sheet"
 import { TorrentStreamView } from "./torrent-stream-view"
 import { TVPillButton, TV, tvSize, TVTorrentStreamPickerDrawer } from "@/components/tv"
 import { useTorrentStreamController } from "./use-torrent-stream-controller"
+import { type ContinueStartResult, streamStartStatusAtom, TVStreamStartWatch } from "@/components/tv/tv-continue-stream-starter"
+import type { TVEpisodeCardStatus } from "@/components/tv/tv-episode-card"
+import type { Anime_Episode } from "@/api/generated/types"
+import { useIsFocused } from "expo-router"
+
+/**
+ * webOS: an episode pressed on the show's page starts on its own card (as
+ * Continue watching does on the start screen): the card shows the server's
+ * step and "Back to cancel", other episodes wait until it plays or is
+ * cancelled, and a failure turns the card red with the reason.
+ */
+const CARD_STARTS = Platform.OS === "web" && Platform.isTV
+const FAILED_SHOWN_MS = 15_000
+
+type CardStart =
+    | { id: number; episodeNumber: number; phase: "starting" }
+    | { id: number; episodeNumber: number; phase: "failed"; message: string }
 
 type AnimeEntryTorrentStreamSectionProps = {
     entry: Anime_Entry
@@ -57,6 +74,67 @@ export function AnimeEntryTorrentStreamSection({ entry, resumeRef }: AnimeEntryT
         || (!isPreparingStream && isLoadedStream)
         || !!keptStream
     const statusVisibleRef = React.useRef(statusVisible)
+
+    const [cardStart, setCardStart] = React.useState<CardStart | null>(null)
+    const cardStartRef = React.useRef(cardStart)
+    cardStartRef.current = cardStart
+    const cancelCardStartRef = React.useRef<(() => void) | null>(null)
+    const cardStartStatus = useAtomValue(streamStartStatusAtom)
+    const isFocused = useIsFocused()
+    const lockRef = React.useRef({ locked: torrentStream.isEpisodeSelectionLocked, episode: torrentStream.loadingEpisodeNumber })
+    lockRef.current = { locked: torrentStream.isEpisodeSelectionLocked, episode: torrentStream.loadingEpisodeNumber }
+
+    /** webOS: the card starts its episode (see CARD_STARTS); one at a time. */
+    const pressEpisodeOnCard = React.useCallback((episode: Anime_Episode) => {
+        const current = cardStartRef.current
+        const busyEpisode = current?.phase === "starting"
+            ? current.episodeNumber
+            : lockRef.current.locked ? lockRef.current.episode : null
+        if (busyEpisode !== null) {
+            if (busyEpisode !== episode.episodeNumber) {
+                toast.info(`Episode ${busyEpisode} is already starting. Press Back to cancel it first.`)
+            }
+            return
+        }
+        setCardStart({ id: Date.now(), episodeNumber: episode.episodeNumber, phase: "starting" })
+    }, [])
+
+    const onCardStartResult = React.useCallback((result: ContinueStartResult) => {
+        const current = cardStartRef.current
+        if (!current || current.phase !== "starting") return
+        if (result.kind === "failed") {
+            setCardStart({ ...current, phase: "failed", message: result.message })
+            return
+        }
+        // Playing, or the release list opened on this page (auto-select off).
+        setCardStart(null)
+    }, [])
+
+    // Back cancels the start; a failure message goes away after a while.
+    React.useEffect(() => {
+        if (!cardStart) return
+        if (cardStart.phase === "failed") {
+            const timer = setTimeout(() => setCardStart(current => current?.id === cardStart.id ? null : current), FAILED_SHOWN_MS)
+            return () => clearTimeout(timer)
+        }
+        if (!isFocused) return
+        const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
+            cancelCardStartRef.current?.()
+            setCardStart(null)
+            return true
+        })
+        return () => subscription.remove()
+    }, [cardStart, isFocused])
+
+    const episodeCardStatus = React.useMemo<{ episodeNumber: number; status: TVEpisodeCardStatus } | null>(() => {
+        if (!cardStart) return null
+        return {
+            episodeNumber: cardStart.episodeNumber,
+            status: cardStart.phase === "failed"
+                ? { message: cardStart.message, hint: "OK: try again", error: true }
+                : { message: cardStartStatus, hint: "Back to cancel" },
+        }
+    }, [cardStart, cardStartStatus])
 
     const stopTVStream = React.useCallback(() => {
         restoreFocusRef.current = true
@@ -191,7 +269,7 @@ export function AnimeEntryTorrentStreamSection({ entry, resumeRef }: AnimeEntryT
             handledPlaybackIntentRef.current = playbackIntent.id
             setPlaybackIntent(current => current?.id === playbackIntent.id ? null : current)
             const episode = torrentStream.episodes.find(item => item.episodeNumber === playbackIntent.episodeNumber)
-            if (episode) torrentStream.handleEpisodePress(episode)
+            if (episode) (CARD_STARTS ? pressEpisodeOnCard : torrentStream.handleEpisodePress)(episode)
             else toast.info(`Episode ${playbackIntent.episodeNumber} isn't available to stream yet.`)
             return
         }
@@ -210,12 +288,12 @@ export function AnimeEntryTorrentStreamSection({ entry, resumeRef }: AnimeEntryT
         }
 
         torrentStream.startPreviousBatchStream(targetEpisode, playbackMode)
-    }, [entry.mediaId, playbackIntent, setPlaybackIntent, torrentStream])
+    }, [entry.mediaId, playbackIntent, pressEpisodeOnCard, setPlaybackIntent, torrentStream])
 
     return (
         <>
 
-            {(isPreparingStream || !!loadingState) && (
+            {(isPreparingStream || !!loadingState) && !(CARD_STARTS && cardStart?.phase === "starting") && (
                 Platform.isTV ? (
                     <View style={{ paddingHorizontal: TV.gutter, paddingTop: tvSize(10), paddingBottom: tvSize(15) }}>
                         <View
@@ -366,9 +444,11 @@ export function AnimeEntryTorrentStreamSection({ entry, resumeRef }: AnimeEntryT
                     episodes={torrentStream.episodes}
                     progress={progress}
                     selectedEpisodeNumber={torrentStream.selectedEpisodeNumber ?? 0}
-                    onEpisodePress={torrentStream.handleEpisodePress}
-                    isEpisodeSelectionLocked={torrentStream.isEpisodeSelectionLocked}
-                    loadingEpisodeNumber={torrentStream.loadingEpisodeNumber}
+                    onEpisodePress={CARD_STARTS ? pressEpisodeOnCard : torrentStream.handleEpisodePress}
+                    // webOS: cards stay pressable while one starts, to say which one is (pressEpisodeOnCard).
+                    isEpisodeSelectionLocked={CARD_STARTS ? false : torrentStream.isEpisodeSelectionLocked}
+                    loadingEpisodeNumber={CARD_STARTS && cardStart ? null : torrentStream.loadingEpisodeNumber}
+                    episodeCardStatus={CARD_STARTS ? episodeCardStatus : null}
                     autoSelect={torrentStream.autoSelect}
                     autoSelectFile={torrentStream.autoSelectFile}
                     streamMode={torrentStream.streamMode}
@@ -389,6 +469,16 @@ export function AnimeEntryTorrentStreamSection({ entry, resumeRef }: AnimeEntryT
                     />
                 </View>
             )}
+
+            {CARD_STARTS && cardStart?.phase === "starting" ? (
+                <TVStreamStartWatch
+                    key={cardStart.id}
+                    torrentStream={torrentStream}
+                    episodeNumber={cardStart.episodeNumber}
+                    onResult={onCardStartResult}
+                    cancelRef={cancelCardStartRef}
+                />
+            ) : null}
 
             {!Platform.isTV && (
                 <TorrentStreamPickerSheet

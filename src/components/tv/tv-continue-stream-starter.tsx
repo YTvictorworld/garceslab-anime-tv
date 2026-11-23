@@ -57,8 +57,25 @@ export function TVContinueStreamStarter(props: Props) {
     return <Starter {...props} entry={entry} />
 }
 
-function Starter({ entry, episodeNumber, onResult, cancelRef }: Props & { entry: Anime_Entry }) {
+function Starter({ entry, ...props }: Props & { entry: Anime_Entry }) {
     const torrentStream = useTorrentStreamController({ entry })
+    return <TVStreamStartWatch {...props} torrentStream={torrentStream} />
+}
+
+export type TorrentStreamController = ReturnType<typeof useTorrentStreamController>
+
+type WatchProps = Omit<Props, "mediaId"> & {
+    /** The controller that presses the episode: the start screen's own, or the show page's. */
+    torrentStream: TorrentStreamController
+}
+
+/**
+ * Presses `episodeNumber` once through `torrentStream` and reports how the
+ * start ends (playing, the release list opened, failed, stalled). The start
+ * screen's cards and the show page's episode cards both follow a start with
+ * it. Renders nothing.
+ */
+export function TVStreamStartWatch({ torrentStream, episodeNumber, onResult, cancelRef }: WatchProps) {
     const preparing = useAtomValue(torrentStreamIsPreparingAtom)
     const playerOpen = useAtomValue(playerOpenAtom)
     const error = useAtomValue(streamStartErrorAtom)
