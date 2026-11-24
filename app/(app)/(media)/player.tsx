@@ -13,7 +13,7 @@ import {
     createAnimeEntryPlaybackIntent,
     tvReturnFocusAtom,
 } from "@/atoms/anime-entry.atoms"
-import { useServerUrl } from "@/atoms/server.atoms"
+import { serverStatusAtom, useServerUrl } from "@/atoms/server.atoms"
 import { selectedQualityAtom, selectedServerAtom } from "@/components/features/onlinestream/use-onlinestream-controller"
 import {
     NEXT_EPISODE_CONFIRM_PROGRESS_THRESHOLD,
@@ -40,6 +40,8 @@ import type { PlayerPanel } from "@/components/features/player/types"
 import { createGestureRefs, syncGestureRef } from "@/components/features/player/types"
 import { type NextStreamRequest, PlayerNextStream, PlayerNextStreamProgress } from "@/components/features/torrentstream/player-next-stream"
 import { TVPlayerControls, TVPlayerDialog, TVPlayerPanel } from "@/components/tv"
+import { TVUpNextCard } from "@/components/tv/tv-up-next-card"
+import { getEpisodeSpoilerState, getSpoilerSafeAnimeImage } from "@/lib/anime-spoilers"
 import { playPlayerExit } from "@/components/tv/tv-player-exit"
 import { tvSize } from "@/components/tv/tv-scale"
 import { useTVScrub } from "@/components/tv/use-tv-scrub"
@@ -104,6 +106,10 @@ type NextEpisodePrompt = {
     onConfirm?: () => void
     /** Garceslab Anime: the canon/filler pill of the episode it plays. */
     tag?: EpisodeTagKind
+    /** TV corner card: "Next episode" / "Previous episode", the episode's name and its art. */
+    kicker?: string
+    episodeName?: string
+    image?: string
 }
 
 const DEFAULT_TEXT_SUBTITLE_MARGIN_Y = 34
@@ -913,6 +919,9 @@ function PlayerScreenInner() {
         void playPlayerExit(exitViewRef.current).then(leave)
     }, [canGoBack, controls.clearHideTimer, handleBack, player.pause, scrub, source?.directStreamPlaybackId])
 
+    /** TV: the "Up next" card (set once useAutoNextEpisode has run, below); read by the key handlers. */
+    const upNextRef = React.useRef({ visible: false, cancel: () => {} })
+
     // The error and loading screens replace the player and its dialogs.
     const showsBareScreen = !!error || (!!loadingMessage && !source)
 
@@ -986,7 +995,8 @@ function PlayerScreenInner() {
             && handleRemoteShortcut(event.eventType)
         ) return
 
-        if (panel || nextEpisodePrompt || showExitPrompt) return
+        // The prompts and the Up next card have the focus: arrows and OK are theirs.
+        if (panel || nextEpisodePrompt || showExitPrompt || upNextRef.current.visible) return
 
         // webOS: left/right with the controls hidden bring them up on the seek
         // bar and start scrubbing on the press itself, not on its release.
@@ -1075,6 +1085,11 @@ function PlayerScreenInner() {
                 setNextEpisodePrompt(null)
                 return true
             }
+            // Back on the Up next card is its Cancel / Watch credits.
+            if (upNextRef.current.visible) {
+                upNextRef.current.cancel()
+                return true
+            }
             if (controls.controlsVisible) {
                 controls.clearHideTimer()
                 controls.setControlsVisible(false)
@@ -1135,6 +1150,21 @@ function PlayerScreenInner() {
         ?? (nextEpisodeNumber ? `Episode ${nextEpisodeNumber}` : "the next episode")
     /** With its tag and skip: "Episode 110 (skipping filler episodes 64–109) · CANON". */
     const nextEpisodeText = nextEpisodeLine(nextEpisodeLabel, nextEpisodeTag, nextEpisodeSkip, "")
+
+    // TV "Up next" card: the episode's name and art, without spoilers when the
+    // profile hides them (the episode after the one playing counts as unwatched).
+    const serverStatus = useAtomValue(serverStatusAtom)
+    const episodeCardInfo = (episode: Anime_Episode | null, episodeNumber: number | null) => {
+        const label = episode?.displayTitle ?? (episodeNumber ? `Episode ${episodeNumber}` : "Next episode")
+        const spoiler = getEpisodeSpoilerState(serverStatus, {
+            episodeNumber,
+            watchedProgress: Math.max(source?.entryListData?.progress ?? 0, source?.episodeNumber ?? 0),
+        })
+        const name = !spoiler.hideTitle && episode?.episodeTitle && episode.episodeTitle !== label ? `${label} \u00b7 ${episode.episodeTitle}` : label
+        const image = (spoiler.hideThumbnail ? undefined : episode?.episodeMetadata?.image) ?? getSpoilerSafeAnimeImage(source?.media)
+        return { name, image }
+    }
+    const nextEpisodeCard = episodeCardInfo(nextEpisode, nextEpisodeNumber)
 
     const canPlayPrevious = Boolean(source?.nextEpisodeAction)
         && previousEpisodeNumber !== null
@@ -1306,7 +1336,15 @@ function PlayerScreenInner() {
         remainingTime,
         eofReached: state.eofReached,
         playNextEpisode,
+        // TV: Netflix-style, the card comes up when the ending starts or in the
+        // last seconds while the episode plays. Auto skip OP/ED jumps over the
+        // ending, so then only the last seconds count.
+        upNext: Platform.isTV
+            ? { outroStart: prefs.autoSkipOpEd ? null : skipData.ed?.interval.startTime ?? null }
+            : undefined,
     })
+    const upNextVisible = autoNext.autoNextCountdown !== null && !state.isPiPActive && canAutoAdvance
+    upNextRef.current = { visible: Platform.isTV && upNextVisible, cancel: autoNext.cancelAutoNext }
 
     const shouldConfirmEarlySkip = state.duration > 0
         && remainingTime > NEXT_EPISODE_CONFIRM_REMAINING_SECONDS
@@ -1327,6 +1365,9 @@ function PlayerScreenInner() {
                 description: `Continuing to ${nextEpisodeText} will return you to the source picker.`,
                 confirmLabel: "Continue",
                 tag: nextEpisodeTag,
+                kicker: "Next episode",
+                episodeName: nextEpisodeCard.name,
+                image: nextEpisodeCard.image,
             })
             return
         }
@@ -1336,6 +1377,9 @@ function PlayerScreenInner() {
                 description: `${formatTime(remainingTime)} is still left in this episode. Start ${nextEpisodeText} now?`,
                 confirmLabel: "Play next",
                 tag: nextEpisodeTag,
+                kicker: "Next episode",
+                episodeName: nextEpisodeCard.name,
+                image: nextEpisodeCard.image,
             })
             return
         }
@@ -1352,12 +1396,14 @@ function PlayerScreenInner() {
 
         const label = previousEpisode?.displayTitle ?? `Episode ${previousEpisodeNumber}`
         const play = () => playEpisodeSelection(previousEpisode, previousEpisodeNumber)
+        const card = { kicker: "Previous episode", episodeName: label, image: episodeCardInfo(previousEpisode, previousEpisodeNumber).image }
         if (source.nextEpisodeAction === "torrentstream-manual" || source.nextEpisodeAction === "debridstream-manual") {
             setNextEpisodePrompt({
                 title: "Choose previous episode source?",
                 description: `Going back to ${label} will return you to the source picker.`,
                 confirmLabel: "Continue",
                 onConfirm: play,
+                ...card,
             })
             return
         }
@@ -1367,6 +1413,7 @@ function PlayerScreenInner() {
                 description: `${formatTime(remainingTime)} is still left in this episode. Start ${label} now?`,
                 confirmLabel: "Play previous",
                 onConfirm: play,
+                ...card,
             })
             return
         }
@@ -1794,21 +1841,26 @@ function PlayerScreenInner() {
                 )}
 
 
-                {autoNext.autoNextCountdown !== null && !isPiPActive && canAutoAdvance && (
+                {upNextVisible && (
                     Platform.isTV ? (
-                        <TVPlayerDialog
-                            open
-                            eyebrow="Up next"
-                            title={nextEpisodeLabel}
+                        <TVUpNextCard
+                            kicker="Next episode"
+                            title={nextEpisodeCard.name}
                             tag={nextEpisodeTag}
-                            text={`${nextEpisodeSkip ? `${capitalize(describeEpisodeSkip(nextEpisodeSkip))}\n` : ""}Playing automatically in ${autoNext.autoNextCountdown}s`}
-                            confirmLabel="Play now"
+                            note={nextEpisodeSkip ? capitalize(describeEpisodeSkip(nextEpisodeSkip)) : undefined}
+                            image={nextEpisodeCard.image}
+                            confirmLabel="Next episode"
+                            // Before the end the card hides until then; at the end it's gone for good.
+                            cancelLabel={state.eofReached ? "Cancel" : "Watch credits"}
+                            countdown={autoNext.autoNextTotal
+                                ? { remaining: autoNext.autoNextCountdown!, total: autoNext.autoNextTotal }
+                                : undefined}
                             onCancel={autoNext.cancelAutoNext}
                             onConfirm={autoNext.triggerAutoNext}
                         />
                     ) : (
                         <AutoNextCard
-                            countdown={autoNext.autoNextCountdown}
+                            countdown={autoNext.autoNextCountdown!}
                             nextEpisodeLabel={nextEpisodeText}
                             controlsVisible={controls.controlsVisible}
                             controlsLocked={controls.controlsLocked}
@@ -1822,13 +1874,14 @@ function PlayerScreenInner() {
 
                 {nextEpisodePrompt && !isPiPActive && (
                     Platform.isTV ? (
-                        <TVPlayerDialog
-                            open
-                            eyebrow="Next episode"
-                            title={nextEpisodePrompt.title}
+                        <TVUpNextCard
+                            kicker={nextEpisodePrompt.kicker ?? nextEpisodePrompt.title}
+                            title={nextEpisodePrompt.episodeName ?? nextEpisodePrompt.title}
                             tag={nextEpisodePrompt.tag}
-                            text={nextEpisodePrompt.description}
+                            note={nextEpisodePrompt.description}
+                            image={nextEpisodePrompt.image}
                             confirmLabel={nextEpisodePrompt.confirmLabel}
+                            cancelLabel="Cancel"
                             onCancel={dismissNextEpisodePrompt}
                             onConfirm={confirmNextEpisodePrompt}
                         />

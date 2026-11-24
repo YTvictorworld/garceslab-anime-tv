@@ -365,6 +365,16 @@ The built-in player is the TV's HTML5 video engine, not libmpv.
   eases in. Back still closes an open panel or dialog first, then the controls. The controls'
   exit button leaves the same way; the remote's Stop key leaves and also ends the stream. The
   position goes to the server's watch history before the player closes.
+- **Up next, Netflix-style.** With *Auto next episode* on, a small card comes up in the
+  bottom-right corner while the episode keeps playing (nothing is dimmed): when the ending
+  starts (the ED from the file's chapters or AniSkip, if it starts in the last three minutes)
+  or in the last 20 seconds. It shows the next episode's art, name and tag, what *Skip filler
+  and recaps* skips, and a *Next episode* button that fills up over 15 seconds and then plays
+  it. *Watch credits* (or Back) hides it until the episode ends, when it comes back with a
+  10-second countdown; *Cancel* (or Back) there stops it for this episode. Pausing hides the
+  card. With *Auto skip OP / ED* on, only the last 20 seconds count. The early-skip prompts
+  ("Play next episode?", "Choose next episode source?" and the previous-episode ones) use the
+  same corner card without a countdown.
 - **Next episode stays in the player.** For an auto-selected or previous-batch torrent or
   debrid stream, the next episode (the button, the countdown, CH+/CH−, or the episodes
   panel) starts from the player: it stops the current video, shows its loading screen with
