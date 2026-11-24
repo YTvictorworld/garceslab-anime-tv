@@ -27,8 +27,8 @@ export const TV_VISUAL_FLAG_INFO = {
             + "No filter or backdrop-filter.",
     },
     cardGradients: {
-        effect: "Poster and episode cards: a dark bottom gradient (the web's card gradient), "
-            + "a faint edge line and a short shade under the corner chips.",
+        effect: "Poster and episode cards: a dark bottom gradient (the web's card gradient) "
+            + "and a short shade under the top corner chips.",
         cost: "Low to medium. One static gradient layer per mounted card; no shadows, no blur, "
             + "and the focus scale stays the only animation.",
     },

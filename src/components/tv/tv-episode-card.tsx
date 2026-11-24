@@ -5,6 +5,7 @@ import { TV, tvSize } from "@/components/tv/tv-scale"
 import { EPISODE_TAG_LABELS, EPISODE_TAG_SPOKEN, EPISODE_TAG_STYLE, type EpisodeTagKind } from "@/lib/episode-tags/episode-tags"
 import { LinearGradient } from "expo-linear-gradient"
 import { Ionicons } from "@/lib/icons/Ionicons"
+import { TV_VISUAL } from "@/lib/tv/visual-flags"
 import * as React from "react"
 import { ActivityIndicator, Platform, Pressable, type PressableProps, Text, View } from "react-native"
 
@@ -14,6 +15,13 @@ import { ActivityIndicator, Platform, Pressable, type PressableProps, Text, View
  * `blurredImage` (art that gives nothing away) dimmed instead, or nothing.
  */
 const CSS_BLUR = Platform.OS === "web"
+
+/** cardGradients: the web's episode gradient, plus a short top shade behind the corner chips. */
+const BOTTOM_COLORS = TV_VISUAL.cardGradients
+    ? ["transparent", "rgba(12,12,12,0.5)", "rgba(12,12,12,0.94)"] as const
+    : ["transparent", "rgba(0,0,0,0.78)"] as const
+const BOTTOM_LOCATIONS = TV_VISUAL.cardGradients ? [0.3, 0.66, 1] as const : [0.42, 1] as const
+const TOP_COLORS = ["rgba(12,12,12,0.42)", "transparent"] as const
 
 export interface TVEpisodeCardProps extends Omit<PressableProps, "onPress"> {
     image?: string
@@ -142,11 +150,18 @@ export const TVEpisodeCard = React.memo(
                                 />
                             ) : null}
                             <LinearGradient
-                                colors={["transparent", "rgba(0,0,0,0.78)"]}
-                                locations={[0.42, 1]}
+                                colors={BOTTOM_COLORS}
+                                locations={BOTTOM_LOCATIONS}
                                 style={{ position: "absolute", inset: 0 }}
                                 pointerEvents="none"
                             />
+                            {TV_VISUAL.cardGradients ? (
+                                <LinearGradient
+                                    colors={TOP_COLORS}
+                                    style={{ position: "absolute", left: 0, right: 0, top: 0, height: "32%" }}
+                                    pointerEvents="none"
+                                />
+                            ) : null}
                             {completed ? (
                                 <View
                                     style={{
@@ -279,7 +294,13 @@ export const TVEpisodeCard = React.memo(
                         <Text
                             className="font-semibold text-white"
                             numberOfLines={1}
-                            style={{
+                            style={TV_VISUAL.typography ? {
+                                marginTop: tvSize(12),
+                                fontSize: tvSize(21),
+                                lineHeight: tvSize(27),
+                                letterSpacing: tvSize(0.1),
+                                opacity: focus.focused ? 1 : 0.86,
+                            } : {
                                 marginTop: tvSize(10),
                                 fontSize: tvSize(22),
                                 opacity: focus.focused ? 1 : 0.82,
@@ -289,9 +310,11 @@ export const TVEpisodeCard = React.memo(
                         </Text>
                         {subtitle ? (
                             <Text
-                                className="text-white/45"
+                                className={TV_VISUAL.typography ? "font-medium text-white/45" : "text-white/45"}
                                 numberOfLines={1}
-                                style={{ marginTop: tvSize(2), fontSize: tvSize(18) }}
+                                style={TV_VISUAL.typography
+                                    ? { marginTop: tvSize(3), fontSize: tvSize(17), lineHeight: tvSize(22) }
+                                    : { marginTop: tvSize(2), fontSize: tvSize(18) }}
                             >
                                 {subtitle}
                             </Text>

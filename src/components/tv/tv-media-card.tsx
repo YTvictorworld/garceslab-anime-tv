@@ -8,10 +8,13 @@ import { useAnimeLibraryEntryDataValue, useMediaEntryListDataValue } from "@/ato
 import { useMediaCardSettings } from "@/atoms/server.atoms"
 import { TVFocusScaleView, usePreferredFocus, useTVFocus } from "@/components/tv/tv-focus"
 import { TVLazyImage } from "@/components/tv/tv-lazy-image"
+import { isAiringStatus, TVReleasingBadge } from "@/components/tv/tv-releasing-badge"
 import { TVScoreBadge } from "@/components/tv/tv-score-badge"
 import { TV, tvSize } from "@/components/tv/tv-scale"
 import { Ionicons } from "@/lib/icons/Ionicons"
 import { animeCardStats, mediaTitle } from "@/lib/media-metadata"
+import { TV_VISUAL } from "@/lib/tv/visual-flags"
+import { LinearGradient } from "expo-linear-gradient"
 import * as React from "react"
 import { Platform, Pressable, Text, View } from "react-native"
 
@@ -29,6 +32,10 @@ const LARGE_COVER_MAX_CARD_WIDTH = 250
  * plain placeholder there instead.
  */
 const CSS_BLUR = Platform.OS === "web"
+
+/** The web's card gradient (MediaCardBodyBottomGradient): static, one layer per card. */
+const BOTTOM_GRADIENT_COLORS = ["transparent", "rgba(12,12,12,0.55)", "rgba(12,12,12,0.92)"] as const
+const BOTTOM_GRADIENT_LOCATIONS = [0, 0.45, 1] as const
 
 type TVMediaCardProps = {
     media: AL_BaseAnime
@@ -83,6 +90,8 @@ export const TVMediaCard = React.memo(function TVMediaCard({
     const stats = animeCardStats(media, list, library, nakama, showUnwatched)
     const showLibrary = !hideLibraryBadge && stats.files > 0
     const showScore = showAudienceScore && !hideAudienceScore && !!media.meanScore
+    const airingStatus = TV_VISUAL.releasingBadge && isAiringStatus(media.status) ? media.status : null
+    const hasBottomChip = showScore || !!badge || !!list?.score
 
     const isPreferred = usePreferredFocus(preferred)
     const handlePress = onPress ?? (() => onPressMedia?.(media))
@@ -127,6 +136,20 @@ export const TVMediaCard = React.memo(function TVMediaCard({
                                 position: "absolute",
                                 inset: 0,
                                 backgroundColor: "rgba(0,0,0,0.42)",
+                            }}
+                        />
+                    ) : null}
+                    {TV_VISUAL.cardGradients ? (
+                        <LinearGradient
+                            pointerEvents="none"
+                            colors={BOTTOM_GRADIENT_COLORS}
+                            locations={BOTTOM_GRADIENT_LOCATIONS}
+                            style={{
+                                position: "absolute",
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                height: hasBottomChip ? "50%" : "34%",
                             }}
                         />
                     ) : null}
@@ -176,6 +199,18 @@ export const TVMediaCard = React.memo(function TVMediaCard({
                             <Ionicons name="library" size={tvSize(20)} color="#431407" />
                         </View>
                     ) : null}
+                    {airingStatus ? (
+                        <View
+                            pointerEvents="none"
+                            style={{
+                                position: "absolute",
+                                top: showLibrary ? tvSize(46) : tvSize(8),
+                                right: tvSize(8),
+                            }}
+                        >
+                            <TVReleasingBadge status={airingStatus} compact />
+                        </View>
+                    ) : null}
                     {badge ? (
                         <View
                             style={{
@@ -221,7 +256,13 @@ export const TVMediaCard = React.memo(function TVMediaCard({
                 <Text
                     className="font-semibold text-white"
                     numberOfLines={1}
-                    style={{
+                    style={TV_VISUAL.typography ? {
+                        marginTop: tvSize(12),
+                        fontSize: tvSize(21),
+                        lineHeight: tvSize(27),
+                        letterSpacing: tvSize(0.1),
+                        opacity: focusState.focused ? 1 : 0.86,
+                    } : {
                         marginTop: tvSize(10),
                         fontSize: tvSize(22),
                         opacity: focusState.focused ? 1 : 0.78,
@@ -230,9 +271,11 @@ export const TVMediaCard = React.memo(function TVMediaCard({
                     {title}
                 </Text>
                 <Text
-                    className="text-white/40"
+                    className={TV_VISUAL.typography ? "font-medium text-white/45" : "text-white/40"}
                     numberOfLines={1}
-                    style={{ marginTop: tvSize(2), fontSize: tvSize(18) }}
+                    style={TV_VISUAL.typography
+                        ? { marginTop: tvSize(3), fontSize: tvSize(17), lineHeight: tvSize(22) }
+                        : { marginTop: tvSize(2), fontSize: tvSize(18) }}
                 >
                     {[media.seasonYear, media.format?.replaceAll("_", " ")].filter(Boolean).join(" · ")}
                 </Text>
