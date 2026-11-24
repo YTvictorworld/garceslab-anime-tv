@@ -674,6 +674,52 @@ are released, so a long seek doesn't continue when you come back.
 - Whether a sideloaded app really can't show a toast or put cards on the home screen of
   the C3. That is what LG's docs and staff say (see Start screen); it was not tried.
 
+## Direct-play test build (phase 1.5 spike)
+
+A side-by-side build that answers one question: can the TV play a debrid (TorBox) link
+**directly**, with the MKV's own subtitles, seeking and audio switching, instead of the
+server relaying the video through its direct stream?
+
+```bash
+WEBOS_APP_ID=app.garceslab.anime.directtest WEBOS_APP_TITLE="GA Direct Test" npm run build:webos
+# -> dist/webos/app.garceslab.anime.directtest_<version>_all.ipk
+```
+
+Any app id containing `directtest` (or `EXPO_PUBLIC_DIRECT_PLAY_TEST=1`) turns it on. In
+that build only **debrid** streams change; torrent streams, library files and online
+streams play as usual.
+
+- **Getting the link:** the app starts the debrid stream with the `externalPlayerLink`
+  playback type, which the server already supports for external players: it resolves the
+  TorBox link and sends it to this client only (`external-player-open-url`), without
+  starting its direct stream. No server change is needed.
+- **Video:** the link goes straight into the TV's `<video>`.
+- **Subtitles:** read on the TV from the MKV with HTTP Range requests
+  (`src/lib/player/mkv/`): the header (Tracks, Cues, attachments) first, then only the
+  subtitle blocks. When the Cues index the subtitle blocks (mkvmerge and ffmpeg write
+  them), each line is one small read, near the playhead first and then the rest of the
+  file in the background. Otherwise whole clusters are read a minute ahead of playback
+  (this downloads the file twice; the diagnostics say which way was used). ASS is drawn
+  with JASSUB/libass with the file's fonts, SRT as text. Image subtitles (PGS) are not read.
+- **CORS:** the reads use `fetch` first. If the CDN doesn't allow the app's origin, the
+  ranges go through the app's JS service (`range` method), never the video, and a toast
+  says so.
+- **Audio:** the file's audio tracks are listed from the header; switching uses the
+  `<video>`'s `audioTracks`.
+- **Progress:** reported per profile as the native apps do it (manual tracking,
+  continuity every 15 s, the episode marked watched at 85 %).
+- **Failures are loud:** a dialog says what failed ("Direct play failed: reading
+  subtitles: CORS on subtitle fetch") with **Retry via server**, which starts the same
+  release through the server's direct stream. A playback error shows the same button.
+- **Diagnostics:** press **Info** (the player stats) to show the direct-play panel: reader
+  path and CORS, container and muxer, codecs, subtitle tracks with lines read, strategy,
+  reads and bytes, fonts, audio tracks and `audioTracks` support and switches, buffered
+  ranges, the last seek's latency, MediaError and errors. The same summary goes to the
+  debug log (see below) every minute and when the episode closes, prefixed
+  `[direct-play] Direct play summary`. It never contains the link.
+
+`npm test` covers the parser on generated samples (`tests/fixtures/mkv/make-fixtures.sh`).
+
 ## Debug logs
 
 A TV has no clipboard or share sheet, so Settings › **Diagnostics** keeps logs on the TV

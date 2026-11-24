@@ -393,7 +393,7 @@ test("the built service registers the relay under the ID the app calls, and work
 
         const service = (globalThis as { __tenjiService?: any }).__tenjiService
         assert.equal(service.id, RELAY_SERVICE_ID)
-        assert.deepEqual(Object.keys(service.methods).sort(), ["close", "connect", "send"])
+        assert.deepEqual(Object.keys(service.methods).sort(), ["close", "connect", "range", "send"])
         assert.equal(typeof service.methods.connect.cancel, "function")
         assert.ok(service.activityManager.idleTimeout > 30)
 

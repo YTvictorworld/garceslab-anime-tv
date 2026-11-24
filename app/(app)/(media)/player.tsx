@@ -41,6 +41,7 @@ import { createGestureRefs, syncGestureRef } from "@/components/features/player/
 import { type NextStreamRequest, PlayerNextStream, PlayerNextStreamProgress } from "@/components/features/torrentstream/player-next-stream"
 import { TVPlayerControls, TVPlayerDialog, TVPlayerPanel } from "@/components/tv"
 import { TVUpNextCard } from "@/components/tv/tv-up-next-card"
+import { TVDirectPlayDiagnostics, useDirectPlayDiagnostics } from "@/components/tv/tv-direct-play-diagnostics"
 import { getEpisodeSpoilerState, getSpoilerSafeAnimeImage } from "@/lib/anime-spoilers"
 import { playPlayerExit } from "@/components/tv/tv-player-exit"
 import { tvSize } from "@/components/tv/tv-scale"
@@ -225,9 +226,16 @@ function PlayerScreenInner() {
     const [, setOnlineServer] = useAtom(selectedServerAtom)
     const [, setOnlineQuality] = useAtom(selectedQualityAtom)
     const [loadingMessage, setLoadingMessage] = useAtom(playerLoadingMessageAtom)
-    const error = useAtomValue(playerErrorAtom)
+    const [error, setPlayerError] = useAtom(playerErrorAtom)
     const [nextEpisodePrompt, setNextEpisodePrompt] = React.useState<NextEpisodePrompt | null>(null)
-    const [showExitPrompt, setShowExitPrompt] = React.useState(false)
+    const [exitPromptOpen, setExitPromptOpen] = React.useState(false)
+    /** Direct-play test: the failure dialog ("Retry via server"); it holds the keys like the exit prompt. */
+    const [directFailureOpen, setDirectFailureOpen] = React.useState(false)
+    const showExitPrompt = exitPromptOpen || directFailureOpen
+    const setShowExitPrompt = React.useCallback((open: boolean) => {
+        setExitPromptOpen(open)
+        if (!open) setDirectFailureOpen(false)
+    }, [])
     /** TV: the next stream being started from the player, which shows its loading screen meanwhile. */
     const [nextStream, setNextStream] = React.useState<NextStreamRequest & { label: string; entryView: MobilePlaybackSource["entryView"] } | null>(null)
     const nextStreamCancelRef = React.useRef<(() => void) | null>(null)
@@ -1200,7 +1208,7 @@ function PlayerScreenInner() {
         setReturnFocus({ mediaId, episodeNumber, view: entryView })
         if (withIntent) {
             setPlaybackIntent(createAnimeEntryPlaybackIntent({
-                kind: `${mode === "debrid" ? "debridstream" : "torrentstream"}-${kind}`, mediaId, episodeNumber,
+                kind: `${mode === "debrid" ? "debridstream" : "torrentstream"}-${kind === "retry-relay" ? "auto-select" : kind}`, mediaId, episodeNumber,
             }))
         }
         if (canGoBack()) {
@@ -1223,6 +1231,23 @@ function PlayerScreenInner() {
     React.useEffect(() => {
         if (source && nextStream) setNextStream(null)
     }, [nextStream, source])
+
+    // Direct-play test build: a failure is shown at once, with a way out through the server.
+    const directDiagnostics = useDirectPlayDiagnostics()
+    const directFailure = source?.directPlay && directDiagnostics.sourceId === source.id ? directDiagnostics.failure : null
+    const directSourceRef = React.useRef<MobilePlaybackSource | null>(null)
+    if (source?.directPlay) directSourceRef.current = source
+    React.useEffect(() => {
+        if (directFailure && !error) setDirectFailureOpen(true)
+    }, [directFailure, error])
+
+    const retryViaServer = React.useCallback(() => {
+        const failed = directSourceRef.current
+        if (!failed) return
+        setDirectFailureOpen(false)
+        setPlayerError(null)
+        startStreamInPlayer({ kind: "retry-relay", mode: "debrid", mediaId: failed.mediaId, episodeNumber: failed.episodeNumber }, `episode ${failed.episodeNumber} via the server`)
+    }, [setPlayerError, startStreamInPlayer])
 
     const playEpisodeSelection = React.useCallback((episode: Anime_Episode | null, episodeNumber: number | null) => {
         if (!source) return
@@ -1640,9 +1665,18 @@ function PlayerScreenInner() {
                 <StatusBar hidden />
                 <Text className="text-red-400 text-lg font-semibold mb-2">Playback Error</Text>
                 <Text className="text-white/70 text-center mb-6">{error}</Text>
+                {source?.directPlay ? (
+                    <RNPressable
+                        onPress={retryViaServer}
+                        hasTVPreferredFocus={Platform.isTV}
+                        className="rounded-xl border-2 border-transparent bg-white/10 px-6 py-3 mb-3 focus:border-brand-100"
+                    >
+                        <Text className="text-white font-medium">Retry via server</Text>
+                    </RNPressable>
+                ) : null}
                 <RNPressable
                     onPress={handleBack}
-                    hasTVPreferredFocus={Platform.isTV}
+                    hasTVPreferredFocus={Platform.isTV && !source?.directPlay}
                     className="rounded-xl border-2 border-transparent bg-white/10 px-6 py-3 focus:border-brand-100"
                 >
                     <Text className="text-white font-medium">Go Back</Text>
@@ -1723,6 +1757,11 @@ function PlayerScreenInner() {
                         top={Math.max(insets.top + 16, Platform.isTV ? 32 : 16)}
                         right={Math.max(insets.right + 16, Platform.isTV ? 32 : 16)}
                     />
+                ) : null}
+
+                {/* Direct-play test build: what direct play found out (Info shows it with the stats). */}
+                {source?.directPlay && prefs.showStats && !isPiPActive ? (
+                    <TVDirectPlayDiagnostics top={Math.max(insets.top + 16, 32)} left={Math.max(insets.left + 16, 32)} />
                 ) : null}
 
 
@@ -2028,10 +2067,25 @@ function PlayerScreenInner() {
                     )
                 )}
 
+                {Platform.OS === "web" && (
+                    <TVPlayerDialog
+                        open={directFailureOpen}
+                        title="Direct play failed"
+                        text={`${directFailure ?? ""}\n\nThe video may keep playing without what failed. Press Info for the diagnostics.`}
+                        cancelLabel="Keep watching"
+                        confirmLabel="Retry via server"
+                        onCancel={() => {
+                            setDirectFailureOpen(false)
+                            controls.showControls()
+                        }}
+                        onConfirm={retryViaServer}
+                    />
+                )}
+
                 {/* webOS leaves without asking (see leavePlayer). */}
                 {Platform.isTV && Platform.OS !== "web" && (
                     <TVPlayerDialog
-                        open={showExitPrompt}
+                        open={exitPromptOpen}
                         eyebrow="Stop playback"
                         title="Leave the player?"
                         text={`Stop playing “${source?.media?.title?.userPreferred ?? source?.media?.title?.english ?? "this episode"}”?`}

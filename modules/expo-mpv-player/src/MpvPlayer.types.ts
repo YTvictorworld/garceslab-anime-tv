@@ -52,6 +52,8 @@ export type MpvVideoSource = {
     onMediaEvent?: (event: MpvMediaEvent) => void
     /** Fonts the file carries (MKV attachments), as URLs, for drawing ASS subtitles with libass. */
     subtitleFonts?: string[]
+    /** Fonts read from the file on the TV (direct play), which may arrive after playback starts. */
+    subtitleFontData?: MpvFontData
     /** Draw ASS subtitles with libass (default) or as plain text lines; `setAssRendering` changes it later. */
     assRendering?: boolean
     /**
@@ -75,6 +77,13 @@ export type MpvSourceAudioTrack = {
     support: "plays" | "risky" | "broken"
     /** The TV leaves it out of the browser's audio tracks (TrueHD on webOS). */
     unlisted?: boolean
+}
+
+export type MpvFontData = {
+    /** Fonts loaded so far. */
+    current: () => Uint8Array[]
+    /** Called with each later batch. Returns the unsubscribe function. */
+    subscribe: (listener: (fonts: Uint8Array[]) => void) => () => void
 }
 
 export type MpvStreamedSubtitleTrack = {

@@ -13,6 +13,7 @@
 type JassubRenderer = {
     setTrack: (content: string) => Promise<void>
     processChunk: (data: string, timecode: number, duration: number) => Promise<void>
+    addFonts: (fonts: Array<Uint8Array | string>) => Promise<boolean>
 }
 
 type JassubFrame = { mediaTime: number; width: number; height: number; expectedDisplayTime: number }
@@ -212,7 +213,7 @@ export class LibassRenderer {
      * element (JASSUB sizes the canvas to the video's picture). Rejects when
      * the TV can't run it.
      */
-    static async create(video: HTMLVideoElement, host: HTMLElement, fonts: string[]): Promise<LibassRenderer> {
+    static async create(video: HTMLVideoElement, host: HTMLElement, fonts: Array<string | Uint8Array>): Promise<LibassRenderer> {
         if (!supportsLibass()) throw new Error("This browser can't run libass (no OffscreenCanvas or WebAssembly)")
         const { JASSUB, workerUrl, wasmUrl, defaultFont } = await loadAssets()
 
@@ -280,6 +281,13 @@ export class LibassRenderer {
         // order they were posted, so libass still reads them in order.
         const { renderer } = this.instance
         await Promise.all(chunks.map(chunk => renderer.processChunk(chunk.data, chunk.start, chunk.duration)))
+        this.clock?.redraw()
+    }
+
+    /** Fonts that arrived after libass started (read from the file on the TV). */
+    async addFonts(fonts: Uint8Array[]) {
+        if (fonts.length === 0) return
+        await this.instance.renderer.addFonts(fonts)
         this.clock?.redraw()
     }
 

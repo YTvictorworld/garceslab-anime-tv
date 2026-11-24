@@ -265,6 +265,7 @@ export class WebVideoPlayer {
     /** Bumped on every load, so late answers about an older source are dropped. */
     private loadId = 0
     private unsubscribeStreamedSubtitles: (() => void) | null = null
+    private unsubscribeFontData: (() => void) | null = null
     private loadTimer: ReturnType<typeof setTimeout> | null = null
     /** The audio tracks were checked for one the TV plays no sound for, this load. */
     private audioChecked = false
@@ -454,7 +455,8 @@ export class WebVideoPlayer {
             }
             console.warn("[web-video-player] no metadata after", LOAD_TIMEOUT_MS, "ms", {
                 networkState: this.video.networkState,
-                src: this.video.currentSrc,
+                // Not the URL itself: debrid links carry the account's token.
+                hasSrc: !!this.video.currentSrc,
             })
             this.callbacks.onError({ error: `The TV's player did not start this video within ${LOAD_TIMEOUT_MS / 1000} seconds`, code: 4 })
         }, LOAD_TIMEOUT_MS)
@@ -486,6 +488,8 @@ export class WebVideoPlayer {
         this.clearLoadTimer()
         this.unsubscribeStreamedSubtitles?.()
         this.unsubscribeStreamedSubtitles = null
+        this.unsubscribeFontData?.()
+        this.unsubscribeFontData = null
         // A new source may carry other fonts.
         this.destroyLibass()
         this.hls?.destroy()
@@ -972,12 +976,17 @@ export class WebVideoPlayer {
         }
         this.libassDeferred = false
         const loadId = this.loadId
-        this.libassStarting = LibassRenderer.create(this.video, this.subtitleHost, this.source?.subtitleFonts ?? []).then((renderer) => {
+        const fontData = this.source?.subtitleFontData
+        const fonts: Array<string | Uint8Array> = [...this.source?.subtitleFonts ?? [], ...fontData?.current() ?? []]
+        this.libassStarting = LibassRenderer.create(this.video, this.subtitleHost, fonts).then((renderer) => {
             if (loadId !== this.loadId || !this.source) {
                 renderer.destroy()
                 return
             }
             this.libassStarting = null
+            // Fonts read from the file after this point go to libass as they arrive.
+            this.unsubscribeFontData?.()
+            this.unsubscribeFontData = fontData?.subscribe(batch => this.runLibass(current => current.addFonts(batch))) ?? null
             renderer.setDelay(this.subtitleDelay)
             this.libass = renderer
             this.libassEntry = null
@@ -1018,6 +1027,8 @@ export class WebVideoPlayer {
     }
 
     private destroyLibass() {
+        this.unsubscribeFontData?.()
+        this.unsubscribeFontData = null
         this.libass?.destroy()
         this.libass = null
         this.libassStarting = null
