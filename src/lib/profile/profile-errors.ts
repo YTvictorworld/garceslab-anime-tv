@@ -9,9 +9,31 @@ export function isProfileRequiredError(message: string | null | undefined): bool
     return message === "PROFILE_REQUIRED" || message === "PROFILE_INVALID_TOKEN"
 }
 
+/**
+ * The code of an error message: "LANES_FULL: All 3 viewing slots…" →
+ * "LANES_FULL". Messages without a code come back as they are.
+ */
+export function errorCode(message: string | null | undefined): string {
+    const text = (message ?? "").trim()
+    const match = /^([A-Z][A-Z0-9_]+)(?::|$)/.exec(text)
+    return match ? match[1] : text
+}
+
+/**
+ * LANES_FULL (phase 2 viewer sessions): the server's own sentence names who
+ * holds the slots, e.g. "All 3 viewing slots are in use (Ana, Bob and Carl)".
+ */
+export function lanesFullMessage(message: string | null | undefined): string {
+    const detail = (message ?? "").replace(/^LANES_FULL:?\s*/, "").trim()
+    const sentence = detail || "All viewing slots are in use"
+    return `${sentence.replace(/\.$/, "")}. Try again when someone stops watching.`
+}
+
 /** The message to show for a profile error code, or null when it isn't one. */
 export function profileErrorMessage(message: string | null | undefined, retryAfterSeconds?: number | null): string | null {
-    switch (message) {
+    switch (errorCode(message)) {
+        case "LANES_FULL":
+            return lanesFullMessage(message)
         case "PLAYBACK_BUSY":
             return "Another playback is in progress. Stop it first, then try again."
         case "PROFILE_REQUIRED":

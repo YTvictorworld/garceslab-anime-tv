@@ -42,14 +42,16 @@ export function useContinuitySync(
     React.useEffect(() => {
         if (!isConnected || !source || source.serverStreamType || source.mediaId <= 0 || source.episodeNumber <= 0) return
 
+        const { mediaId, episodeNumber } = source
         startManualTracking({
-            mediaId: source.mediaId,
-            episodeNumber: source.episodeNumber,
+            mediaId,
+            episodeNumber,
             clientId: getClientIdentity().clientId,
         })
 
         return () => {
-            cancelManualTracking()
+            // With the episode: a late cancel doesn't end the next episode's viewer session.
+            cancelManualTracking({ mediaId, episodeNumber })
         }
     }, [cancelManualTracking, isConnected, source?.episodeNumber, source?.id, source?.mediaId, source?.serverStreamType, startManualTracking])
 

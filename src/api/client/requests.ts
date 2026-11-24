@@ -351,6 +351,10 @@ function _handleSeaError(data: any): string {
 
     if (!err) return "Unknown error"
 
+    // Profile and viewing-slot codes (PLAYBACK_BUSY, LANES_FULL: …) read as sentences.
+    const codeMessage = profileErrorMessage(err)
+    if (codeMessage) return codeMessage
+
     if (err.includes("Too many requests"))
         return "AniList: Too many requests, please wait a moment and try again."
 

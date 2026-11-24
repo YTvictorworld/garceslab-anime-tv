@@ -1,5 +1,5 @@
 import { useServerMutation } from "@/api/client/requests"
-import { PlaybackPlayVideo_Variables, PlaybackStartManualTracking_Variables } from "@/api/generated/endpoint.types"
+import { PlaybackCancelManualTracking_Variables, PlaybackPlayVideo_Variables, PlaybackStartManualTracking_Variables } from "@/api/generated/endpoint.types"
 import { API_ENDPOINTS } from "@/api/generated/endpoints"
 import { Anime_LocalFile } from "@/api/generated/types"
 import { useServerStatus } from "@/atoms/server.atoms"
@@ -92,8 +92,12 @@ export function usePlaybackStartManualTracking() {
     })
 }
 
+/**
+ * Garceslab Anime: pass the episode whose tracking ends, so a server with
+ * viewer sessions keeps the session of the episode that follows it.
+ */
 export function usePlaybackCancelManualTracking({ onSuccess }: { onSuccess?: () => void }) {
-    return useServerMutation<boolean>({
+    return useServerMutation<boolean, Partial<PlaybackCancelManualTracking_Variables> | void>({
         endpoint: API_ENDPOINTS.PLAYBACK_MANAGER.PlaybackCancelManualTracking.endpoint,
         method: API_ENDPOINTS.PLAYBACK_MANAGER.PlaybackCancelManualTracking.methods[0],
         mutationKey: [API_ENDPOINTS.PLAYBACK_MANAGER.PlaybackCancelManualTracking.key],

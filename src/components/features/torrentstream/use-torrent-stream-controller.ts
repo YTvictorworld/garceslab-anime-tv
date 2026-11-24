@@ -23,6 +23,7 @@ import { useServerStatus } from "@/atoms/server.atoms"
 import { torrentSearchAcrossProvidersAtom, torrentSearchExtraProviderIdsAtom } from "@/atoms/torrent-search.atoms"
 import { getDefaultPlaybackSource } from "@/lib/default-playback-source"
 import { rememberDebridStart } from "@/lib/player/direct-play-mode"
+import { profileErrorMessage } from "@/lib/profile/profile-errors"
 import { streamPlaybackType } from "@/lib/player/direct-stream"
 import { endKeptStream, findKeptStream, probeKeptStream } from "@/lib/player/kept-direct-stream"
 import { useOpenKeptStream } from "@/lib/player/session"
@@ -79,7 +80,8 @@ type UseTorrentStreamControllerParams = {
 /** The message of a failed stream request, for the TV start screen's card. */
 function streamErrorMessage(error: unknown) {
     const message = error instanceof Error ? error.message : typeof error === "string" ? error : ""
-    return message || "The server couldn't start the stream"
+    // LANES_FULL ("All 3 viewing slots are in use (…)"), PLAYBACK_BUSY: plain sentences.
+    return profileErrorMessage(message) ?? (message || "The server couldn't start the stream")
 }
 
 export function useTorrentStreamController({ entry, mode = "stream" }: UseTorrentStreamControllerParams) {
