@@ -41,6 +41,11 @@ export type PlayerPreferences = {
     longPressFastForwardSpeed: number
     /** Whether the player should automatically advance near the end of an episode. */
     autoNextEpisode: boolean
+    /**
+     * Garceslab Anime: "next episode" (auto next and the Next button) jumps
+     * over filler and recap episodes, when the anime's episode tags are known.
+     */
+    skipFillerEpisodes: boolean
     /** Whether tapping the center of the screen toggles play/pause. */
     centerTapPlayPause: boolean
     /** Whether side vertical swipes adjust brightness and volume. */
@@ -80,6 +85,7 @@ const DEFAULTS: PlayerPreferences = {
     buttonSeekSec: 3,
     longPressFastForwardSpeed: 2.0,
     autoNextEpisode: true,
+    skipFillerEpisodes: false,
     centerTapPlayPause: true,
     sideSwipeBrightnessVolume: true,
     // playbackBrightness: null,

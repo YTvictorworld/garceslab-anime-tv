@@ -422,6 +422,7 @@ export function TVLibraryScreen() {
                     progressPercent,
                     // The hero falls back to a percentage without it.
                     progressLabel: progressPercent > 0 && minutesLeft > 0 ? `${minutesLeft}m left` : undefined,
+                    episodeTag: episode.type === "main" ? { mediaId: media.id, episodeNumber: episode.episodeNumber } : undefined,
                     actionLabel: startCardStatus?.mediaId === media.id
                         ? `${startCardStatus.status.message}  ·  ${startCardStatus.status.hint}`
                         : progressPercent > 0 ? `Resume ${episode.displayTitle}` : `Play ${episode.displayTitle}`,

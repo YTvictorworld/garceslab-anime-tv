@@ -43,6 +43,14 @@ All for the LG webOS build:
   the anime and at least one episode is filler or recap; otherwise, or on any error, cards are
   unchanged. While the server fetches, the app asks again every 4 s for about two minutes.
   Tests in `tests/episode-tags.test.ts`.
+- **Episode tags beyond the anime page** (`src/components/tv/tv-episode-tag-pill.tsx`,
+  `tv-continue-card.tsx`, `tv-hero-carousel.tsx`, `tv-player-controls.tsx`, `tv-player-dialog.tsx`,
+  `app/(app)/(media)/player.tsx`): the pill on Continue watching cards, the hero's continue
+  slide, the player's top bar, its Next button and the next-episode prompts. Requests go
+  through `src/lib/episode-tags/request-limit.ts` (three at a time, one cache entry per anime).
+- **Skip filler and recaps** (`src/lib/episode-tags/next-episode.ts`, a player setting synced
+  per profile as `tv.skipFillerEpisodes`): next episode jumps over filler and recap episodes
+  when tags are known. Tests in `tests/next-episode-tags.test.ts`.
 
 ## 2026-11 (profiles, phase 4: polish)
 

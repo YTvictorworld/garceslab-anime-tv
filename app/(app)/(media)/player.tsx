@@ -21,6 +21,7 @@ import {
     TV_CONTROLS_HIDE_DELAY,
 } from "@/components/features/player/constants"
 import { clamp, formatTime, getBackPanel, getChapterAtTime, getFillZoomScale, getSourceVideoAspectRatio } from "@/components/features/player/helpers"
+import { useEpisodeTags } from "@/api/hooks/episode-tags.hooks"
 import { useAutoNextEpisode } from "@/components/features/player/hooks/use-auto-next-episode"
 import { useControlsVisibility } from "@/components/features/player/hooks/use-controls-visibility"
 import { useDoubleTapSeek } from "@/components/features/player/hooks/use-double-tap-seek"
@@ -56,6 +57,8 @@ import type { PlayerChapter } from "@/lib/player"
 import { getLocalEpisodePlaybackSource } from "@/lib/player"
 import { endKeptStream } from "@/lib/player/kept-direct-stream"
 import { usePlayerPreferences } from "@/lib/player/player-preferences"
+import { episodeTagFor, type EpisodeTagKind } from "@/lib/episode-tags/episode-tags"
+import { describeEpisodeSkip, nextEpisodeLine, planNextEpisode } from "@/lib/episode-tags/next-episode"
 import { DEFAULT_RESUME_RULE, getWatchHistoryResumePosition, WEB_TV_RESUME_RULE } from "@/lib/player/resume-position"
 import type { MobilePlaybackSource } from "@/lib/player/types"
 import { useContinuitySync } from "@/lib/player/use-continuity-sync"
@@ -89,12 +92,18 @@ import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 ///////////////////////////////////////////////////////////////////////////////
 
+function capitalize(text: string) {
+    return text.charAt(0).toUpperCase() + text.slice(1)
+}
+
 type NextEpisodePrompt = {
     title: string
     description: string
     confirmLabel: string
     /** Defaults to playing the next episode. */
     onConfirm?: () => void
+    /** Garceslab Anime: the canon/filler pill of the episode it plays. */
+    tag?: EpisodeTagKind
 }
 
 const DEFAULT_TEXT_SUBTITLE_MARGIN_Y = 34
@@ -346,15 +355,39 @@ function PlayerScreenInner() {
     const videoAspectRatio = getSourceVideoAspectRatio(source)
     const fillZoomScale = getFillZoomScale(screenWidth, screenHeight, videoAspectRatio)
 
-    const nextEpisode = !source?.episodes || source.episodes.length === 0
+    const naturalNextEpisode = !source?.episodes || source.episodes.length === 0
         ? null
         : source.episodes.find(e => e.episodeNumber === source.episodeNumber + 1) ?? null
 
-    const nextEpisodeNumber = nextEpisode
-        ? nextEpisode.episodeNumber
+    const naturalNextEpisodeNumber = naturalNextEpisode
+        ? naturalNextEpisode.episodeNumber
         : !source?.media?.episodes || source.episodeNumber >= source.media.episodes
             ? null
             : source.episodeNumber + 1
+
+    // Garceslab Anime: canon/filler tags for the current and next episode, and
+    // "Skip filler and recaps" (see planNextEpisode). Without tags, or with the
+    // option off, next is the natural next episode as before.
+    const episodeTags = useEpisodeTags(source?.mediaId)
+    const isMainEpisode = !source?.episode || source.episode.type === "main"
+    const currentEpisodeTag = isMainEpisode ? episodeTagFor(episodeTags, source?.episodeNumber) : undefined
+    const availableEpisodeNumbers = React.useMemo(() => source?.nextEpisodeAction === "local-file" && source.episodes
+        ? new Set(source.episodes.filter(e => e.type === "main").map(e => e.episodeNumber))
+        : null, [source?.episodes, source?.nextEpisodeAction])
+    const nextEpisodePlan = planNextEpisode({
+        current: isMainEpisode ? source?.episodeNumber : null,
+        natural: naturalNextEpisodeNumber,
+        tags: episodeTags,
+        skipFiller: prefs.skipFillerEpisodes,
+        lastEpisode: source?.media?.episodes,
+        available: availableEpisodeNumbers,
+    })
+    const nextEpisodeSkip = nextEpisodePlan?.skip ?? null
+    const nextEpisode = nextEpisodeSkip
+        ? source?.episodes?.find(e => e.episodeNumber === nextEpisodePlan!.episodeNumber && e.type === "main") ?? null
+        : naturalNextEpisode
+    const nextEpisodeNumber = nextEpisodePlan?.episodeNumber ?? null
+    const nextEpisodeTag = isMainEpisode ? episodeTagFor(episodeTags, nextEpisodeNumber) : undefined
 
     const previousEpisode = !source?.episodes || source.episodes.length === 0
         ? null
@@ -1100,6 +1133,8 @@ function PlayerScreenInner() {
 
     const nextEpisodeLabel = nextEpisode?.displayTitle
         ?? (nextEpisodeNumber ? `Episode ${nextEpisodeNumber}` : "the next episode")
+    /** With its tag and skip: "Episode 110 (skipping filler episodes 64–109) · CANON". */
+    const nextEpisodeText = nextEpisodeLine(nextEpisodeLabel, nextEpisodeTag, nextEpisodeSkip, "")
 
     const canPlayPrevious = Boolean(source?.nextEpisodeAction)
         && previousEpisodeNumber !== null
@@ -1289,16 +1324,18 @@ function PlayerScreenInner() {
         if (source.nextEpisodeAction === "torrentstream-manual" || source.nextEpisodeAction === "debridstream-manual") {
             setNextEpisodePrompt({
                 title: "Choose next episode source?",
-                description: `Continuing to ${nextEpisodeLabel} will return you to the source picker.`,
+                description: `Continuing to ${nextEpisodeText} will return you to the source picker.`,
                 confirmLabel: "Continue",
+                tag: nextEpisodeTag,
             })
             return
         }
         if (shouldConfirmEarlySkip) {
             setNextEpisodePrompt({
                 title: "Play next episode?",
-                description: `${formatTime(remainingTime)} is still left in this episode. Start ${nextEpisodeLabel} now?`,
+                description: `${formatTime(remainingTime)} is still left in this episode. Start ${nextEpisodeText} now?`,
                 confirmLabel: "Play next",
+                tag: nextEpisodeTag,
             })
             return
         }
@@ -1679,6 +1716,11 @@ function PlayerScreenInner() {
                             longSeekVisible={tvLongSeek.visible}
                             seekSec={prefs.buttonSeekSec}
                             canPlayNext={canPlayNext}
+                            episodeTag={currentEpisodeTag}
+                            nextEpisode={canPlayNext ? {
+                                label: nextEpisodeLine(nextEpisodeLabel, undefined, nextEpisodeSkip),
+                                tag: nextEpisodeTag,
+                            } : undefined}
                             canShowEpisodes={(source?.episodes?.length ?? 0) > 1}
                             skipLabel={showSkipIntro ? "Skip intro" : showSkipOutro ? "Skip outro" : undefined}
                             onSkip={(showSkipIntro || showSkipOutro) ? () => {
@@ -1758,7 +1800,8 @@ function PlayerScreenInner() {
                             open
                             eyebrow="Up next"
                             title={nextEpisodeLabel}
-                            text={`Playing automatically in ${autoNext.autoNextCountdown}s`}
+                            tag={nextEpisodeTag}
+                            text={`${nextEpisodeSkip ? `${capitalize(describeEpisodeSkip(nextEpisodeSkip))}\n` : ""}Playing automatically in ${autoNext.autoNextCountdown}s`}
                             confirmLabel="Play now"
                             onCancel={autoNext.cancelAutoNext}
                             onConfirm={autoNext.triggerAutoNext}
@@ -1766,7 +1809,7 @@ function PlayerScreenInner() {
                     ) : (
                         <AutoNextCard
                             countdown={autoNext.autoNextCountdown}
-                            nextEpisodeLabel={nextEpisodeLabel}
+                            nextEpisodeLabel={nextEpisodeText}
                             controlsVisible={controls.controlsVisible}
                             controlsLocked={controls.controlsLocked}
                             padR={padR}
@@ -1783,6 +1826,7 @@ function PlayerScreenInner() {
                             open
                             eyebrow="Next episode"
                             title={nextEpisodePrompt.title}
+                            tag={nextEpisodePrompt.tag}
                             text={nextEpisodePrompt.description}
                             confirmLabel={nextEpisodePrompt.confirmLabel}
                             onCancel={dismissNextEpisodePrompt}

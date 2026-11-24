@@ -243,6 +243,20 @@ Specials have no pill. The episode numbers are MyAnimeList's, so a show that MyA
 AniList split differently (a second cour numbered 13-24 on one and 1-12 on the other) can get
 shifted pills.
 
+The same pill shows outside the show's page: on *Continue watching* cards (including the
+"Next: Episode N" upcoming ones), on the home hero's continue-watching slide, next to the
+episode in the player's top bar, on the player's *Next episode* button (its name when
+focused reads "Next: Episode 34" with the pill) and in the "Up next" countdown and the "Play
+next episode?" prompt. The home screen asks the server for a few shows at a time, and the
+answers are shared with the show's page and the player.
+
+**Skip filler and recaps** (player *Settings*, off by default, follows the profile): auto
+next and the *Next episode* button jump over FILLER and RECAP episodes to the next one that
+isn't (MIX episodes are kept, as they carry part of the story), e.g. "Next: Episode 110
+(skipping filler episodes 64–109)". It only acts when the show has tags; without them, when
+the show ends on filler, or (downloaded files) when the episode to land on isn't downloaded,
+next is the usual next episode.
+
 ## Playback
 
 **Episode cards start in place.** On a show's *Torrents* tab, OK on an episode shows the

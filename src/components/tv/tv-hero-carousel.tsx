@@ -1,4 +1,5 @@
 import { TVButton, TVPillButton } from "@/components/tv/tv-focus"
+import { TVEpisodeTagFor } from "@/components/tv/tv-episode-tag-pill"
 import { TVScoreBadge } from "@/components/tv/tv-score-badge"
 import { TV, tvSize } from "@/components/tv/tv-scale"
 import { TVHeroSkeleton } from "@/components/tv/tv-skeleton"
@@ -31,6 +32,8 @@ export type TVHeroItem = {
     progressPercent?: number
     /** Shown next to the progress meter, e.g. "12m left". */
     progressLabel?: string
+    /** Garceslab Anime: the episode whose canon/filler pill follows the subtitle. */
+    episodeTag?: { mediaId: number; episodeNumber: number }
     actionLabel: string
     onAction: () => void
     secondaryLabel?: string
@@ -207,6 +210,7 @@ export const TVHeroCarousel = React.memo(function TVHeroCarousel({
                                     {item.subtitle}
                                 </Text>
                             ) : null}
+                            {item.episodeTag ? <TVEpisodeTagFor {...item.episodeTag} size={17} style={{ alignSelf: "center" }} /> : null}
                             {progress > 0 ? <HeroProgress percent={progress} label={item.progressLabel} /> : null}
                         </View>
                     ) : null}
