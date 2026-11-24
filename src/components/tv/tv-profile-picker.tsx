@@ -419,8 +419,9 @@ export function TVCreateProfile({ serverUrl, avatars, avatarsLoading, firstRun, 
                         <Text style={{ color: "#a89fff" }}>|</Text>
                     </Text>
                 </View>
-                <View style={{ flexDirection: "row", gap: tvSize(40), alignItems: "flex-start" }}>
-                    <TVFocusGuideView autoFocus trapFocusLeft trapFocusUp trapFocusDown>
+                {/* Keyboard first, then the actions centred under it: Down from the last keyboard row reaches them. */}
+                <View style={{ alignItems: "center", gap: tvSize(30) }}>
+                    <TVFocusGuideView autoFocus trapFocusLeft trapFocusRight trapFocusUp>
                         <TVOnScreenKeyboard
                             value={value}
                             onChange={editingName ? setName : setUsername}
@@ -429,7 +430,7 @@ export function TVCreateProfile({ serverUrl, avatars, avatarsLoading, firstRun, 
                             preferred
                         />
                     </TVFocusGuideView>
-                    <TVFocusGuideView trapFocusRight trapFocusUp trapFocusDown style={{ gap: tvSize(14), width: tvSize(300) }}>
+                    <TVFocusGuideView trapFocusLeft trapFocusRight trapFocusDown style={{ flexDirection: "row", justifyContent: "center", gap: tvSize(20) }}>
                         <TVButton
                             label={editingName ? "Next" : "Done"}
                             variant="primary"
