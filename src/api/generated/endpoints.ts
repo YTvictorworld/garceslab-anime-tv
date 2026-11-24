@@ -2101,6 +2101,11 @@ export const API_ENDPOINTS = {
             methods: ["GET"],
             endpoint: "/api/v1/profiles/me/activity",
         },
+        /**
+         *  @description
+         *  Route imports an AniList anime list (and optionally the favourites) into a profile.
+         *  Body: {"username": string} for a public list (anonymous), or {"token": string} for a private list: the token is used for this import only and is never stored or logged. Also "mode" (merge|replace) and "favourites" (default true).
+         */
         ImportProfileAnilist: {
             key: "PROFILES-DATA-import-profile-anilist",
             methods: ["POST"],
@@ -2130,6 +2135,63 @@ export const API_ENDPOINTS = {
             key: "PROFILES-DATA-export-profile",
             methods: ["GET"],
             endpoint: "/api/v1/profiles/{id}/export",
+        },
+    },
+    PROFILES_LIBRARY: {
+        /**
+         *  @description
+         *  Route returns the current profile's favourites (anime favourites carry their media).
+         *  Optional query `kind`: ANIME, MANGA, CHARACTER, STAFF or STUDIO.
+         */
+        GetMyFavourites: {
+            key: "PROFILES-LIBRARY-get-my-favourites",
+            methods: ["GET"],
+            endpoint: "/api/v1/profiles/me/favourites",
+        },
+        AddMyFavourite: {
+            key: "PROFILES-LIBRARY-add-my-favourite",
+            methods: ["POST"],
+            endpoint: "/api/v1/profiles/me/favourites/{kind}/{refId}",
+        },
+        RemoveMyFavourite: {
+            key: "PROFILES-LIBRARY-remove-my-favourite",
+            methods: ["DELETE"],
+            endpoint: "/api/v1/profiles/me/favourites/{kind}/{refId}",
+        },
+        /**
+         *  @description
+         *  Route renames and/or moves one of the current profile's custom lists.
+         *  Body: {"name"?: string, "position"?: int (0-based)}.
+         */
+        UpdateMyCustomList: {
+            key: "PROFILES-LIBRARY-update-my-custom-list",
+            methods: ["PATCH"],
+            endpoint: "/api/v1/profiles/me/lists/{listId}",
+        },
+        GetMyListEntry: {
+            key: "PROFILES-LIBRARY-get-my-list-entry",
+            methods: ["GET"],
+            endpoint: "/api/v1/profiles/me/entries/{mediaId}",
+        },
+        /**
+         *  @description
+         *  Route edits (or adds) the current profile's list entry for a media: status, score, progress, dates, rewatches, private, notes and custom lists.
+         *  Only the fields sent change. A date with null parts clears it, "" clears the notes. A new entry is PLANNING unless a status is sent.
+         */
+        EditMyListEntry: {
+            key: "PROFILES-LIBRARY-edit-my-list-entry",
+            methods: ["PATCH"],
+            endpoint: "/api/v1/profiles/me/entries/{mediaId}",
+        },
+        /**
+         *  @description
+         *  Route returns the media the current profile watched most recently (latest position, list status and media).
+         *  Optional query `limit` (default 20, max 200).
+         */
+        GetMyRecentlyWatched: {
+            key: "PROFILES-LIBRARY-get-my-recently-watched",
+            methods: ["GET"],
+            endpoint: "/api/v1/profiles/me/recently-watched",
         },
     },
     PROFILES_PLAYER: {
