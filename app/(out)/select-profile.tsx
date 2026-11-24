@@ -18,7 +18,7 @@ import { TVEditProfile } from "@/components/tv/tv-profile-editor"
 import { type CreateProfileInput, TVCreateProfile, TVPinPad, TVProfilePicker } from "@/components/tv/tv-profile-picker"
 import { profileErrorMessage, serverHasProfiles } from "@/lib/profile/profile-errors"
 import { getProfileSessionEnd, setProfileSession } from "@/lib/profile/profile-session"
-import { useProfileSwitch } from "@/lib/profile/use-profile-switch"
+import { takePendingProfileEntry, useProfileSwitch } from "@/lib/profile/use-profile-switch"
 import { logger } from "@/lib/utils/logger"
 import { toast } from "@/lib/utils/toast"
 import { router } from "expo-router"
@@ -84,14 +84,21 @@ export default function SelectProfileScreen() {
     // The profile to focus in the picker after editing it.
     const [lastEditedId, setLastEditedId] = React.useState<number | null>(null)
 
+    // The nav bar's switcher already opened the next profile: enter it, no picker.
+    const [pendingEntry] = React.useState(takePendingProfileEntry)
     React.useEffect(() => {
+        if (pendingEntry) enterProfile(pendingEntry.session, pendingEntry.profile)
+    }, [enterProfile, pendingEntry])
+
+    React.useEffect(() => {
+        if (pendingEntry) return
         if (!serverUrl) {
             router.replace("/(out)/set-server-url")
             return
         }
         // A stock Seanime server (or one with profiles off): nothing to pick.
         if (statusKnown && !hasProfiles) router.replace("/(app)/(tabs)/(library)")
-    }, [hasProfiles, serverUrl, statusKnown])
+    }, [hasProfiles, pendingEntry, serverUrl, statusKnown])
 
     React.useEffect(() => {
         if (errorCode(profilesQuery.error) === "UNAUTHENTICATED" || errorCode(status.error) === "UNAUTHENTICATED") {
@@ -307,7 +314,7 @@ export default function SelectProfileScreen() {
         }
     }, [enterProfile, serverUrl])
 
-    if (!statusKnown && !status.data) {
+    if (pendingEntry || (!statusKnown && !status.data)) {
         return <View className="bg-background flex-1" />
     }
 

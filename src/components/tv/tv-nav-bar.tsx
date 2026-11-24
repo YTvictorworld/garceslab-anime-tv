@@ -2,6 +2,7 @@ import { avatarImageUrl } from "@/api/hooks/profiles.hooks"
 import { useProfileSession } from "@/atoms/profile.atoms"
 import { useServerUrl } from "@/atoms/server.atoms"
 import { useTVFocus } from "@/components/tv/tv-focus"
+import { TVProfileSwitcher } from "@/components/tv/tv-profile-switcher"
 import { TV, tvSize } from "@/components/tv/tv-scale"
 import { IMAGES } from "@/constants/images"
 import { TV_VISUAL } from "@/lib/tv/visual-flags"
@@ -56,14 +57,11 @@ function NavItem({
     item,
     active,
     pending,
-    avatarUri,
     onPress,
 }: {
     item: (typeof ITEMS)[number]
     active: boolean
     pending: boolean
-    /** Garceslab Anime: the current profile's avatar replaces the tab's icon. */
-    avatarUri?: string | null
     onPress: () => void
 }) {
     const focusState = useTVFocus(1.05, item.label)
@@ -104,18 +102,6 @@ function NavItem({
                             size={tvSize(26)}
                             color={focused ? "#0a0a0a" : "#ffffff"}
                         />
-                    ) : avatarUri ? (
-                        <Image
-                            source={{ uri: avatarUri }}
-                            style={{
-                                width: tvSize(28),
-                                height: tvSize(28),
-                                borderRadius: tvSize(6),
-                                opacity: focused || active ? 1 : 0.7,
-                            }}
-                            contentFit="cover"
-                            accessibilityIgnoresInvertColors
-                        />
                     ) : (
                         <Ionicons
                             name={focused || active ? item.activeIcon : item.icon}
@@ -142,6 +128,54 @@ function NavItem({
     )
 }
 
+/**
+ * Garceslab Anime: the profile in use, at the right end of the bar. OK opens
+ * the profile switcher (TVProfileSwitcher), like the avatar menu on the web.
+ */
+function ProfileNavItem({ name, avatarUri, open, onPress }: { name: string; avatarUri: string | null; open: boolean; onPress: () => void }) {
+    const focusState = useTVFocus(1.08, "profile-switcher")
+    return (
+        <Pressable
+            onPress={onPress}
+            onFocus={focusState.focus}
+            onBlur={focusState.blur}
+            accessibilityRole="button"
+            accessibilityLabel={`${name}. Switch profile`}
+            style={{ flexShrink: 0 }}
+        >
+            {({ focused }) => (
+                <Animated.View
+                    style={[
+                        focusState.style,
+                        {
+                            // As tall as the tabs, so the bar keeps its height.
+                            width: tvSize(40),
+                            height: tvSize(40),
+                            borderRadius: tvSize(12),
+                            borderWidth: tvSize(2),
+                            borderColor: focused ? "#ffffff" : (open ? "rgba(168,159,255,0.9)" : "transparent"),
+                            padding: tvSize(2),
+                        },
+                    ]}
+                >
+                    {avatarUri ? (
+                        <Image
+                            source={{ uri: avatarUri }}
+                            style={{ width: "100%", height: "100%", borderRadius: tvSize(8) }}
+                            contentFit="cover"
+                            accessibilityIgnoresInvertColors
+                        />
+                    ) : (
+                        <View style={{ flex: 1, borderRadius: tvSize(8), backgroundColor: "rgba(255,255,255,0.12)", alignItems: "center", justifyContent: "center" }}>
+                            <Ionicons name="person" size={tvSize(20)} color="#ffffff" />
+                        </View>
+                    )}
+                </Animated.View>
+            )}
+        </Pressable>
+    )
+}
+
 export function TVNavBar() {
     const segments = useSegments()
     const serverUrl = useServerUrl()
@@ -149,6 +183,7 @@ export function TVNavBar() {
     const profileAvatar = avatarImageUrl(serverUrl, profileSession?.profile.avatarUrl)
     const routeKey = segments.join("/")
     const [pending, setPending] = React.useState<string | null>(null)
+    const [switcherOpen, setSwitcherOpen] = React.useState(false)
     const isActive = React.useCallback((key: (typeof ITEMS)[number]["key"]) => {
         if (key === "discover") return routeKey.includes("discover")
         if (key === "schedule") return routeKey.includes("schedule")
@@ -244,12 +279,34 @@ export function TVNavBar() {
                             item={item}
                             active={isActive(item.key)}
                             pending={pending === item.key}
-                            avatarUri={item.key === "settings" ? profileAvatar : null}
                             onPress={() => open(item)}
                         />
                     ))}
+                    {profileSession ? (
+                        <>
+                            <View
+                                style={{
+                                    width: tvSize(1),
+                                    height: tvSize(28),
+                                    marginHorizontal: tvSize(8),
+                                    backgroundColor: "rgba(255,255,255,0.14)",
+                                }}
+                            />
+                            <ProfileNavItem
+                                name={profileSession.profile.name}
+                                avatarUri={profileAvatar}
+                                open={switcherOpen}
+                                onPress={() => setSwitcherOpen(true)}
+                            />
+                        </>
+                    ) : null}
                 </TVFocusGuideView>
             </View>
+            <TVProfileSwitcher
+                open={switcherOpen}
+                onOpenChange={setSwitcherOpen}
+                currentProfileId={profileSession?.profile.id ?? null}
+            />
         </View>
     )
 }

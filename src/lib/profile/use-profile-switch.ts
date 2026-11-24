@@ -9,6 +9,17 @@ import { useQueryClient } from "@tanstack/react-query"
 import { router } from "expo-router"
 import * as React from "react"
 
+/** A profile opened by the nav bar's switcher, entered by the select-profile route (changeProfile). */
+let pendingEntry: { session: ProfileSession; profile: Profile } | null = null
+
+/** The switcher's profile to enter, once. */
+export function takePendingProfileEntry(): { session: ProfileSession; profile: Profile } | null {
+    if (!pendingEntry) return null
+    const entry = { session: pendingEntry.session, profile: pendingEntry.profile }
+    pendingEntry = null
+    return entry
+}
+
 /**
  * Garceslab Anime: entering and leaving a profile. Each one starts from an
  * empty cache (and its own saved responses), so nothing of the previous
@@ -40,5 +51,19 @@ export function useProfileSwitch() {
         router.replace("/(out)/select-profile")
     }, [queryClient, serverUrl, setServerStatus])
 
-    return { enterProfile, switchProfile }
+    /**
+     * Straight from one profile to another (the nav bar's profile switcher).
+     * The new session is already open (the server moved this TV to it when it
+     * was selected), so nothing is logged out. The app still passes through
+     * the select-profile route, which enters it at once without showing the
+     * picker: the screens of the previous profile unmount there, as they do
+     * after "Switch profile", instead of staying mounted on an emptied cache.
+     */
+    const changeProfile = React.useCallback((session: ProfileSession, selected: Profile) => {
+        endKeptStream("terminate")
+        pendingEntry = { session, profile: selected }
+        router.replace("/(out)/select-profile")
+    }, [])
+
+    return { enterProfile, switchProfile, changeProfile }
 }
