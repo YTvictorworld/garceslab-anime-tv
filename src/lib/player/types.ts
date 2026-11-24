@@ -102,6 +102,8 @@ export type MobilePlaybackSource = {
      * on the TV (direct-play-session.ts).
      */
     directPlay?: boolean
+    /** Direct play: the retry (1-3) this link is, after earlier direct links failed. */
+    directRetryAttempt?: number
     continuityKind: Continuity_Kind
 
     /** Seconds to resume from. Populated from continuity before playback starts. */

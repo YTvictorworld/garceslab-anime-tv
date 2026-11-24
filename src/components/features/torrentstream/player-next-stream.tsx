@@ -1,20 +1,31 @@
 import type { Anime_Entry } from "@/api/generated/types"
 import { useGetAnimeEntry } from "@/api/hooks/anime_entries.hooks"
 import { activeStreamSessionAtom, directStreamLoadingMessageAtom, torrentStreamIsPreparingAtom, torrentStreamPendingInfoAtom } from "@/lib/player"
-import { lastDebridStartFor, requestRelayForNextStart } from "@/lib/player/direct-play-mode"
-import { useAtomValue } from "jotai"
+import { directRetrySelection, lastDebridStartFor, requestRelayForNextStart } from "@/lib/player/direct-play-mode"
+import type { PlayerNextEpisodeAction } from "@/lib/player/types"
+import { logger } from "@/lib/utils/logger"
+import { useAtomValue, useSetAtom } from "jotai"
 import * as React from "react"
 import { Text } from "react-native"
 import { type StreamMode, useTorrentStreamController } from "./use-torrent-stream-controller"
 
 /** The next episode's stream, started from the player instead of the show page. */
 export type NextStreamRequest = {
-    /** retry-relay: the same debrid start again, through the server (direct-play test build). */
-    kind: "auto-select" | "previous-batch" | "retry-relay"
+    /**
+     * retry-relay: the same debrid start again, through the server.
+     * retry-direct: a fresh direct link to the release and file the failed one
+     * played (no auto-select), after `delayMs`.
+     */
+    kind: "auto-select" | "previous-batch" | "retry-relay" | "retry-direct"
     mode: StreamMode
     mediaId: number
     episodeNumber: number
+    delayMs?: number
+    /** Retries: how the episode was started, kept for the next episode. */
+    nextEpisodeAction?: PlayerNextEpisodeAction
 }
+
+const log = logger("player-next-stream")
 
 type PlayerNextStreamProps = {
     request: NextStreamRequest
@@ -51,7 +62,15 @@ function Starter({ entry, request, onNeedsEntry, onFailed, cancelRef }: PlayerNe
     const pendingInfo = useAtomValue(torrentStreamPendingInfoAtom)
     const isPreparing = useAtomValue(torrentStreamIsPreparingAtom)
     const inFlight = !!pendingInfo || isPreparing
+    const setPendingInfo = useSetAtom(torrentStreamPendingInfoAtom)
     const [started, setStarted] = React.useState(false)
+    // A direct retry waits its backoff first.
+    const [waited, setWaited] = React.useState(!request.delayMs)
+    React.useEffect(() => {
+        if (waited) return
+        const timer = setTimeout(() => setWaited(true), request.delayMs)
+        return () => clearTimeout(timer)
+    }, [request.delayMs, waited])
     const wasInFlight = React.useRef(false)
 
     React.useEffect(() => {
@@ -63,7 +82,7 @@ function Starter({ entry, request, onNeedsEntry, onFailed, cancelRef }: PlayerNe
 
     // Once the episode list is in, as the show page does for a playback intent.
     React.useEffect(() => {
-        if (started || torrentStream.isLoadingEpisodeCollection) return
+        if (started || !waited || torrentStream.isLoadingEpisodeCollection) return
         setStarted(true)
         const episode = torrentStream.episodes.find(item => item.episodeNumber === request.episodeNumber)
         if (!episode?.aniDBEpisode) {
@@ -71,16 +90,39 @@ function Starter({ entry, request, onNeedsEntry, onFailed, cancelRef }: PlayerNe
             return
         }
         torrentStream.setStreamMode(request.mode)
+        if (request.kind === "retry-direct") {
+            const record = lastDebridStartFor(request.mediaId, request.episodeNumber)
+            const selection = directRetrySelection(record)
+            if (!record || !selection) {
+                log.warning("Direct retry: the release isn't known any more", { mediaId: request.mediaId, episodeNumber: request.episodeNumber })
+                onFailed()
+                return
+            }
+            // The same release and file: the server only resolves a fresh link (no auto-select).
+            const result = torrentStream.startManualStream({ episode: record.episode, torrent: selection.torrent, fileId: selection.fileId }, "debrid")
+            if (result.kind === "blocked") {
+                onFailed()
+                return
+            }
+            const nextEpisodeAction = request.nextEpisodeAction
+            if (nextEpisodeAction) setPendingInfo(info => info && { ...info, nextEpisodeAction })
+            return
+        }
         if (request.kind === "retry-relay") {
             const record = lastDebridStartFor(request.mediaId, request.episodeNumber)
             requestRelayForNextStart()
+            // The same release the direct link played, when the server named it.
+            const resolved = record?.resolved
             if (record?.kind === "manual" && record.manual) torrentStream.startManualStream({ episode: record.episode, ...record.manual }, "debrid")
+            else if (record && resolved) torrentStream.startManualStream({ episode: record.episode, torrent: resolved.torrent, fileId: resolved.fileId }, "debrid")
             else torrentStream.startAutoSelectedStream(episode, "debrid")
+            const nextEpisodeAction = request.nextEpisodeAction
+            if (nextEpisodeAction) setPendingInfo(info => info && { ...info, nextEpisodeAction })
             return
         }
         if (request.kind === "auto-select") torrentStream.startAutoSelectedStream(episode, request.mode)
         else torrentStream.startPreviousBatchStream(episode, request.mode)
-    }, [onNeedsEntry, request, started, torrentStream])
+    }, [onFailed, onNeedsEntry, request, setPendingInfo, started, torrentStream, waited])
 
     // A previous batch whose file isn't known asks for the picker, which lives on the show page.
     React.useEffect(() => {

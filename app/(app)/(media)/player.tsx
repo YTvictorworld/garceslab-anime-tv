@@ -42,8 +42,16 @@ import { type NextStreamRequest, PlayerNextStream, PlayerNextStreamProgress } fr
 import { TVPlayerControls, TVPlayerDialog, TVPlayerPanel } from "@/components/tv"
 import { TVUpNextCard } from "@/components/tv/tv-up-next-card"
 import { TVDirectPlayDiagnostics, useDirectPlayDiagnostics } from "@/components/tv/tv-direct-play-diagnostics"
-import { DIRECT_PLAY_LOUD } from "@/lib/player/direct-play-mode"
-import { directPlayFailureAction, VIEWER_SESSION_ENDED_EVENT, type ViewerSessionEnded, viewerSessionEndedAction } from "@/lib/player/direct-play-policy"
+import { clearDirectRetry, DIRECT_PLAY_LOUD, directRetrySelection, lastDebridStartFor, requestDirectRetry } from "@/lib/player/direct-play-mode"
+import {
+    directPlayFailureAction,
+    directRetriesSoFar,
+    isRetryableDirectFailure,
+    RELAY_NOTICE,
+    VIEWER_SESSION_ENDED_EVENT,
+    type ViewerSessionEnded,
+    viewerSessionEndedAction,
+} from "@/lib/player/direct-play-policy"
 import { subscribeWsMessage } from "@/api/components/websocket-hub"
 import { usePlaybackStartManualTracking } from "@/api/hooks/playback_manager.hooks"
 import { getEpisodeSpoilerState, getSpoilerSafeAnimeImage } from "@/lib/anime-spoilers"
@@ -64,6 +72,7 @@ import type { PlayerChapter } from "@/lib/player"
 import { getLocalEpisodePlaybackSource } from "@/lib/player"
 import { endKeptStream } from "@/lib/player/kept-direct-stream"
 import { usePlayerPreferences } from "@/lib/player/player-preferences"
+import { logger } from "@/lib/utils/logger"
 import { episodeTagFor, type EpisodeTagKind } from "@/lib/episode-tags/episode-tags"
 import { describeEpisodeSkip, nextEpisodeLine, planNextEpisode } from "@/lib/episode-tags/next-episode"
 import { DEFAULT_RESUME_RULE, getWatchHistoryResumePosition, WEB_TV_RESUME_RULE } from "@/lib/player/resume-position"
@@ -117,6 +126,7 @@ type NextEpisodePrompt = {
     image?: string
 }
 
+const log = logger("player")
 const DEFAULT_TEXT_SUBTITLE_MARGIN_Y = 34
 const SEEK_SNAP_MAX_THRESHOLD = 4
 const SEEK_SNAP_DURATION_RATIO = 0.02
@@ -241,7 +251,7 @@ function PlayerScreenInner() {
         if (!open) setDirectFailureOpen(false)
     }, [])
     /** TV: the next stream being started from the player, which shows its loading screen meanwhile. */
-    const [nextStream, setNextStream] = React.useState<NextStreamRequest & { label: string; entryView: MobilePlaybackSource["entryView"] } | null>(null)
+    const [nextStream, setNextStream] = React.useState<NextStreamRequest & { label: string; entryView: MobilePlaybackSource["entryView"]; startedAt: number } | null>(null)
     const nextStreamCancelRef = React.useRef<(() => void) | null>(null)
 
     // player + prefs
@@ -890,6 +900,7 @@ function PlayerScreenInner() {
         saveReturnFocus()
         // Back while the next stream starts cancels it.
         if (nextStream) {
+            clearDirectRetry()
             nextStreamCancelRef.current?.()
             setReturnFocus({ mediaId: nextStream.mediaId, episodeNumber: nextStream.episodeNumber, view: nextStream.entryView })
         }
@@ -1211,13 +1222,17 @@ function PlayerScreenInner() {
      * its loading screen until the stream is ready and then plays it, instead
      * of going back to the show page to start it there.
      */
-    const startStreamInPlayer = React.useCallback((request: NextStreamRequest, label: string) => {
-        if (!source) return
-        if (Platform.OS === "web") flushContinuity()
-        player.stop()
-        controls.clearHideTimer()
-        setNextStream({ ...request, label, entryView: source.entryView ?? "torrentstream" })
-        setLoadingMessage(`Starting ${label}…`)
+    const startStreamInPlayer = React.useCallback((request: NextStreamRequest, label: string, message?: string) => {
+        // On the loading screen (a direct retry that got no link) there is no source; the failed one tells the view.
+        const base = source ?? directSourceRef.current
+        if (!base) return
+        if (source) {
+            if (Platform.OS === "web") flushContinuity()
+            player.stop()
+            controls.clearHideTimer()
+        }
+        setNextStream({ ...request, label, entryView: base.entryView ?? "torrentstream", startedAt: Date.now() })
+        setLoadingMessage(message ?? `Starting ${label}…`)
         // The loading screen shows while there is no source; the stream's "ready" event sets the next one.
         setSource(null)
     }, [controls.clearHideTimer, flushContinuity, player, setLoadingMessage, setSource, source])
@@ -1231,7 +1246,7 @@ function PlayerScreenInner() {
         setReturnFocus({ mediaId, episodeNumber, view: entryView })
         if (withIntent) {
             setPlaybackIntent(createAnimeEntryPlaybackIntent({
-                kind: `${mode === "debrid" ? "debridstream" : "torrentstream"}-${kind === "retry-relay" ? "auto-select" : kind}`, mediaId, episodeNumber,
+                kind: `${mode === "debrid" ? "debridstream" : "torrentstream"}-${kind === "retry-relay" || kind === "retry-direct" ? "auto-select" : kind}`, mediaId, episodeNumber,
             }))
         }
         if (canGoBack()) {
@@ -1245,7 +1260,13 @@ function PlayerScreenInner() {
     }, [back, canGoBack, nextStream, replace, setLoadingMessage, setPlaybackIntent, setReturnFocus])
 
     const nextStreamNeedsEntry = React.useCallback(() => leaveNextStreamToEntry(true), [leaveNextStreamToEntry])
+    /** Set below: a direct retry that couldn't even get a link goes through the server. */
+    const relayAfterFailedRetryRef = React.useRef<(() => boolean) | null>(null)
     const nextStreamFailed = React.useCallback(() => {
+        if (nextStream?.kind === "retry-direct") {
+            clearDirectRetry()
+            if (relayAfterFailedRetryRef.current?.()) return
+        }
         if (nextStream) toast.error(`Couldn't start ${nextStream.label}`)
         leaveNextStreamToEntry(false)
     }, [leaveNextStreamToEntry, nextStream])
@@ -1265,31 +1286,82 @@ function PlayerScreenInner() {
     if (source?.directPlay) directSourceRef.current = source
     /** Episodes ("mediaId:episode") already sent through the server after a direct-play failure. */
     const relayTriedRef = React.useRef(new Set<string>())
+    /** Direct retries per episode ("mediaId:episode") and where the last one resumed. */
+    const directRetriesRef = React.useRef(new Map<string, { count: number; resumedAtSec: number }>())
     const handledFailureRef = React.useRef<string | null>(null)
 
     const retryViaServer = React.useCallback(() => {
         const failed = directSourceRef.current
         if (!failed) return
+        clearDirectRetry()
         relayTriedRef.current.add(`${failed.mediaId}:${failed.episodeNumber}`)
         setDirectFailureOpen(false)
         setPlayerError(null)
-        startStreamInPlayer({ kind: "retry-relay", mode: "debrid", mediaId: failed.mediaId, episodeNumber: failed.episodeNumber }, `episode ${failed.episodeNumber} via the server`)
+        startStreamInPlayer({
+            kind: "retry-relay",
+            mode: "debrid",
+            mediaId: failed.mediaId,
+            episodeNumber: failed.episodeNumber,
+            nextEpisodeAction: failed.nextEpisodeAction,
+        }, `episode ${failed.episodeNumber} via the server`)
     }, [setPlayerError, startStreamInPlayer])
+
+    relayAfterFailedRetryRef.current = () => {
+        const failed = directSourceRef.current
+        if (!failed || relayTriedRef.current.has(`${failed.mediaId}:${failed.episodeNumber}`)) return false
+        toast.info(RELAY_NOTICE, { visibilityTime: 4000 })
+        retryViaServer()
+        return true
+    }
 
     React.useEffect(() => {
         if (!directFailure || !source || error) return
         const key = `${source.id}:${directFailure.kind}`
         if (handledFailureRef.current === key) return
         handledFailureRef.current = key
+        const episodeKey = `${source.mediaId}:${source.episodeNumber}`
+        const diagnostics = directDiagnostics
+        const record = lastDebridStartFor(source.mediaId, source.episodeNumber)
+        const cause = diagnostics.failureCause ?? "unknown"
+        const retryable = isRetryableDirectFailure(directFailure.kind, cause, {
+            headerRead: diagnostics.container !== null,
+            videoProblems: diagnostics.video?.problems.length ?? 0,
+        })
+        const backoffUntil = diagnostics.network?.backoffUntil
         const action = directPlayFailureAction(directFailure.kind, {
             loud: DIRECT_PLAY_LOUD,
-            relayTried: relayTriedRef.current.has(`${source.mediaId}:${source.episodeNumber}`),
+            relayTried: relayTriedRef.current.has(episodeKey),
             canRetry: true,
             playedSec: directFailure.positionSec,
+            cause,
+            retryable,
+            directRetries: directRetriesSoFar(directRetriesRef.current.get(episodeKey), directFailure.positionSec),
+            canRetryDirect: directRetrySelection(record) !== null,
+            cdnBackoffMs: backoffUntil ? Math.max(0, backoffUntil - Date.now()) : 0,
+        })
+        log.info("Direct play failure handled", {
+            kind: directFailure.kind,
+            cause,
+            retryable,
+            action: action.type,
+            attempt: action.type === "retry-direct" ? action.attempt : undefined,
+            positionSec: Math.round(directFailure.positionSec),
         })
         switch (action.type) {
             case "dialog":
                 setDirectFailureOpen(true)
+                break
+            case "retry-direct":
+                directRetriesRef.current.set(episodeKey, { count: action.attempt, resumedAtSec: action.resumeAtSec })
+                requestDirectRetry({ mediaId: source.mediaId, episodeNumber: source.episodeNumber, attempt: action.attempt, resumeAtSec: action.resumeAtSec })
+                startStreamInPlayer({
+                    kind: "retry-direct",
+                    mode: "debrid",
+                    mediaId: source.mediaId,
+                    episodeNumber: source.episodeNumber,
+                    delayMs: action.delayMs,
+                    nextEpisodeAction: source.nextEpisodeAction,
+                }, `episode ${source.episodeNumber} directly`, action.notice)
                 break
             case "retry-relay":
                 toast.info(action.notice, { visibilityTime: 4000 })
@@ -1302,7 +1374,7 @@ function PlayerScreenInner() {
                 setPlayerError(action.message)
                 break
         }
-    }, [directFailure, error, retryViaServer, setPlayerError, source])
+    }, [directDiagnostics, directFailure, error, retryViaServer, setPlayerError, source, startStreamInPlayer])
 
     const playEpisodeSelection = React.useCallback((episode: Anime_Episode | null, episodeNumber: number | null) => {
         if (!source) return
@@ -1757,6 +1829,7 @@ function PlayerScreenInner() {
                     <>
                         <PlayerNextStreamProgress fontSize={Platform.isTV ? tvSize(20) : 14} />
                         <PlayerNextStream
+                            key={nextStream.startedAt}
                             request={nextStream}
                             onNeedsEntry={nextStreamNeedsEntry}
                             onFailed={nextStreamFailed}

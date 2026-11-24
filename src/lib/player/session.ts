@@ -1,4 +1,4 @@
-import { DIRECT_PLAY } from "./direct-play-mode"
+import { DIRECT_PLAY, rememberResolvedDebridRelease, takeDirectRetry } from "./direct-play-mode"
 import { getServerBaseUrl } from "@/api/client/server-url"
 import { subscribeWsMessage, type WebsocketMessage } from "@/api/components/websocket-hub"
 import { API_ENDPOINTS } from "@/api/generated/endpoints"
@@ -10,6 +10,7 @@ import type {
     Anime_Episode,
     Anime_LibraryCollection,
     DebridClient_StreamState,
+    HibikeTorrent_AnimeTorrent,
     Torrentstream_TorrentStatus,
 } from "@/api/generated/types"
 import { usePlaybackCancelManualTracking } from "@/api/hooks/playback_manager.hooks"
@@ -256,6 +257,9 @@ type ExternalPlayerOpenURLPayload = {
     mediaId?: number
     episodeNumber?: number
     mediaTitle?: string
+    /** Garceslab Anime server: the release and file a direct debrid stream resolved. */
+    torrent?: HibikeTorrent_AnimeTorrent
+    fileId?: string
 }
 
 function isTorrentStreamLoadingState(value: string): value is TorrentStreamLoadingState {
@@ -877,8 +881,19 @@ export function usePlayerEventListener() {
                         .replace("{{SCHEME}}", base.startsWith("https") ? "https" : "http")
                         .replace("{{HOST}}", base.replace(/^https?:\/\//, ""))
 
-                    if (directPlay) log.info("Direct play: the TV plays the debrid link itself")
-                    openStreamInPlayer(resolvedUrl, { ...payload, mediaId: payload.mediaId, episodeNumber: payload.episodeNumber }, directPlay ? { directPlay } : undefined)
+                    let extra: Partial<MobilePlaybackSource> | undefined
+                    if (directPlay) {
+                        log.info("Direct play: the TV plays the debrid link itself")
+                        if (payload.torrent && typeof payload.fileId === "string") {
+                            rememberResolvedDebridRelease(payload.mediaId, payload.episodeNumber, payload.torrent, payload.fileId)
+                        }
+                        const retry = takeDirectRetry(payload.mediaId, payload.episodeNumber)
+                        if (retry) log.info("Direct play: fresh link for a retry", { attempt: retry.attempt, resumeAtSec: Math.round(retry.resumeAtSec) })
+                        extra = retry
+                            ? { directPlay, directRetryAttempt: retry.attempt, resumePositionSec: retry.resumeAtSec > 0 ? retry.resumeAtSec : undefined }
+                            : { directPlay }
+                    }
+                    openStreamInPlayer(resolvedUrl, { ...payload, mediaId: payload.mediaId, episodeNumber: payload.episodeNumber }, extra)
                     return
                 }
 

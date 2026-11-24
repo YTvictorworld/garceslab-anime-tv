@@ -7,7 +7,7 @@
 import type { PacedReaderStats } from "./mkv/range-reader.ts"
 import type { ExtractorStats } from "./mkv/subtitle-extractor.ts"
 
-import type { DirectPlayFailureKind } from "./direct-play-policy"
+import { DIRECT_PLAY_RETRIES, type DirectPlayFailureCause, type DirectPlayFailureKind } from "./direct-play-policy.ts"
 
 export type DirectPlaySubtitleTrack = {
     number: number
@@ -57,6 +57,10 @@ export type DirectPlayDiagnostics = {
     failureKind: DirectPlayFailureKind | null
     /** Seconds the video had played when it failed. */
     failurePositionSec: number
+    /** Why it failed, as far as the TV can tell (decides whether a fresh link is tried). */
+    failureCause: DirectPlayFailureCause | null
+    /** Which direct retry this link is (0: the first link; up to DIRECT_PLAY_RETRIES). */
+    directRetries: number
 }
 
 function fresh(sourceId: string | null): DirectPlayDiagnostics {
@@ -89,6 +93,8 @@ function fresh(sourceId: string | null): DirectPlayDiagnostics {
         failure: null,
         failureKind: null,
         failurePositionSec: 0,
+        failureCause: null,
+        directRetries: 0,
     }
 }
 
@@ -146,7 +152,8 @@ export function summarizeDiagnostics(d: DirectPlayDiagnostics): string[] {
     const lines: string[] = []
     const x = d.extractor
     lines.push(`mode: direct (debrid link on the TV's <video>); bytes for subtitles via ${d.readerPath ?? "—"}`)
-    if (d.failure) lines.push(`FAILURE: ${d.failure}`)
+    if (d.failure) lines.push(`FAILURE: ${d.failure}${d.failureCause ? ` [${d.failureCause}]` : ""}`)
+    lines.push(`direct retries: ${d.directRetries}/${DIRECT_PLAY_RETRIES}${d.directRetries > 0 ? " (fresh link for the same file)" : ""}`)
     if (d.container) {
         const c = d.container
         lines.push(`container: ${c.docType}, ${c.durationSec.toFixed(0)} s, muxer ${c.writingApp ?? "?"} / ${c.muxingApp ?? "?"}, cues ${c.hasCues ? "yes" : "no"}`)
