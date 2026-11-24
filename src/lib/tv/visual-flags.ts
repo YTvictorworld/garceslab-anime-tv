@@ -49,10 +49,12 @@ export const TV_VISUAL_FLAG_INFO = {
             + "AniList's ~100 px `medium` covers.",
     },
     scheduleDayArt: {
-        effect: "Schedule: each day column shows its first episode's cover, dim, behind its "
-            + "header (the web calendar's day background); brighter for today.",
-        cost: "Low. Up to seven `large` covers at low opacity with a static gradient each; "
-            + "nothing animates (the web's rotating background is left out).",
+        effect: "Schedule: each day column shows its first episode's cover, dim, behind the "
+            + "column and fading out towards its bottom (the web calendar's day background); "
+            + "brighter for today.",
+        cost: "Low. Up to seven `large` covers at low opacity, each with a static gradient and, "
+            + "on webOS, a CSS mask painted once; nothing animates (the web's rotating "
+            + "background is left out).",
     },
 } as const satisfies Record<string, { effect: string; cost: string }>
 

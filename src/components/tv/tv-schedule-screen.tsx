@@ -5,7 +5,6 @@ import { useGetRawAnimeCollection } from "@/api/hooks/anilist.hooks"
 import { TVButton, TVFocusScaleView, useTVFocus } from "@/components/tv/tv-focus"
 import { requestTVFocus } from "@/components/tv/tv-native"
 import { TVLazyImage } from "@/components/tv/tv-lazy-image"
-import { TVNavScrim } from "@/components/tv/tv-nav-scrim"
 import { TV, tvSize } from "@/components/tv/tv-scale"
 import { TVPageSkeleton } from "@/components/tv/tv-skeleton"
 import { Ionicons } from "@/lib/icons/Ionicons"
@@ -24,7 +23,7 @@ import { Image } from "expo-image"
 import { LinearGradient } from "expo-linear-gradient"
 import { router, useFocusEffect, useIsFocused } from "expo-router"
 import * as React from "react"
-import { Pressable, ScrollView, Text, TVFocusGuideView, View } from "react-native"
+import { Platform, Pressable, ScrollView, Text, TVFocusGuideView, View } from "react-native"
 
 /** Same zone as the upcoming cards on Home (see tv-continue-card.tsx). */
 const AIRING_TIME_ZONE = process.env.EXPO_PUBLIC_TV_TIME_ZONE || undefined
@@ -176,64 +175,68 @@ export function TVScheduleScreen() {
     ].filter(Boolean).join("  ·  ")
 
     return (
-        <View style={{ flex: 1, backgroundColor: "#0a0a0a" }}>
-            <ScrollView
-                style={{ flex: 1 }}
-                fadingEdgeLength={{ start: TV.navInset + tvSize(18), end: 0 }}
-                contentContainerStyle={{ paddingTop: TV.navInset, paddingBottom: tvSize(48) }}
-                showsVerticalScrollIndicator={false}
+        <View style={{ flex: 1, backgroundColor: "#0a0a0a", paddingTop: TV.navInset }}>
+            {/*
+              The header stays put under the nav bar; only the grid scrolls, and
+              only when a day has more episodes than fit (when everything fits the
+              grid isn't scrollable, so moving focus never shifts the screen).
+            */}
+            <View
+                style={{
+                    paddingHorizontal: TV.gutter,
+                    paddingBottom: tvSize(18),
+                    flexDirection: "row",
+                    alignItems: "flex-end",
+                    justifyContent: "space-between",
+                    gap: tvSize(24),
+                }}
             >
-                <View
-                    style={{
-                        paddingHorizontal: TV.gutter,
-                        paddingBottom: tvSize(18),
-                        flexDirection: "row",
-                        alignItems: "flex-end",
-                        justifyContent: "space-between",
-                        gap: tvSize(24),
-                    }}
-                >
-                    <View style={{ flexShrink: 1, gap: tvSize(4) }}>
-                        <View style={{ flexDirection: "row", alignItems: "baseline", gap: tvSize(18) }}>
-                            <Text
-                                className="font-black text-white"
-                                style={{ fontSize: tvSize(40), lineHeight: tvSize(48), letterSpacing: tvSize(-0.5) }}
-                            >
-                                Schedule
-                            </Text>
-                            <Text className="font-semibold" style={{ fontSize: tvSize(26), color: week.isCurrent ? LILAC_TEXT : "#ffffff" }}>
-                                {week.label}
-                            </Text>
-                        </View>
-                        <Text className="font-medium text-white/50" style={{ fontSize: tvSize(18) }} numberOfLines={1}>
-                            {subtitle}
+                <View style={{ flexShrink: 1, gap: tvSize(4) }}>
+                    <View style={{ flexDirection: "row", alignItems: "baseline", gap: tvSize(18) }}>
+                        <Text
+                            className="font-black text-white"
+                            style={{ fontSize: tvSize(40), lineHeight: tvSize(48), letterSpacing: tvSize(-0.5) }}
+                        >
+                            Schedule
+                        </Text>
+                        <Text className="font-semibold" style={{ fontSize: tvSize(26), color: week.isCurrent ? LILAC_TEXT : "#ffffff" }}>
+                            {week.label}
                         </Text>
                     </View>
-                    <TVFocusGuideView trapFocusLeft trapFocusRight style={{ flexDirection: "row", gap: tvSize(12) }}>
-                        <TVButton
-                            label="Previous week"
-                            variant="secondary"
-                            size="compact"
-                            icon={<Ionicons name="chevron-back" size={tvSize(22)} color="#ffffff" />}
-                            onPress={() => setWeekOffset(offset => Math.max(-MAX_WEEK_OFFSET, offset - 1))}
-                        />
-                        <TVButton
-                            label="This week"
-                            variant={week.isCurrent ? "primary" : "secondary"}
-                            size="compact"
-                            icon={<Ionicons name="today-outline" size={tvSize(22)} color="#ffffff" />}
-                            onPress={() => setWeekOffset(0)}
-                        />
-                        <TVButton
-                            label="Next week"
-                            variant="secondary"
-                            size="compact"
-                            icon={<Ionicons name="chevron-forward" size={tvSize(22)} color="#ffffff" />}
-                            onPress={() => setWeekOffset(offset => Math.min(MAX_WEEK_OFFSET, offset + 1))}
-                        />
-                    </TVFocusGuideView>
+                    <Text className="font-medium text-white/50" style={{ fontSize: tvSize(18) }} numberOfLines={1}>
+                        {subtitle}
+                    </Text>
                 </View>
+                <TVFocusGuideView trapFocusLeft trapFocusRight style={{ flexDirection: "row", gap: tvSize(12) }}>
+                    <TVButton
+                        label="Previous week"
+                        variant="secondary"
+                        size="compact"
+                        icon={<Ionicons name="chevron-back" size={tvSize(22)} color="#ffffff" />}
+                        onPress={() => setWeekOffset(offset => Math.max(-MAX_WEEK_OFFSET, offset - 1))}
+                    />
+                    <TVButton
+                        label="This week"
+                        variant={week.isCurrent ? "primary" : "secondary"}
+                        size="compact"
+                        icon={<Ionicons name="today-outline" size={tvSize(22)} color="#ffffff" />}
+                        onPress={() => setWeekOffset(0)}
+                    />
+                    <TVButton
+                        label="Next week"
+                        variant="secondary"
+                        size="compact"
+                        icon={<Ionicons name="chevron-forward" size={tvSize(22)} color="#ffffff" />}
+                        onPress={() => setWeekOffset(offset => Math.min(MAX_WEEK_OFFSET, offset + 1))}
+                    />
+                </TVFocusGuideView>
+            </View>
 
+            <ScrollView
+                style={{ flex: 1 }}
+                contentContainerStyle={{ paddingTop: tvSize(6), paddingBottom: tvSize(32) }}
+                showsVerticalScrollIndicator={false}
+            >
                 <TVFocusGuideView
                     autoFocus={isFocused}
                     destinations={initialCard ? [initialCard] : undefined}
@@ -271,13 +274,24 @@ export function TVScheduleScreen() {
                     </View>
                 ) : null}
             </ScrollView>
-            <TVNavScrim />
         </View>
     )
 }
 
-/** Fills the screen below the header, like the web's calendar. */
-const COLUMN_MIN_HEIGHT = tvSize(800)
+/**
+ * Columns end a little after the busiest day's last episode (the row keeps
+ * them the same height, like the web's calendar), but never shorter than this.
+ */
+const COLUMN_MIN_HEIGHT = tvSize(440)
+
+/**
+ * scheduleDayArt: the cover fades out down the column. On webOS a CSS mask
+ * (painted once) fades the art itself to transparent, so there is no edge;
+ * elsewhere a gradient fades it into the column's colour.
+ */
+const ART_MASK = Platform.OS === "web"
+    ? { WebkitMaskImage: "linear-gradient(to bottom, #000 0%, rgba(0,0,0,0.75) 30%, rgba(0,0,0,0.3) 65%, transparent 100%)" } as object
+    : null
 
 const TVScheduleDayColumn = React.memo(function TVScheduleDayColumn({
     day,
@@ -312,19 +326,22 @@ const TVScheduleDayColumn = React.memo(function TVScheduleDayColumn({
             }}
         >
             {art ? (
-                // The web calendar's day background: the first episode's cover, dim and still.
-                <View pointerEvents="none" style={{ position: "absolute", left: 0, right: 0, top: 0, height: tvSize(260) }}>
+                // The web calendar's day background: the first episode's cover, dim and
+                // still, over the whole column and fading out towards its bottom.
+                <View pointerEvents="none" style={[{ position: "absolute", inset: 0 }, ART_MASK]}>
                     <Image
                         source={{ uri: art }}
-                        style={{ position: "absolute", inset: 0, opacity: day.isToday ? 0.42 : 0.16 }}
+                        style={{ position: "absolute", inset: 0, opacity: day.isToday ? 0.5 : 0.22 }}
                         contentFit="cover"
                         cachePolicy="memory-disk"
                         transition={0}
                         accessibilityIgnoresInvertColors
                     />
                     <LinearGradient
-                        colors={["rgba(10,10,10,0.2)", "rgba(10,10,10,0.85)", "#0b0a0c"]}
-                        locations={[0, 0.6, 1]}
+                        colors={ART_MASK
+                            ? ["rgba(10,10,10,0.25)", "rgba(10,10,10,0.6)", "rgba(10,10,10,0.6)"]
+                            : ["rgba(10,10,10,0.25)", "rgba(10,10,10,0.7)", "#0d0c0e"]}
+                        locations={[0, 0.3, 1]}
                         style={{ position: "absolute", inset: 0 }}
                     />
                 </View>
@@ -379,7 +396,7 @@ const TVScheduleDayColumn = React.memo(function TVScheduleDayColumn({
                 </View>
             </View>
 
-            <View style={{ paddingHorizontal: tvSize(8), paddingBottom: tvSize(10), gap: tvSize(8) }}>
+            <View style={{ paddingHorizontal: tvSize(8), paddingBottom: tvSize(18), gap: tvSize(8) }}>
                 {day.items.map((entry, index) => (
                     <TVScheduleItem
                         key={entryKey(entry)}
