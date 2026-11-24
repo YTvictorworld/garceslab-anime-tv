@@ -1,5 +1,5 @@
 /**
- * What the direct-play spike found out about the current episode, for the
+ * What direct play found out about the current episode, for the
  * on-screen diagnostics panel (Info key) and the log summary. Never holds
  * the debrid URL: it carries the account's access token.
  * Kept free of React Native (and of `@/` imports) so the tests load it.
@@ -7,12 +7,14 @@
 import type { PacedReaderStats } from "./mkv/range-reader.ts"
 import type { ExtractorStats } from "./mkv/subtitle-extractor.ts"
 
+import type { DirectPlayFailureKind } from "./direct-play-policy"
+
 export type DirectPlaySubtitleTrack = {
     number: number
     codec: string
     language?: string
     title?: string
-    /** Text tracks are read; image ones (PGS, VobSub) are not in the spike. */
+    /** Text tracks are read; image ones (PGS, VobSub) are not read on the TV. */
     supported: boolean
 }
 
@@ -49,8 +51,12 @@ export type DirectPlayDiagnostics = {
     /** Range reads: count, failures, slowest and average time. */
     reads: { count: number; failed: number; bytes: number; totalMs: number; maxMs: number }
     errors: string[]
-    /** The loud failure, as shown on the TV ("Direct play failed: …"). */
+    /** The failure, as logged and shown by the test build ("Direct play failed: …"). */
     failure: string | null
+    /** What failed, for the player's fallback (direct-play-policy.ts). */
+    failureKind: DirectPlayFailureKind | null
+    /** Seconds the video had played when it failed. */
+    failurePositionSec: number
 }
 
 function fresh(sourceId: string | null): DirectPlayDiagnostics {
@@ -81,6 +87,8 @@ function fresh(sourceId: string | null): DirectPlayDiagnostics {
         reads: { count: 0, failed: 0, bytes: 0, totalMs: 0, maxMs: 0 },
         errors: [],
         failure: null,
+        failureKind: null,
+        failurePositionSec: 0,
     }
 }
 

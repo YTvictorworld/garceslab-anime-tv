@@ -3,7 +3,7 @@ import { directPlayDiagnostics, summarizeDiagnostics } from "@/lib/player/direct
 import * as React from "react"
 import { Text, View } from "react-native"
 
-/** The direct-play spike's findings, while it plays (Info key, with the player stats). */
+/** What direct play found out, while it plays ("Playback stats", for support). */
 export function useDirectPlayDiagnostics() {
     return React.useSyncExternalStore(directPlayDiagnostics.subscribe, directPlayDiagnostics.get, directPlayDiagnostics.get)
 }

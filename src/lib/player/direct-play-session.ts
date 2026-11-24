@@ -1,14 +1,16 @@
 /**
- * Direct-play spike (phase 1.5): the TV plays the debrid link itself and
- * reads the subtitles from the MKV with Range requests (mkv/), instead of
- * the server's direct stream reading them while it relays the video.
+ * Direct play (phase 1.5 spike, default since phase 2): the TV plays the
+ * debrid link itself and reads the subtitles from the MKV with Range
+ * requests (mkv/), instead of the server's direct stream reading them while
+ * it relays the video.
  *
  * Per episode this reads the file's header (tracks, Cues, fonts), hands the
  * player streamed subtitle tracks that fill in as lines are read (the same
  * shape the server's direct stream gives, so JASSUB/libass draws ASS and
  * SRT shows as text), and records what worked and what didn't for the
- * diagnostics panel and the log. Failures are loud (a dialog with "Retry via
- * server"), never a quiet fallback.
+ * diagnostics panel ("Playback stats") and the log. A failure is recorded
+ * with its kind; the player then falls back to the server quietly, or opens
+ * the diagnostics dialog in the test build (direct-play-policy.ts).
  */
 import type { MpvFontData, MpvMediaEvent, MpvStreamedSubtitleLine, MpvStreamedSubtitles } from "expo-mpv-player"
 import { logger } from "@/lib/utils/logger"
@@ -17,6 +19,8 @@ import { canUseRelayRanges, createRelayRangeReader } from "@/lib/webos/luna-rang
 import React from "react"
 import { describeStreamCodecs, directStreamChapters } from "./direct-stream"
 import { describeRanges, directPlayDiagnostics, summarizeDiagnostics } from "./direct-play-diagnostics"
+import { DIRECT_PLAY_LOUD } from "./direct-play-mode"
+import type { DirectPlayFailureKind } from "./direct-play-policy"
 import { isFontAttachment, isTextSubtitle, type MkvIndex, MkvError, readAttachedFiles, readMkvIndex, type RangeReader, toMkvMetadata } from "./mkv/mkv-demux"
 import { chunkedReader, createFetchRangeReader, createPacedReader, isFatalRangeError, RangeFetchError, type ReaderEvent } from "./mkv/range-reader"
 import { createSubtitleExtractor, type SubtitleExtractor } from "./mkv/subtitle-extractor"
@@ -183,7 +187,7 @@ async function openFile(url: string): Promise<{ reader: RangeReader; index: MkvI
         directPlayDiagnostics.update(d => ({ cors: [...d.cors, "fetch with Range is blocked by CORS"] }))
         if (!canUseRelayRanges()) throw error
         log.warning("CORS blocks the subtitle reads; using the app's relay service for them")
-        toast.warning("Direct play: CORS blocks reading subtitles from the CDN, so they go through the app's service (video still direct).", { visibilityTime: 6000 })
+        if (DIRECT_PLAY_LOUD) toast.warning("Direct play: CORS blocks reading subtitles from the CDN, so they go through the app's service (video still direct).", { visibilityTime: 6000 })
         const relayBegan = Date.now()
         session.useRelay()
         const index = await withTimeout(readMkvIndex(session.reader), HEADER_TIMEOUT_MS * 2, "Reading the file's header through the service")
@@ -334,11 +338,11 @@ async function startSession(source: MobilePlaybackSource, isCurrent: () => boole
     let extractor: SubtitleExtractor | null = null
     let lineStore: ReturnType<typeof createLineStore> | null = null
 
-    const fail = (what: string, error: unknown) => {
+    const fail = (what: string, error: unknown, kind: DirectPlayFailureKind) => {
         const failure = `Direct play failed: ${what}: ${describeError(error)}`
         log.error(failure)
         directPlayDiagnostics.error(failure)
-        directPlayDiagnostics.update({ failure })
+        directPlayDiagnostics.update({ failure, failureKind: kind, failurePositionSec: currentVideoTime() })
     }
 
     const dispose = () => {
@@ -355,14 +359,20 @@ async function startSession(source: MobilePlaybackSource, isCurrent: () => boole
     const plan: DirectPlayPlan = {
         externalSubtitles: [],
         subtitleFontData: fonts,
-        mediaInfoSummary: { mode: "direct", reasons: ["direct play test: debrid link on the TV"] },
+        mediaInfoSummary: { mode: "direct", reasons: ["direct play: debrid link on the TV"] },
     }
 
     let opened: Awaited<ReturnType<typeof openFile>>
     try {
         opened = await openFile(source.url)
     } catch (error) {
-        fail("reading the file's header", error)
+        if (error instanceof MkvError) {
+            // Not a Matroska file we can read (an MP4, say): it plays as it is, without the file's subtitles.
+            log.info("Direct play: not a readable MKV, playing without the file's subtitles", { error: describeError(error) })
+            directPlayDiagnostics.error(`not a readable MKV: ${describeError(error)}`)
+        } else {
+            fail("reading the file's header", error, "header")
+        }
         return { id: source.id, plan, dispose }
     }
     const { reader, index, path } = opened
@@ -421,7 +431,7 @@ async function startSession(source: MobilePlaybackSource, isCurrent: () => boole
             if (!cancelled()) store.push(lines)
         },
         onStats: stats => directPlayDiagnostics.update({ extractor: stats }),
-        onFatal: error => fail("reading subtitles", error),
+        onFatal: error => fail("reading subtitles", error, "subtitles"),
     })
     const subtitleReader = extractor
     subtitleReader.seek(source.resumePositionSec ?? 0)
@@ -436,7 +446,7 @@ async function startSession(source: MobilePlaybackSource, isCurrent: () => boole
     plan.chapters = directStreamChapters(metadata)
     plan.mediaInfoSummary = {
         mode: "direct",
-        reasons: ["direct play test: debrid link on the TV", ...codecs.videoProblems],
+        reasons: ["direct play: debrid link on the TV", ...codecs.videoProblems],
         videoCodec: codecs.video,
         audioCodec: codecs.audio.join(", ") || undefined,
         resolution: codecs.resolution,
@@ -447,7 +457,7 @@ async function startSession(source: MobilePlaybackSource, isCurrent: () => boole
         else subtitleReader.update(event.currentTime)
     }
     if (subtitleTracks.length > readable.length) {
-        directPlayDiagnostics.error(`${subtitleTracks.length - readable.length} subtitle track(s) are image-based or encoded and not read by the spike`)
+        directPlayDiagnostics.error(`${subtitleTracks.length - readable.length} subtitle track(s) are image-based or encoded and not read on the TV`)
     }
     return { id: source.id, plan, dispose }
 }
@@ -488,11 +498,26 @@ export function useDirectPlaySession(source: MobilePlaybackSource | null): Sessi
     return session?.id === id ? session : null
 }
 
-/** For the player's error handler: a MediaError on direct play, said plainly. */
-export function directPlayErrorMessage(error: { message: string; code?: number }): string {
+/**
+ * For the player's error handler: a MediaError on direct play. The test build
+ * shows it plainly; the normal build reports it handled (`true`), as the
+ * player starts the episode again through the server (or shows its error
+ * screen when it can't).
+ */
+export function directPlayErrorMessage(error: { message: string; code?: number; position?: number }): true | string {
     const failure = `Direct play failed: the TV's player reported ${error.code !== undefined ? `MediaError ${error.code}` : "an error"}${error.message ? ` (${error.message})` : ""}`
-    directPlayDiagnostics.update({ failure, mediaError: { code: error.code ?? 0, message: error.message } })
+    directPlayDiagnostics.update({
+        failure,
+        failureKind: "video",
+        failurePositionSec: error.position ?? currentVideoTime(),
+        mediaError: { code: error.code ?? 0, message: error.message },
+    })
     log.error(failure)
     logSummary("playback error")
-    return failure
+    return DIRECT_PLAY_LOUD ? failure : true
+}
+
+function currentVideoTime(): number {
+    const video = typeof document !== "undefined" ? document.querySelector("video") : null
+    return video && Number.isFinite(video.currentTime) ? video.currentTime : 0
 }

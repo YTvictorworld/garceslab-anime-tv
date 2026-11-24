@@ -1,5 +1,5 @@
 /**
- * Reads what the direct-play spike needs from a Matroska file over HTTP
+ * Reads what direct play needs from a Matroska file over HTTP
  * Range requests: the header (Info, Tracks, Cues, Chapters, the attachment
  * list) and single subtitle blocks. Never reads video or audio data.
  * Kept free of React Native (and of `@/` imports) so the tests load it.
@@ -101,7 +101,7 @@ const MAX_ATTACHMENTS = 200
 
 const SUBTITLE_CODECS = new Set(["S_TEXT/ASS", "S_TEXT/SSA", "S_TEXT/UTF8", "S_TEXT/WEBVTT"])
 
-/** Subtitle codecs this parser turns into lines (PGS and VobSub are images, which the spike skips). */
+/** Subtitle codecs this parser turns into lines (PGS and VobSub are images, which direct play skips). */
 export function isTextSubtitle(track: Pick<MkvTrack, "codecId">) {
     return SUBTITLE_CODECS.has(track.codecId)
 }

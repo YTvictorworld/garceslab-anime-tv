@@ -1,5 +1,5 @@
 /**
- * HTTP Range reads for the direct-play spike's MKV parser, with errors that
+ * HTTP Range reads for direct play's MKV parser, with errors that
  * say what went wrong (CORS, a server without Range support, an expired
  * link) so the TV can show it rather than fall back quietly.
  * Kept free of React Native (and of `@/` imports) so the tests load it.

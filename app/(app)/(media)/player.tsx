@@ -42,6 +42,10 @@ import { type NextStreamRequest, PlayerNextStream, PlayerNextStreamProgress } fr
 import { TVPlayerControls, TVPlayerDialog, TVPlayerPanel } from "@/components/tv"
 import { TVUpNextCard } from "@/components/tv/tv-up-next-card"
 import { TVDirectPlayDiagnostics, useDirectPlayDiagnostics } from "@/components/tv/tv-direct-play-diagnostics"
+import { DIRECT_PLAY_LOUD } from "@/lib/player/direct-play-mode"
+import { directPlayFailureAction, VIEWER_SESSION_ENDED_EVENT, type ViewerSessionEnded, viewerSessionEndedAction } from "@/lib/player/direct-play-policy"
+import { subscribeWsMessage } from "@/api/components/websocket-hub"
+import { usePlaybackStartManualTracking } from "@/api/hooks/playback_manager.hooks"
 import { getEpisodeSpoilerState, getSpoilerSafeAnimeImage } from "@/lib/anime-spoilers"
 import { playPlayerExit } from "@/components/tv/tv-player-exit"
 import { tvSize } from "@/components/tv/tv-scale"
@@ -927,6 +931,25 @@ function PlayerScreenInner() {
         void playPlayerExit(exitViewRef.current).then(leave)
     }, [canGoBack, controls.clearHideTimer, handleBack, player.pause, scrub, source?.directStreamPlaybackId])
 
+    // Viewer sessions (phase 2): the server ended this device's session while it
+    // plays. Stopped from Settings, or the profile moved to another device:
+    // leave and say why. The slot lapsed (idle, websocket gap): take it again.
+    const { mutate: reclaimViewerSlot } = usePlaybackStartManualTracking()
+    const viewerSourceRef = React.useRef(source)
+    viewerSourceRef.current = source
+    React.useEffect(() => subscribeWsMessage((message) => {
+        if (message.type !== VIEWER_SESSION_ENDED_EVENT || !message.payload) return
+        const current = viewerSourceRef.current
+        const playing = current && !current.serverStreamType ? { mediaId: current.mediaId, episodeNumber: current.episodeNumber } : null
+        const action = viewerSessionEndedAction(message.payload as ViewerSessionEnded, playing)
+        if (action.type === "leave") {
+            toast.info(action.message, { visibilityTime: 5000 })
+            leavePlayer()
+        } else if (action.type === "reclaim" && playing) {
+            reclaimViewerSlot({ ...playing, clientId: getClientIdentity().clientId })
+        }
+    }), [leavePlayer, reclaimViewerSlot])
+
     /** TV: the "Up next" card (set once useAutoNextEpisode has run, below); read by the key handlers. */
     const upNextRef = React.useRef({ visible: false, cancel: () => {} })
 
@@ -1232,22 +1255,54 @@ function PlayerScreenInner() {
         if (source && nextStream) setNextStream(null)
     }, [nextStream, source])
 
-    // Direct-play test build: a failure is shown at once, with a way out through the server.
+    // Direct play: a failure falls back to the server quietly (once per episode),
+    // or opens the diagnostics dialog in the side-by-side test build.
     const directDiagnostics = useDirectPlayDiagnostics()
-    const directFailure = source?.directPlay && directDiagnostics.sourceId === source.id ? directDiagnostics.failure : null
+    const directFailure = source?.directPlay && directDiagnostics.sourceId === source.id && directDiagnostics.failureKind
+        ? { text: directDiagnostics.failure ?? "", kind: directDiagnostics.failureKind, positionSec: directDiagnostics.failurePositionSec }
+        : null
     const directSourceRef = React.useRef<MobilePlaybackSource | null>(null)
     if (source?.directPlay) directSourceRef.current = source
-    React.useEffect(() => {
-        if (directFailure && !error) setDirectFailureOpen(true)
-    }, [directFailure, error])
+    /** Episodes ("mediaId:episode") already sent through the server after a direct-play failure. */
+    const relayTriedRef = React.useRef(new Set<string>())
+    const handledFailureRef = React.useRef<string | null>(null)
 
     const retryViaServer = React.useCallback(() => {
         const failed = directSourceRef.current
         if (!failed) return
+        relayTriedRef.current.add(`${failed.mediaId}:${failed.episodeNumber}`)
         setDirectFailureOpen(false)
         setPlayerError(null)
         startStreamInPlayer({ kind: "retry-relay", mode: "debrid", mediaId: failed.mediaId, episodeNumber: failed.episodeNumber }, `episode ${failed.episodeNumber} via the server`)
     }, [setPlayerError, startStreamInPlayer])
+
+    React.useEffect(() => {
+        if (!directFailure || !source || error) return
+        const key = `${source.id}:${directFailure.kind}`
+        if (handledFailureRef.current === key) return
+        handledFailureRef.current = key
+        const action = directPlayFailureAction(directFailure.kind, {
+            loud: DIRECT_PLAY_LOUD,
+            relayTried: relayTriedRef.current.has(`${source.mediaId}:${source.episodeNumber}`),
+            canRetry: true,
+            playedSec: directFailure.positionSec,
+        })
+        switch (action.type) {
+            case "dialog":
+                setDirectFailureOpen(true)
+                break
+            case "retry-relay":
+                toast.info(action.notice, { visibilityTime: 4000 })
+                retryViaServer()
+                break
+            case "notice":
+                toast.info(action.notice, { visibilityTime: 4000 })
+                break
+            case "error":
+                setPlayerError(action.message)
+                break
+        }
+    }, [directFailure, error, retryViaServer, setPlayerError, source])
 
     const playEpisodeSelection = React.useCallback((episode: Anime_Episode | null, episodeNumber: number | null) => {
         if (!source) return
@@ -1759,7 +1814,7 @@ function PlayerScreenInner() {
                     />
                 ) : null}
 
-                {/* Direct-play test build: what direct play found out (Info shows it with the stats). */}
+                {/* Direct play: what it found out, with "Playback stats" (useful for support). */}
                 {source?.directPlay && prefs.showStats && !isPiPActive ? (
                     <TVDirectPlayDiagnostics top={Math.max(insets.top + 16, 32)} left={Math.max(insets.left + 16, 32)} />
                 ) : null}
@@ -2071,7 +2126,7 @@ function PlayerScreenInner() {
                     <TVPlayerDialog
                         open={directFailureOpen}
                         title="Direct play failed"
-                        text={`${directFailure ?? ""}\n\nThe video may keep playing without what failed. Press Info for the diagnostics.`}
+                        text={`${directFailure?.text ?? ""}\n\nThe video may keep playing without what failed. Press Info for the diagnostics.`}
                         cancelLabel="Keep watching"
                         confirmLabel="Retry via server"
                         onCancel={() => {

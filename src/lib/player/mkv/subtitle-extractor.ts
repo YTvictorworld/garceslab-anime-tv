@@ -1,6 +1,6 @@
 /**
  * Reads the subtitle lines of a Matroska file over HTTP Range requests while
- * the TV's <video> plays it, for the direct-play spike.
+ * the TV's <video> plays it, for direct play.
  *
  * The debrid CDN throttles a client that sends many requests while its
  * <video> streams from the same host (HTTP 429), so reads are few and large:

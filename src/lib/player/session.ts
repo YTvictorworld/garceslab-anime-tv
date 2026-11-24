@@ -1,4 +1,4 @@
-import { DIRECT_PLAY_TEST } from "./direct-play-mode"
+import { DIRECT_PLAY } from "./direct-play-mode"
 import { getServerBaseUrl } from "@/api/client/server-url"
 import { subscribeWsMessage, type WebsocketMessage } from "@/api/components/websocket-hub"
 import { API_ENDPOINTS } from "@/api/generated/endpoints"
@@ -852,9 +852,9 @@ export function usePlayerEventListener() {
                         return
                     }
 
-                    // Direct-play test build: a debrid link (not a server URL) plays on the TV as it is.
+                    // Direct play: a debrid link (not a server URL) plays on the TV as it is.
                     const mode = pendingInfoRef.current?.streamMode ?? streamSessionModeRef.current
-                    const directPlay = DIRECT_PLAY_TEST && mode === "debrid" && !payload.url.includes("/api/v1/")
+                    const directPlay = DIRECT_PLAY && mode === "debrid" && !payload.url.includes("/api/v1/")
 
                     clearCancelManualTrackingTimer()
                     // Direct play keeps the manual tracking the player starts: it is how the server follows progress.
@@ -872,7 +872,7 @@ export function usePlayerEventListener() {
                         .replace("{{SCHEME}}", base.startsWith("https") ? "https" : "http")
                         .replace("{{HOST}}", base.replace(/^https?:\/\//, ""))
 
-                    if (directPlay) log.info("Direct play (test): the TV plays the debrid link itself")
+                    if (directPlay) log.info("Direct play: the TV plays the debrid link itself")
                     openStreamInPlayer(resolvedUrl, { ...payload, mediaId: payload.mediaId, episodeNumber: payload.episodeNumber }, directPlay ? { directPlay } : undefined)
                     return
                 }

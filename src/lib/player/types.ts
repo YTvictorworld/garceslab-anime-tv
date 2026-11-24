@@ -97,7 +97,7 @@ export type MobilePlaybackSource = {
     mkvMetadata?: MKVParser_Metadata
 
     /**
-     * Direct-play spike: `url` is the debrid link itself, played by the TV
+     * Direct play: `url` is the debrid link itself, played by the TV
      * without the server's direct stream; subtitles are read from the file
      * on the TV (direct-play-session.ts).
      */

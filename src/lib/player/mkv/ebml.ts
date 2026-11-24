@@ -1,5 +1,5 @@
 /**
- * Minimal EBML reading for the direct-play spike's Matroska parser.
+ * Minimal EBML reading for direct play's Matroska parser.
  * Works on byte windows fetched with HTTP Range requests, so every reader
  * takes an absolute file offset and the window it was read into.
  * Kept free of React Native (and of `@/` imports) so the tests load it.
