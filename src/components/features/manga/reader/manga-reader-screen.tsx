@@ -1013,9 +1013,9 @@ function PageScrubber({
                             maximumValue={Math.max(0, spreads.length - 1)}
                             step={1}
                             value={dragSpreadIndex ?? currentSpreadIndex}
-                            minimumTrackTintColor="rgba(161,152,255,0.9)"
+                            minimumTrackTintColor="rgba(230,176,253,0.9)"
                             maximumTrackTintColor="rgba(255,255,255,0.15)"
-                            thumbTintColor="rgba(199,194,255,1)"
+                            thumbTintColor="rgba(230,176,253,1)"
                             onValueChange={handleSliderChange}
                             onSlidingComplete={handleSliderComplete}
                         />
@@ -1408,7 +1408,7 @@ function ReaderStateCard({
         <View className="flex-1 items-center justify-center px-6">
             <View className="w-full max-w-md gap-4 rounded-3xl border border-white/8 bg-white/[0.04] p-6">
                 <View className="h-14 w-14 items-center justify-center rounded-full bg-brand-300/10">
-                    <Ionicons name="book-outline" size={24} color="rgb(199,194,255)" />
+                    <Ionicons name="book-outline" size={24} color="rgb(230,176,253)" />
                 </View>
                 <View className="gap-2">
                     <Text className="text-xl font-semibold text-white">{title}</Text>

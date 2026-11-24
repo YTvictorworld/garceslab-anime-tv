@@ -239,7 +239,7 @@ function InProgressEpisodeRow({
                         <Ionicons
                             name={isDownloading ? "cloud-download-outline" : "time-outline"}
                             size={24}
-                            color={isDownloading ? "rgba(97,82,223,0.9)" : "rgba(255,255,255,0.65)"}
+                            color={isDownloading ? "rgba(164,67,207,0.9)" : "rgba(255,255,255,0.65)"}
                         />
                     </View>
                 </View>

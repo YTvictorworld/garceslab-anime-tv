@@ -257,15 +257,15 @@ export function DownloadMangaChaptersModal({
                                         {isDownloaded ? (
                                             <Ionicons name="checkmark-circle" size={22} color="rgba(120,200,120,0.8)" />
                                         ) : isDownloading ? (
-                                            <Ionicons name="cloud-download-outline" size={20} color="rgba(97,82,223,0.9)" />
+                                            <Ionicons name="cloud-download-outline" size={20} color="rgba(164,67,207,0.9)" />
                                         ) : isPending ? (
                                             <Ionicons name="time-outline" size={20} color="rgba(255,255,255,0.45)" />
                                         ) : (
                                             <View
                                                 className="w-5 h-5 rounded-md border-2 items-center justify-center"
                                                 style={{
-                                                    borderColor: selected ? "rgb(97,82,223)" : "rgba(255,255,255,0.25)",
-                                                    backgroundColor: selected ? "rgb(97,82,223)" : "transparent",
+                                                    borderColor: selected ? "rgb(164,67,207)" : "rgba(255,255,255,0.25)",
+                                                    backgroundColor: selected ? "rgb(164,67,207)" : "transparent",
                                                 }}
                                             >
                                                 {selected && <Ionicons name="checkmark" size={13} color="white" />}

@@ -15,7 +15,7 @@ function ServerEpisodeCountOverlay({ count }: { count: number }) {
     return (
         <View className="absolute left-0 top-0 z-10" pointerEvents="none">
             <View className="h-7 flex-row items-center justify-center rounded-br-lg bg-gray-900/80 px-2">
-                <Ionicons name="server-outline" size={14} color="rgba(165,180,252,0.95)" />
+                <Ionicons name="server-outline" size={14} color="rgba(230,176,253,0.95)" />
                 <Text className="ml-1 text-xs font-bold text-white">{count}</Text>
             </View>
         </View>

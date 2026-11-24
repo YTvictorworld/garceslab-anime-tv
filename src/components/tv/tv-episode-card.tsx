@@ -169,7 +169,7 @@ export const TVEpisodeCard = React.memo(
                                         minHeight: tvSize(30),
                                         borderRadius: tvSize(16),
                                         paddingHorizontal: tvSize(10),
-                                        backgroundColor: "rgba(129,118,239,0.9)",
+                                        backgroundColor: "rgba(164,67,207,0.9)",
                                         flexDirection: "row",
                                         alignItems: "center",
                                         gap: tvSize(5),
@@ -232,7 +232,7 @@ export const TVEpisodeCard = React.memo(
                                 >
                                     {status.error
                                         ? <Ionicons name="alert-circle-outline" size={tvSize(34)} color="#f87171" />
-                                        : <ActivityIndicator size="large" color="#a5a0f5" />}
+                                        : <ActivityIndicator size="large" color="#e6b0fd" />}
                                     <Text
                                         className="font-semibold text-white"
                                         numberOfLines={2}
@@ -262,7 +262,7 @@ export const TVEpisodeCard = React.memo(
                                         style={{
                                             width: `${Math.min(progressPercent, 100)}%`,
                                             height: "100%",
-                                            backgroundColor: "#8176ef",
+                                            backgroundColor: "#d384f5",
                                         }}
                                     />
                                 </View>

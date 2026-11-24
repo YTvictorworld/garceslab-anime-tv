@@ -630,7 +630,7 @@ function TVKeptStreamCard({ episodeNumber, position, detail, resumeRef, stopping
                     label="Resume"
                     accessibilityLabel={resumeLabel}
                     active
-                    icon={<Ionicons name="play" size={tvSize(20)} color="#b8b0ff" />}
+                    icon={<Ionicons name="play" size={tvSize(20)} color="#e6b0fd" />}
                     onPress={onResume}
                 />
                 <TVPillButton

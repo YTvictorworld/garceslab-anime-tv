@@ -198,9 +198,9 @@ function SliderRow({
                 step={step}
                 value={value}
                 onValueChange={onChange}
-                minimumTrackTintColor="rgb(199,194,255)"
+                minimumTrackTintColor="rgb(230,176,253)"
                 maximumTrackTintColor="rgba(255,255,255,0.12)"
-                thumbTintColor="rgb(199,194,255)"
+                thumbTintColor="rgb(230,176,253)"
             />
         </View>
     )
@@ -309,7 +309,7 @@ function OptionGrid<TValue extends string>({
                                 <Ionicons
                                     name={option.icon}
                                     size={16}
-                                    color={active ? "rgb(199,194,255)" : "rgba(255,255,255,0.55)"}
+                                    color={active ? "rgb(230,176,253)" : "rgba(255,255,255,0.55)"}
                                 />
                             </View>
                             <View className="flex-1">
@@ -323,7 +323,7 @@ function OptionGrid<TValue extends string>({
                                 </Text>
                             </View>
                             {active && (
-                                <Ionicons name="checkmark" size={14} color="rgb(199,194,255)" />
+                                <Ionicons name="checkmark" size={14} color="rgb(230,176,253)" />
                             )}
                         </View>
                     </Pressable>

@@ -89,7 +89,7 @@ export function TVLabeledInput({
         <View style={{ gap: tvSize(10) }}>
             <Text
                 style={{
-                    color: focused ? "#d4d0ff" : "rgba(255,255,255,0.45)",
+                    color: focused ? "#f2d2ff" : "rgba(255,255,255,0.45)",
                     fontSize: tvSize(17),
                     fontWeight: "600",
                     letterSpacing: tvSize(1.2),
@@ -115,7 +115,7 @@ export function TVLabeledInput({
                         transform: [{ scale }],
                         borderRadius: tvSize(12),
                         borderWidth: tvSize(2),
-                        borderColor: focused ? "#b8b0ff" : "rgba(255,255,255,0.1)",
+                        borderColor: focused ? "#e6b0fd" : "rgba(255,255,255,0.1)",
                         backgroundColor: focused ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.04)",
                     }}
                 >
@@ -138,7 +138,7 @@ export function TVLabeledInput({
                         returnKeyType="done"
                         submitBehavior="submit"
                         onSubmitEditing={onSubmitEditing}
-                        selectionColor="#b8b0ff"
+                        selectionColor="#e6b0fd"
                         accessibilityLabel={label}
                         style={{
                             flex: 1,

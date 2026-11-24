@@ -1,6 +1,6 @@
-export const BRAND_ACCENT = "#a39dd7"
-export const BRAND_ACCENT_TINT = "rgba(97,82,223,0.16)"
-export const BRAND_ACCENT_BORDER = "rgba(97,82,223,0.25)"
+export const BRAND_ACCENT = "#cdb2de"
+export const BRAND_ACCENT_TINT = "rgba(164,67,207,0.16)"
+export const BRAND_ACCENT_BORDER = "rgba(164,67,207,0.25)"
 export const QUIET_HUD_TEXT = "rgba(255,255,255,0.92)"
 export const BUFFER_FILL = "rgba(255,255,255,0.2)"
 

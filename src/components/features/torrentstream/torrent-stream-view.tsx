@@ -143,7 +143,7 @@ function TVTorrentStreamView({
                 <TVPillButton
                     label={streamMode === "debrid" ? "Debrid streaming" : "Torrent streaming"}
                     active
-                    icon={<Ionicons name="swap-horizontal" size={tvSize(22)} color="#b8b0ff" />}
+                    icon={<Ionicons name="swap-horizontal" size={tvSize(22)} color="#e6b0fd" />}
                     onPress={() => onSelectStreamMode(streamMode === "debrid" ? "torrent" : "debrid")}
                 />
             ) : null}

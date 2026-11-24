@@ -159,7 +159,7 @@ function EpisodeListItemInner({
             )}
             {downloadStatus === "downloading" && (
                 <View className="absolute bottom-1.5 right-1.5 rounded-full p-0.5 bg-black/60">
-                    <Ionicons name="cloud-download-outline" size={16} color="rgba(97,82,223,0.9)" />
+                    <Ionicons name="cloud-download-outline" size={16} color="rgba(164,67,207,0.9)" />
                 </View>
             )}
             {isLoadingOverlay ? (
@@ -209,7 +209,7 @@ function EpisodeListItemInner({
                     style={{
                         width: thumbnailWidth,
                         height: (9 / 16) * thumbnailWidth,
-                        borderColor: focused && Platform.isTV ? "#b8b0ff" : "transparent",
+                        borderColor: focused && Platform.isTV ? "#e6b0fd" : "transparent",
                     }}
                 >
                     {thumbnail}
@@ -308,7 +308,7 @@ export const EpisodeListItem = React.memo(EpisodeListItemInner)
 
 const styles = StyleSheet.create({
     focusedRow: {
-        borderColor: "#b8b0ff",
+        borderColor: "#e6b0fd",
         borderWidth: 2,
     },
     firstRow: {

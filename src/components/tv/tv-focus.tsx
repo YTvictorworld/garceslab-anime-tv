@@ -288,10 +288,10 @@ export const TVPillButton = React.forwardRef<React.ElementRef<typeof Pressable>,
                             gap: label ? tvSize(8) : 0,
                             backgroundColor: focusState.focused
                                 ? "#ffffff"
-                                : (active ? "rgba(168,159,255,0.2)" : "rgba(255,255,255,0.06)"),
+                                : (active ? "rgba(211,132,245,0.2)" : "rgba(255,255,255,0.06)"),
                             borderColor: focusState.focused
                                 ? "#ffffff"
-                                : (active ? "#9b90ff" : "rgba(255,255,255,0.1)"),
+                                : (active ? "#d384f5" : "rgba(255,255,255,0.1)"),
                             flexShrink: 0,
                         },
                     ]}
@@ -304,7 +304,7 @@ export const TVPillButton = React.forwardRef<React.ElementRef<typeof Pressable>,
                                 fontSize: tvSize(18),
                                 color: focusState.focused
                                     ? "#000000"
-                                    : (active ? "#b8b0ff" : "#ffffff"),
+                                    : (active ? "#e6b0fd" : "#ffffff"),
                             }}
                         >
                             {label}

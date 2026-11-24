@@ -81,7 +81,7 @@ const toastConfig = {
         <CompactToast icon="close-circle" iconColor="#f87171" text={props.text2 || ""} />
     ),
     info: (props: BaseToastProps) => (
-        <CompactToast icon="information-circle" iconColor="rgba(97,82,223,0.9)" text={props.text2 || ""} />
+        <CompactToast icon="information-circle" iconColor="rgba(164,67,207,0.9)" text={props.text2 || ""} />
     ),
     warning: (props: BaseToastProps) => (
         <CompactToast icon="warning" iconColor="#fbbf24" text={props.text2 || ""} />

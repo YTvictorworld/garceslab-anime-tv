@@ -244,9 +244,9 @@ export function EditAnilistEntry(props: EditAnilistEntryProps) {
                                                     onSlidingStart={handleScoreSlidingStart}
                                                     onValueChange={handleScoreChange}
                                                     onSlidingComplete={handleScoreSlidingComplete}
-                                                    minimumTrackTintColor="rgb(97 82 223)"
+                                                    minimumTrackTintColor="rgb(164 67 207)"
                                                     maximumTrackTintColor="rgba(255,255,255,0.15)"
-                                                    thumbTintColor="rgb(97 82 223)"
+                                                    thumbTintColor="rgb(164 67 207)"
                                                 />
                                             </View>
                                         </NativeViewGestureHandler>

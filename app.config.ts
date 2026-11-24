@@ -73,7 +73,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
             usesCleartextTraffic: true,
             adaptiveIcon: {
                 foregroundImage: "./src/assets/images/adaptive-icon.png",
-                backgroundColor: "#171140",
+                backgroundColor: "#2b0e38",
             },
             permissions: [
                 "WRITE_SETTINGS",
@@ -104,7 +104,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
                 {
                     image: "./src/assets/images/splash-logo.png",
                     resizeMode: "contain",
-                    backgroundColor: "#070707",
+                    backgroundColor: "#0d0b0f",
                     android: {
                         imageWidth: 200,
                         resizeMode: "contain",

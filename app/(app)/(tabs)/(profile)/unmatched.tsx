@@ -128,8 +128,8 @@ export default function UnmatchedScreen() {
                                 className="bg-white/[0.03] border border-white/5 rounded-2xl p-4 mb-3 gap-3"
                             >
                                 <View className="flex-row items-start gap-3">
-                                    <View className="w-10 h-10 rounded-xl bg-indigo-500/10 items-center justify-center border border-indigo-500/20">
-                                        <Ionicons name="folder-open-outline" size={20} color="#818cf8" />
+                                    <View className="w-10 h-10 rounded-xl bg-brand-500/10 items-center justify-center border border-brand-500/20">
+                                        <Ionicons name="folder-open-outline" size={20} color="#e6b0fd" />
                                     </View>
                                     <View className="flex-1">
                                         <Text className="text-white font-bold text-sm" numberOfLines={1}>
@@ -154,13 +154,13 @@ export default function UnmatchedScreen() {
                                                 <Pressable
                                                     key={anime.id}
                                                     onPress={() => handleMatch(group, anime.id, anime.title?.userPreferred || "Anime")}
-                                                    className="flex-row items-center bg-indigo-500/10 border border-indigo-500/20 active:bg-indigo-500/20 px-3 py-2 rounded-xl gap-2 mr-2"
+                                                    className="flex-row items-center bg-brand-500/10 border border-brand-500/20 active:bg-brand-500/20 px-3 py-2 rounded-xl gap-2 mr-2"
                                                 >
                                                     <SeaImage
                                                         source={{ uri: anime.coverImage?.large }}
                                                         style={{ width: 20, height: 20, borderRadius: 4 }}
                                                     />
-                                                    <Text className="text-indigo-300 text-xs font-semibold max-w-[150px]" numberOfLines={1}>
+                                                    <Text className="text-brand-300 text-xs font-semibold max-w-[150px]" numberOfLines={1}>
                                                         {anime.title?.userPreferred || anime.title?.romaji || anime.title?.english}
                                                     </Text>
                                                 </Pressable>

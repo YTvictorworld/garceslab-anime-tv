@@ -133,7 +133,7 @@ export function TVDrawer({
                         {
                             width,
                             height: "100%",
-                            backgroundColor: "#0c0c0c",
+                            backgroundColor: "#0d0b0f",
                             borderLeftWidth: tvSize(2),
                             borderLeftColor: "rgba(255,255,255,0.08)",
                             transform: inline || WEB_SLIDE ? undefined : [{ translateX: slideAnim }],

@@ -11,7 +11,7 @@ declare global {
 const TV_CSS = `
 *:focus { outline: none; }
 * { -webkit-tap-highlight-color: transparent; }
-html, body { background-color: #070707; overflow: hidden; }
+html, body { background-color: #0d0b0f; overflow: hidden; }
 ::-webkit-scrollbar { display: none; }
 `
 

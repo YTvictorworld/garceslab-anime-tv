@@ -15,7 +15,7 @@ const TEXT_MS = 480
 /** How much of the hero must be on screen for it to keep rotating. */
 const HERO_IN_VIEW_RATIO = 0.3
 const EASE_OUT = "cubic-bezier(0.22, 1, 0.36, 1)"
-const BRAND = "#8176ef"
+const BRAND = "#d384f5"
 
 export type TVHeroItem = {
     key: string

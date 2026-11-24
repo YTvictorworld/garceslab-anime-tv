@@ -146,10 +146,10 @@ export function TVOnlinestreamManualMatchDrawer({
                 </View>
 
                 {currentMapping?.animeId && (
-                    <View style={{ marginHorizontal: tvSize(30), flexDirection: "row", justifyContent: "space-between", alignItems: "center", backgroundColor: "rgba(168,159,255,0.06)", borderWidth: tvSize(1), borderColor: "rgba(168,159,255,0.15)", borderRadius: tvSize(12), padding: tvSize(12) }}>
+                    <View style={{ marginHorizontal: tvSize(30), flexDirection: "row", justifyContent: "space-between", alignItems: "center", backgroundColor: "rgba(211,132,245,0.06)", borderWidth: tvSize(1), borderColor: "rgba(211,132,245,0.15)", borderRadius: tvSize(12), padding: tvSize(12) }}>
                         <View style={{ gap: tvSize(2) }}>
                             <Text style={{ fontSize: tvSize(12), color: "rgba(255,255,255,0.4)", fontWeight: "600" }}>CURRENTLY MAPPED TO</Text>
-                            <Text style={{ fontSize: tvSize(16), color: "#a89fff", fontWeight: "bold" }}>{currentMapping.animeId}</Text>
+                            <Text style={{ fontSize: tvSize(16), color: "#e6b0fd", fontWeight: "bold" }}>{currentMapping.animeId}</Text>
                         </View>
                         <TVButton
                             label="Remove mapping"

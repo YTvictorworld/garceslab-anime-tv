@@ -362,8 +362,8 @@ function ChapterListItem({
                         <View
                             className="w-5 h-5 rounded-md border-2 items-center justify-center"
                             style={{
-                                borderColor: selected ? "rgb(97,82,223)" : "rgba(255,255,255,0.25)",
-                                backgroundColor: selected ? "rgb(97,82,223)" : "transparent",
+                                borderColor: selected ? "rgb(164,67,207)" : "rgba(255,255,255,0.25)",
+                                backgroundColor: selected ? "rgb(164,67,207)" : "transparent",
                             }}
                         >
                             {selected && <Ionicons name="checkmark" size={13} color="white" />}
@@ -422,7 +422,7 @@ function ChapterListItem({
                     <Ionicons name="time-outline" size={15} color="rgba(255,255,255,0.3)" />
                 )}
                 {isRead && !selectionMode && (
-                    <Ionicons name="checkmark-circle" size={18} color="rgba(157, 129, 255, 0.5)" />
+                    <Ionicons name="checkmark-circle" size={18} color="rgba(211,132,245, 0.5)" />
                 )}
                 {!selectionMode && (
                     <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.22)" />

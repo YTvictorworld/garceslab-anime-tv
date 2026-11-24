@@ -195,9 +195,9 @@ export function TorrentStreamPickerSheet(props: TorrentStreamPickerSheetProps) {
                                     variant="cancel"
                                     onPress={() => onDownloadTorrent?.(selectedTorrent!, true)}
                                     disabled={isDownloading}
-                                    className="bg-indigo-500/10 border border-indigo-500/25 active:bg-indigo-500/20"
+                                    className="bg-brand-500/10 border border-brand-500/25 active:bg-brand-500/20"
                                 >
-                                    <Text className="font-semibold text-indigo-400">Download Missing</Text>
+                                    <Text className="font-semibold text-brand-300">Download Missing</Text>
                                 </SheetFooterButton>
                             )}
                             {canChooseFile && (
@@ -205,9 +205,9 @@ export function TorrentStreamPickerSheet(props: TorrentStreamPickerSheetProps) {
                                     variant="cancel"
                                     onPress={onConfirmTorrentSelection}
                                     disabled={isDownloading}
-                                    className="bg-indigo-500/10 border border-indigo-500/25 active:bg-indigo-500/20"
+                                    className="bg-brand-500/10 border border-brand-500/25 active:bg-brand-500/20"
                                 >
-                                    <Text className="font-semibold text-indigo-400">Choose File</Text>
+                                    <Text className="font-semibold text-brand-300">Choose File</Text>
                                 </SheetFooterButton>
                             )}
                         </View>
@@ -639,8 +639,8 @@ function TorrentSelectionStage(props: TorrentSelectionStageProps) {
                         </Text>
                         <View className="flex-row items-center gap-2">
                             {activeFilterCount > 0 && (
-                                <View className="bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded-md">
-                                    <Text className="text-[10px] font-semibold text-indigo-400">
+                                <View className="bg-brand-500/10 border border-brand-500/20 px-2 py-0.5 rounded-md">
+                                    <Text className="text-[10px] font-semibold text-brand-300">
                                         {activeFilterCount} active
                                     </Text>
                                 </View>
@@ -916,7 +916,7 @@ function TorrentFileSelectionStage({ filePreviews, isLoading, onBack, selectedFi
                             className={cn(
                                 "rounded-2xl p-3.5 border-2 gap-2 focus:border-brand-100",
                                 selected
-                                    ? "bg-indigo-500/15 border-indigo-400/30"
+                                    ? "bg-brand-500/15 border-brand-400/30"
                                     : "bg-white/5 border-white/10",
                             )}
                         >
@@ -1038,7 +1038,7 @@ function TorrentProviderSelectionStage({
                                 className={cn(
                                     "rounded-2xl p-3.5 border-2 flex-row justify-between items-center focus:border-brand-100",
                                     isActive
-                                        ? "bg-indigo-500/15 border-indigo-400/30"
+                                        ? "bg-brand-500/15 border-brand-400/30"
                                         : "bg-white/5 border-white/10",
                                 )}
                             >
@@ -1053,7 +1053,7 @@ function TorrentProviderSelectionStage({
                                     )}
                                 </View>
                                 {isActive && (
-                                    <Ionicons name="checkmark-circle" size={18} color="#a5b4fc" />
+                                    <Ionicons name="checkmark-circle" size={18} color="#e6b0fd" />
                                 )}
                             </Pressable>
                         )
@@ -1070,7 +1070,7 @@ function ChoiceChip({ label, active, onPress }: { label: string; active: boolean
             onPress={onPress}
             className={cn(
                 "px-3.5 py-2 rounded-full border-2 focus:border-brand-100 focus:bg-white/15",
-                active ? "bg-indigo-500/60 border-indigo-500/80" : "bg-white/5 border-white/10",
+                active ? "bg-brand-500/60 border-brand-500/80" : "bg-white/5 border-white/10",
             )}
         >
             <Text className={cn("text-xs font-semibold", active ? "text-white" : "text-white/45")}>

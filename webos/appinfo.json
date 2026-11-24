@@ -8,9 +8,9 @@
     "appDescription": "Garceslab Anime for your TV",
     "icon": "icon.png",
     "largeIcon": "largeIcon.png",
-    "iconColor": "#5b3df5",
+    "iconColor": "#a443cf",
     "splashBackground": "splash.png",
-    "bgColor": "#070707",
+    "bgColor": "#0d0b0f",
     "resolution": "1920x1080",
     "disableBackHistoryAPI": true,
     "accessibility": {

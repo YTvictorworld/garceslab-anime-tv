@@ -40,7 +40,7 @@ export function LibrarySearchBar({
         borderColor: interpolateColor(
             focused.value,
             [0, 1],
-            ["rgba(255,255,255,0.08)", "rgba(97,82,223,0.5)"],
+            ["rgba(255,255,255,0.08)", "rgba(164,67,207,0.5)"],
         ),
     }))
 

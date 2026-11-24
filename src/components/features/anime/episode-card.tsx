@@ -62,7 +62,7 @@ export const EpisodeCard = React.memo(function EpisodeCard(props: EpisodeCardPro
                     style={{
                         borderRadius: 12,
                         overflow: "hidden",
-                        borderColor: focused && Platform.isTV ? "#b8b0ff" : "transparent",
+                        borderColor: focused && Platform.isTV ? "#e6b0fd" : "transparent",
                     }}
                 >
                     <SeaImage

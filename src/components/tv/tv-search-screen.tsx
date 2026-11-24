@@ -176,7 +176,7 @@ export function TVSearchScreen() {
                             justifyContent: "center",
                         }}
                     >
-                        <ActivityIndicator size="large" color="#a89fff" />
+                        <ActivityIndicator size="large" color="#e6b0fd" />
                     </View>
                 ) : undefined}
                 emptyTitle={shouldQuery

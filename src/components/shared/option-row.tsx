@@ -12,7 +12,7 @@ type OptionRowProps = {
     monoDetail?: boolean
 }
 
-const BRAND_ACCENT = "rgb(97 82 223)"
+const BRAND_ACCENT = "rgb(164 67 207)"
 
 /**
  * A single-select row for use inside a grouped Surface container.

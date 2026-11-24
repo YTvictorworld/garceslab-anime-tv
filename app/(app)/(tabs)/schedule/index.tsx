@@ -602,7 +602,7 @@ function ScheduleSettingsSheet({
                                             {opt.label}
                                         </Text>
                                         {active && (
-                                            <Ionicons name="checkmark" size={18} color="rgb(97,82,223)" />
+                                            <Ionicons name="checkmark" size={18} color="rgb(164,67,207)" />
                                         )}
                                     </Pressable>
                                 </React.Fragment>

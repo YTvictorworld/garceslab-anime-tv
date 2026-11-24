@@ -290,7 +290,7 @@ export function CollectionFilterSheet({
                                     onChangeText={setTagSearch}
                                     placeholder="Find a tag"
                                     placeholderTextColor="rgba(255,255,255,0.35)"
-                                    selectionColor="rgba(130,115,255,0.9)"
+                                    selectionColor="rgba(211,132,245,0.9)"
                                     style={styles.tagSearchInput}
                                     textAlignVertical="center"
                                     autoCapitalize="none"

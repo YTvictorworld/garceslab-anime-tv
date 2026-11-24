@@ -925,7 +925,7 @@ const TVTabBar = React.memo(function TVTabBar({ tabs, activeKey, activeRef, onTa
                                 height: tvSize(3),
                                 borderTopLeftRadius: tvSize(2),
                                 borderTopRightRadius: tvSize(2),
-                                backgroundColor: "#a89fff",
+                                backgroundColor: "#e6b0fd",
                                 transformOrigin: "left",
                                 transform: [
                                     { translateX: cssIndicator.x },
@@ -947,7 +947,7 @@ const TVTabBar = React.memo(function TVTabBar({ tabs, activeKey, activeRef, onTa
                             height: tvSize(3),
                             borderTopLeftRadius: tvSize(2),
                             borderTopRightRadius: tvSize(2),
-                            backgroundColor: "#a89fff",
+                            backgroundColor: "#e6b0fd",
                         }}
                     />
                 )}

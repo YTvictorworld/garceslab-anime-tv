@@ -21,7 +21,7 @@ export function LibrarySearchHeader(props: LibrarySearchHeaderProps) {
     const animatedBgStyle = useAnimatedStyle(() => {
         if (!hasHero || !scrollY) {
             return {
-                backgroundColor: COLORS.background || "#0c0c0c",
+                backgroundColor: COLORS.background || "#0d0b0f",
                 borderBottomWidth: 1,
                 borderBottomColor: "rgba(255,255,255,0.06)",
             }

@@ -389,7 +389,7 @@ function TVPanelRow({
                     <Text
                         className="font-semibold"
                         style={{
-                            color: active ? "#c5c0ff" : "#ffffff",
+                            color: active ? "#f2d2ff" : "#ffffff",
                             fontSize: tvSize(21),
                         }}
                         numberOfLines={1}

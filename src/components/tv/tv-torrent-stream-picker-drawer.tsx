@@ -889,13 +889,13 @@ const TVTorrentCard = React.memo(function TVTorrentCard({
                         backgroundColor: focus.focused
                             ? "rgba(255,255,255,0.08)"
                             : isSelected
-                              ? "rgba(168,159,255,0.12)"
+                              ? "rgba(211,132,245,0.12)"
                               : "rgba(255,255,255,0.04)",
                         borderWidth: tvSize(2),
                         borderColor: focus.focused
                             ? "#ffffff"
                             : isSelected
-                              ? "#9b90ff"
+                              ? "#d384f5"
                               : "rgba(255,255,255,0.08)",
                         gap: tvSize(10),
                     },
@@ -941,7 +941,7 @@ const TVTorrentCard = React.memo(function TVTorrentCard({
                             <Ionicons
                                 name="checkmark-circle"
                                 size={tvSize(18)}
-                                color="#b8b0ff"
+                                color="#e6b0fd"
                             />
                         )}
                     </View>
@@ -1181,13 +1181,13 @@ const TVFileCard = React.memo(function TVFileCard({
                         backgroundColor: focus.focused
                             ? "#ffffff"
                             : isSelected
-                              ? "rgba(168,159,255,0.12)"
+                              ? "rgba(211,132,245,0.12)"
                               : "rgba(255,255,255,0.04)",
                         borderWidth: tvSize(2),
                         borderColor: focus.focused
                             ? "#ffffff"
                             : isSelected
-                              ? "#9b90ff"
+                              ? "#d384f5"
                               : "rgba(255,255,255,0.08)",
                         flexDirection: "row",
                         justifyContent: "space-between",
@@ -1204,7 +1204,7 @@ const TVFileCard = React.memo(function TVFileCard({
                             color: focus.focused
                                 ? "#000000"
                                 : isSelected
-                                  ? "#b8b0ff"
+                                  ? "#e6b0fd"
                                   : "#ffffff",
                         }}
                         numberOfLines={1}
@@ -1262,7 +1262,7 @@ const TVFileCard = React.memo(function TVFileCard({
                         <Ionicons
                             name="checkmark-circle"
                             size={tvSize(20)}
-                            color={focus.focused ? "#5b4fd8" : "#b8b0ff"}
+                            color={focus.focused ? "#a443cf" : "#e6b0fd"}
                         />
                     )}
                 </View>
