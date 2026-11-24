@@ -194,8 +194,14 @@ Search has its own keyboard: a letter grid for the remote (A–Z, 0–9, Space, 
 Clear), with suggestions next to it and results below that update as you type (250 ms
 after the last key, from two letters on; a newer query cancels the older one). A keyboard
 plugged into the TV types too. OK on the search field still opens the system keyboard.
-AniList matches whole words, so a lone partial word ("blea") finds nothing until it is
-complete ("bleach"); after a first word the last one can be partial ("one pi").
+Suggestions come from the Garceslab Anime server's title index (`GET /api/v1/search/suggest`),
+which matches the start of any title or synonym: "ble" already suggests Bleach, and the line
+under a suggestion shows the synonym that matched ("Attack on Titan" for Shingeki no Kyojin).
+OK on a suggestion opens that anime's page. The results grid below is still AniList's search,
+which matches whole words, so it may stay empty for a partial word ("blea") until it is
+complete ("bleach"); after a first word the last one can be partial ("one pi"). When the
+index has nothing (still downloading, turned off, an older server, or only filters set),
+the suggestions fall back to the first AniList results.
 
 ## Playback
 

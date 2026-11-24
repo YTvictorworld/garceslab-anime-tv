@@ -18,6 +18,7 @@ import {
     searchParamsAtom,
     type SearchParams,
 } from "@/lib/search/search.atoms"
+import { type SearchSuggestion, suggestionDetail } from "@/lib/search/search-suggestions"
 import { SEARCH_DEBOUNCE_MS, searchQueryFor } from "@/lib/tv-keyboard"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { router } from "expo-router"
@@ -65,7 +66,7 @@ export function TVSearchScreen() {
     const activeFilters = getActiveFiltersCount(params)
     const typed = input.trim()
     const waitingForLetters = typed.length > 0 && !searchQueryFor(input)
-    // Suggestions come from one hook, so their source can change (a server title index) without this screen.
+    // Suggestions come from one hook: the server's title index (prefix matches), else AniList.
     const { suggestions, isFetching: searching } = useSearchSuggestions(params.title, params)
 
     const loadMore = React.useCallback(() => {
@@ -78,7 +79,7 @@ export function TVSearchScreen() {
         setParams({ ...next, type: "anime", title: searchQueryFor(input) })
     }, [input, setParams])
 
-    const openMedia = React.useCallback((item: AL_BaseAnime) => {
+    const openMedia = React.useCallback((item: { id: number }) => {
         router.push(`/(app)/entry/anime/${item.id}`)
     }, [])
 
@@ -153,13 +154,13 @@ export function TVSearchScreen() {
                                     {searching ? <ActivityIndicator size="small" color="#a89fff" /> : null}
                                 </View>
                                 {suggestions.length > 0 ? suggestions.map(item => (
-                                    <TVSuggestion key={item.id} media={item} query={typed} onPress={openMedia} />
+                                    <TVSuggestion key={item.id} suggestion={item} query={typed} onPress={openMedia} />
                                 )) : (
                                     <Text className="text-white/40" style={{ fontSize: tvSize(20) }}>
                                         {waitingForLetters
                                             ? "Keep typing: suggestions start at 2 letters."
                                             : shouldQuery && !searching
-                                                // AniList matches whole words (a lone "blea" finds nothing, "bleach" does).
+                                                // Without the server's title index, AniList matches whole words only (a lone "blea" finds nothing).
                                                 ? (params.title ? `No results for “${params.title}” yet. Keep typing the whole word.` : "No titles match these filters")
                                                 : !typed ? "Type with the keyboard: results appear as you go." : ""}
                                     </Text>
@@ -197,14 +198,14 @@ export function TVSearchScreen() {
     )
 }
 
-const TVSuggestion = React.memo(function TVSuggestion({ media, query, onPress }: { media: AL_BaseAnime; query: string; onPress: (media: AL_BaseAnime) => void }) {
-    const focusState = useTVFocus(1.02, `suggestion-${media.id}`)
-    const title = media.title?.userPreferred || media.title?.english || media.title?.romaji || "Untitled"
-    const detail = [media.format, media.seasonYear ?? media.startDate?.year].filter(Boolean).join(" · ")
+const TVSuggestion = React.memo(function TVSuggestion({ suggestion, query, onPress }: { suggestion: SearchSuggestion; query: string; onPress: (suggestion: SearchSuggestion) => void }) {
+    const focusState = useTVFocus(1.02, `suggestion-${suggestion.id}`)
+    const title = suggestion.title
+    const detail = suggestionDetail(suggestion)
     const color = focusState.focused ? "#000000" : "#ffffff"
     return (
         <Pressable
-            onPress={() => onPress(media)}
+            onPress={() => onPress(suggestion)}
             onFocus={focusState.focus}
             onBlur={focusState.blur}
             accessibilityRole="button"
@@ -231,7 +232,8 @@ const TVSuggestion = React.memo(function TVSuggestion({ media, query, onPress }:
                     <HighlightedTitle title={title} query={query} focused={focusState.focused} />
                 </Text>
                 {detail ? (
-                    <Text style={{ color: focusState.focused ? "rgba(0,0,0,0.6)" : "rgba(255,255,255,0.4)", fontSize: tvSize(16) }}>{detail}</Text>
+                    // The matched synonym can be long: it may take up to 45 % of the row, on one line.
+                    <Text numberOfLines={1} style={{ maxWidth: "45%", color: focusState.focused ? "rgba(0,0,0,0.6)" : "rgba(255,255,255,0.4)", fontSize: tvSize(16) }}>{detail}</Text>
                 ) : null}
             </Animated.View>
         </Pressable>
