@@ -13,8 +13,11 @@
  */
 import { hasLunaBridge, lunaCall, lunaSubscribe, type LunaResponse, type LunaSubscription } from "./luna.ts"
 
-/** webos/build.mjs packages the service as `<app id>.service`; a test checks the two agree. */
-export const RELAY_SERVICE_ID = "app.seanime.tenji.service"
+/**
+ * webos/build.mjs packages the service as `<app id>.service`; a test checks the two agree.
+ * A side-by-side test build (WEBOS_APP_ID) passes its id in EXPO_PUBLIC_WEBOS_APP_ID.
+ */
+export const RELAY_SERVICE_ID = `${process.env.EXPO_PUBLIC_WEBOS_APP_ID || "app.seanime.tenji"}.service`
 const SERVICE = `luna://${RELAY_SERVICE_ID}`
 
 /** Starting the service is Node starting on the TV; a working one answers well within this. */
