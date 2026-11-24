@@ -7,6 +7,8 @@ import type {
     AL_BaseAnime,
 } from "@/api/generated/types"
 import { getEpisodePercentageComplete, useGetContinuityWatchHistory } from "@/api/hooks/continuity.hooks"
+import { useEpisodeTags } from "@/api/hooks/episode-tags.hooks"
+import { episodeTagFor } from "@/lib/episode-tags/episode-tags"
 import { tvReturnFocusAtom } from "@/atoms/anime-entry.atoms"
 import {
     TVButton,
@@ -64,6 +66,7 @@ export function TVAnimeEntryScreen({
     const serverLocalIdentity = useServerLocalIdentity()
     const serverLocalEntry = useServerLocalAnimeEntry(entry.mediaId)
     const { data: watchHistory } = useGetContinuityWatchHistory()
+    const episodeTags = useEpisodeTags(entry.mediaId)
     const [localView, setLocalView] = React.useState<AnimeEntryView>(() => tvEntryView(initialView))
     const [editOpen, setEditOpen] = React.useState(false)
     const [returnFocus, setReturnFocus] = useAtom(tvReturnFocusAtom)
@@ -198,12 +201,14 @@ export function TVAnimeEntryScreen({
             progressPercent: getEpisodePercentageComplete(watchHistory, entry.mediaId, item.progressNumber),
             completed,
             filler: item.episodeMetadata?.isFiller,
+            // Specials and NCs have their own numbering: only main episodes get a tag.
+            episodeTag: item.type === "main" ? episodeTagFor(episodeTags, item.episodeNumber) : undefined,
             blurred: spoiler.hideThumbnail || blurAdult,
             // webOS shows this dimmed instead of blurring: the show's art hides
             // an episode spoiler; adult content gets a plain placeholder.
             blurredImage: blurAdult ? undefined : fallbackImage ?? entry.media?.coverImage?.large,
         }
-    }, [entry.media?.bannerImage, entry.media?.coverImage?.large, entry.media?.isAdult, entry.mediaId, progress, serverStatus, watchHistory])
+    }, [entry.media?.bannerImage, entry.media?.coverImage?.large, entry.media?.isAdult, entry.mediaId, episodeTags, progress, serverStatus, watchHistory])
 
     const renderEpisode = React.useCallback((item: Anime_Episode, index: number) => {
         const props = cardProps(item)

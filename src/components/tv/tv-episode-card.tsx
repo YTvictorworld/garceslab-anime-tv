@@ -2,6 +2,7 @@ import type { Anime_Episode } from "@/api/generated/types"
 import { TVFocusScaleView, usePreferredFocus, useTVFocus } from "@/components/tv/tv-focus"
 import { TVLazyImage } from "@/components/tv/tv-lazy-image"
 import { TV, tvSize } from "@/components/tv/tv-scale"
+import { EPISODE_TAG_LABELS, EPISODE_TAG_SPOKEN, EPISODE_TAG_STYLE, type EpisodeTagKind } from "@/lib/episode-tags/episode-tags"
 import { LinearGradient } from "expo-linear-gradient"
 import { Ionicons } from "@/lib/icons/Ionicons"
 import * as React from "react"
@@ -39,6 +40,11 @@ export interface TVEpisodeCardProps extends Omit<PressableProps, "onPress"> {
     tag?: { label: string; icon: React.ComponentProps<typeof Ionicons>["name"]; dimmed?: boolean }
     /** Covers the art: a stream starting for this card (with a spinner) or why it failed. */
     status?: TVEpisodeCardStatus
+    /**
+     * Garceslab Anime: a CANON / FILLER / RECAP / MIX pill in the top-right
+     * corner (see useEpisodeTags). Replaces the `filler` chip when set.
+     */
+    episodeTag?: EpisodeTagKind
 }
 
 export type TVEpisodeCardStatus = {
@@ -68,6 +74,7 @@ export const TVEpisodeCard = React.memo(
             blurredImage,
             tag,
             status,
+            episodeTag,
             ...props
         }, ref) {
             const focus = useTVFocus(1.05, title)
@@ -89,7 +96,7 @@ export const TVEpisodeCard = React.memo(
                     hasTVPreferredFocus={isPreferred}
                     scrollSnapAlign="start"
                     accessibilityRole="button"
-                    accessibilityLabel={`${title}${subtitle ? `, ${subtitle}` : ""}${status ? `, ${status.message}${status.hint ? `. ${status.hint}` : ""}` : ""}`}
+                    accessibilityLabel={`${title}${subtitle ? `, ${subtitle}` : ""}${episodeTag ? `, ${EPISODE_TAG_SPOKEN[episodeTag]}` : ""}${status ? `, ${status.message}${status.hint ? `. ${status.hint}` : ""}` : ""}`}
                     style={{ width }}
                     {...props}
                 >
@@ -180,7 +187,7 @@ export const TVEpisodeCard = React.memo(
                                         {tag.label}
                                     </Text>
                                 </View>
-                            ) : filler ? (
+                            ) : filler && !episodeTag ? (
                                 <View
                                     style={{
                                         position: "absolute",
@@ -197,6 +204,7 @@ export const TVEpisodeCard = React.memo(
                                     </Text>
                                 </View>
                             ) : null}
+                            {episodeTag ? <TVEpisodeTagPill kind={episodeTag} /> : null}
                             <View
                                 style={{
                                     position: "absolute",
@@ -293,3 +301,50 @@ export const TVEpisodeCard = React.memo(
             )
         })
 )
+
+/**
+ * Garceslab Anime: the episode tag pill, small and bold enough to read from the
+ * couch. It sits under the status overlay, so loading and error states cover it.
+ */
+function TVEpisodeTagPill({ kind }: { kind: EpisodeTagKind }) {
+    const style = EPISODE_TAG_STYLE[kind]
+    const borderWidth = style.border ? Math.max(1, tvSize(1.5)) : 0
+    return (
+        <View
+            pointerEvents="none"
+            importantForAccessibility="no-hide-descendants"
+            style={{
+                position: "absolute",
+                top: tvSize(12),
+                right: tvSize(12),
+                overflow: "hidden",
+                borderRadius: tvSize(7),
+                borderWidth,
+                borderColor: style.border ?? "transparent",
+                paddingHorizontal: tvSize(10) - borderWidth,
+                paddingVertical: tvSize(4) - borderWidth,
+                backgroundColor: style.background,
+            }}
+        >
+            {kind === "mixed" ? (
+                <LinearGradient
+                    colors={["#a443cf", "#f59e4b"]}
+                    start={{ x: 0, y: 0.5 }}
+                    end={{ x: 1, y: 0.5 }}
+                    style={{ position: "absolute", inset: 0 }}
+                />
+            ) : null}
+            <Text
+                style={{
+                    color: style.color,
+                    fontSize: tvSize(15),
+                    lineHeight: tvSize(20),
+                    fontWeight: "800",
+                    letterSpacing: tvSize(0.8),
+                }}
+            >
+                {EPISODE_TAG_LABELS[kind]}
+            </Text>
+        </View>
+    )
+}

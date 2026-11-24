@@ -13,6 +13,8 @@ import type { StreamMode } from "./use-torrent-stream-controller"
 
 import { TVEpisodeCard, TVEpisodeGrid, TVEpisodePlayButton, TVPillButton, tvSize } from "@/components/tv"
 import type { TVEpisodeCardStatus } from "@/components/tv/tv-episode-card"
+import { useEpisodeTags } from "@/api/hooks/episode-tags.hooks"
+import { episodeTagFor } from "@/lib/episode-tags/episode-tags"
 
 const TV_PAGE_SIZE = 24
 
@@ -73,6 +75,7 @@ function TVTorrentStreamView({
     episodeCardStatus,
 }: TorrentStreamViewProps) {
     const serverStatus = useServerStatus()
+    const episodeTags = useEpisodeTags(entry.mediaId)
     const handleAvailableEpisodePress = React.useMemo(() => {
         return isEpisodeSelectionLocked ? undefined : onEpisodePress
     }, [isEpisodeSelectionLocked, onEpisodePress])
@@ -115,10 +118,12 @@ function TVTorrentStreamView({
                 onPress={() => handleAvailableEpisodePress?.(ep)}
                 recyclingKey={ep.localFile?.path || `tv-torrent-ep-${ep.episodeNumber}-${idx}`}
                 status={episodeCardStatus?.episodeNumber === ep.episodeNumber ? episodeCardStatus.status : undefined}
+                episodeTag={ep.type === "main" ? episodeTagFor(episodeTags, ep.episodeNumber) : undefined}
             />
         )
     }, [
         episodeCardStatus,
+        episodeTags,
         handleAvailableEpisodePress,
         isEpisodeSelectionLocked,
         keptEpisodeNumber,
