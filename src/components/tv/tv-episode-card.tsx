@@ -240,7 +240,7 @@ export const TVEpisodeCard = React.memo(
                                 >
                                     {status.error
                                         ? <Ionicons name="alert-circle-outline" size={tvSize(34)} color="#f87171" />
-                                        : <ActivityIndicator size="large" color="#e6b0fd" />}
+                                        : <ActivityIndicator size={tvSize(40)} color="#e6b0fd" />}
                                     <Text
                                         className="font-semibold text-white"
                                         numberOfLines={2}
