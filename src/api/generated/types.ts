@@ -2296,6 +2296,44 @@ export type DebridClient_StreamState = {
 export type DebridClient_StreamStatus = "downloading" | "ready" | "failed" | "started"
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Episodetags
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/**
+ * - Filepath: internal/episodetags/tags.go
+ * - Filename: tags.go
+ * - Package: episodetags
+ * @description
+ *  Kind is what an episode is.
+ */
+export type EpisodeTags_Kind = "canon" | "filler" | "recap" | "mixed"
+
+/**
+ * - Filepath: internal/episodetags/tags.go
+ * - Filename: tags.go
+ * - Package: episodetags
+ * @description
+ *  Response is what GET /api/v1/anime/episode-tags/{id} returns.
+ */
+export type EpisodeTags_Response = {
+    status: EpisodeTags_Status
+    malId: number
+    episodes?: Record<string, EpisodeTags_Kind>
+    hasNonCanon: boolean
+    fetchedAt?: string
+    source?: string
+}
+
+/**
+ * - Filepath: internal/episodetags/tags.go
+ * - Filename: tags.go
+ * - Package: episodetags
+ * @description
+ *  Status says whether a Response has data.
+ */
+export type EpisodeTags_Status = "ready" | "pending" | "unavailable"
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Extension
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

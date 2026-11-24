@@ -18,6 +18,12 @@ under the Mozilla Public License 2.0 and keep that license. No additional
 restrictions apply. The modifications and their dates are listed in
 MODIFICATIONS.md (GPL-3.0, section 5a); the complete history is in the git log.
 
+Episode tags (CANON, FILLER, RECAP on episode cards) show MyAnimeList
+(https://myanimelist.net) episode data that the Garceslab Anime server reads
+through the Jikan-compatible APIs Tenrai (https://tenrai.org), jikan-edge
+(https://jikan.lucashdo.com) and Jikan (https://jikan.moe). The data belongs
+to MyAnimeList; this project is not affiliated with MyAnimeList or these APIs.
+
 "Seanime" and "Seanime Tenji", and their logos, belong to their respective
 owners and are used only to describe where this program comes from.
 Garceslab Anime is an independent, unofficial project. It is not affiliated

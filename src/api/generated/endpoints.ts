@@ -312,6 +312,23 @@ export const API_ENDPOINTS = {
             endpoint: "/api/v1/library/anime-entry/update-repeat",
         },
     },
+    ANIME_EPISODE_TAGS: {
+        /**
+         *  @description
+         *  Route returns canon/filler/recap tags for the episodes of an anime.
+         *  Tags come from MyAnimeList data via Jikan-compatible APIs (Tenrai, jikan-edge, Jikan), looked up by the media's MAL id.
+         *  It never waits for the network: "status" is "ready" (tags in "episodes"), "pending" (nothing cached yet, a background
+         *  fetch is running; ask again in a few seconds) or "unavailable" (no MAL id, not on MAL, providers down, disabled or offline).
+         *  "episodes" maps the episode number (MAL numbering = the episode list's episodeNumber) to "canon", "filler", "recap" or "mixed".
+         *  "hasNonCanon" is true when at least one episode is not canon; clients show tags only then.
+         *  Tags are cached in the data directory: refreshed daily while the anime airs, every 30 days once finished.
+         */
+        GetAnimeEpisodeTags: {
+            key: "ANIME-EPISODE-TAGS-get-anime-episode-tags",
+            methods: ["GET"],
+            endpoint: "/api/v1/anime/episode-tags/{id}",
+        },
+    },
     AUTH: {
         /**
          *  @description

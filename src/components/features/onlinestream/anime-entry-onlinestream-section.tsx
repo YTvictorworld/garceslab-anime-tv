@@ -18,6 +18,8 @@ import { useAtom } from "jotai"
 import * as React from "react"
 import { ActivityIndicator, Pressable, Text, useWindowDimensions, View, Platform, FlatList, TVFocusGuideView } from "react-native"
 
+import { useEpisodeTags } from "@/api/hooks/episode-tags.hooks"
+import { episodeTagFor } from "@/lib/episode-tags/episode-tags"
 import { TVEpisodeCard, TVEpisodeGrid, TVEpisodePlayButton, TVPillButton, TV, tvSize, TVOnlinestreamManualMatchDrawer } from "@/components/tv"
 
 type AnimeEntryOnlinestreamSectionProps = {
@@ -158,6 +160,7 @@ function TVAnimeEntryOnlinestreamSection({
     setManualMatchOpen: (o: boolean) => void
 }) {
     const serverStatus = useServerStatus()
+    const episodeTags = useEpisodeTags(entry.mediaId)
     const handleEpisodePress = React.useCallback((onlineEp: any) => {
         const epNumber = onlineEp.number
         if (controller.playRequestedEpisode === epNumber) {
@@ -194,9 +197,10 @@ function TVAnimeEntryOnlinestreamSection({
                 blurred={spoiler.hideThumbnail}
                 onPress={() => handleEpisodePress(onlineEp)}
                 recyclingKey={`tv-online-ep-${onlineEp.number}-${idx}`}
+                episodeTag={episodeTagFor(episodeTags, onlineEp.number)}
             />
         )
-    }, [controller.progress, entry.media?.bannerImage, handleEpisodePress, serverStatus])
+    }, [controller.progress, entry.media?.bannerImage, episodeTags, handleEpisodePress, serverStatus])
 
     return (
         <View style={{ paddingBottom: tvSize(80), gap: tvSize(30) }}>
