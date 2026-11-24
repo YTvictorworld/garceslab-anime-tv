@@ -5,6 +5,7 @@ import { TVHeroSkeleton } from "@/components/tv/tv-skeleton"
 import { Ionicons } from "@/lib/icons/Ionicons"
 import { Image } from "expo-image"
 import { LinearGradient } from "expo-linear-gradient"
+import { TV_VISUAL } from "@/lib/tv/visual-flags"
 import * as React from "react"
 import { Platform, Pressable, Text, TVFocusGuideView, View } from "react-native"
 
@@ -188,7 +189,9 @@ export const TVHeroCarousel = React.memo(function TVHeroCarousel({
                 <View ref={textRef} style={{ gap: tvSize(10) }}>
                     <Text
                         className="font-black text-white"
-                        style={{ fontSize: tvSize(52), lineHeight: tvSize(58) }}
+                        style={TV_VISUAL.typography
+                            ? { fontSize: tvSize(52), lineHeight: tvSize(60), letterSpacing: tvSize(-0.6) }
+                            : { fontSize: tvSize(52), lineHeight: tvSize(58) }}
                         numberOfLines={2}
                     >
                         {item.title}
