@@ -22,6 +22,7 @@ import { describeTVAudioTrack } from "@/lib/webos/tv-audio"
 import type { MpvChapter, MpvExternalSubtitle, MpvSourceAudioTrack } from "expo-mpv-player"
 import React from "react"
 import { createDirectStreamSession, describeStreamCodecs, type DirectStreamSession, directStreamChapters } from "./direct-stream"
+import { directPlayErrorMessage, useDirectPlaySession } from "./direct-play-session"
 import { streamAudioWarning, streamFailureMessage } from "./direct-stream-format"
 import { endKeptStream, keptDirectStreams } from "./kept-direct-stream"
 import { proxiedUrl } from "./online-proxy"
@@ -320,6 +321,7 @@ export function useWebPlaybackPlan(source: MobilePlaybackSource | null): WebPlay
     const [fallback, setFallback] = React.useState<{ id: string; position?: number } | null>(null)
     const { data: watchHistory } = useGetContinuityWatchHistory()
     const directStream = useDirectStreamSession(source)
+    const directPlay = useDirectPlaySession(source)
     const serverUrl = useServerUrl()
     const library = isLibraryFile(source)
     const streamIsHls = source?.streamKind === "hls"
@@ -383,6 +385,11 @@ export function useWebPlaybackPlan(source: MobilePlaybackSource | null): WebPlay
 
     return React.useMemo(() => {
         if (!source) return undefined
+        if (source.directPlay) {
+            // Direct-play test: wait for the file's header (tracks, Cues), then play the link as it is.
+            if (!directPlay) return undefined
+            return { ...directPlay.plan, onPlaybackError: directPlayErrorMessage }
+        }
         if (source.directStreamPlaybackId) {
             // Wait for the session, or the server would never hear the player loaded.
             if (directStream?.id !== source.id) return undefined
@@ -431,5 +438,5 @@ export function useWebPlaybackPlan(source: MobilePlaybackSource | null): WebPlay
         }
         if (!current) return undefined
         return { ...current.plan, onPlaybackError }
-    }, [current, directStream, library, onPlaybackError, serverUrl, source, streamIsHls, subtitleFonts])
+    }, [current, directPlay, directStream, library, onPlaybackError, serverUrl, source, streamIsHls, subtitleFonts])
 }

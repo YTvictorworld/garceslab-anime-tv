@@ -1,3 +1,4 @@
+import { DIRECT_PLAY_TEST } from "./direct-play-mode"
 import { getServerBaseUrl } from "@/api/client/server-url"
 import { subscribeWsMessage, type WebsocketMessage } from "@/api/components/websocket-hub"
 import { API_ENDPOINTS } from "@/api/generated/endpoints"
@@ -851,11 +852,18 @@ export function usePlayerEventListener() {
                         return
                     }
 
+                    // Direct-play test build: a debrid link (not a server URL) plays on the TV as it is.
+                    const mode = pendingInfoRef.current?.streamMode ?? streamSessionModeRef.current
+                    const directPlay = DIRECT_PLAY_TEST && mode === "debrid" && !payload.url.includes("/api/v1/")
+
                     clearCancelManualTrackingTimer()
-                    cancelManualTrackingTimer.current = setTimeout(() => {
-                        log.info("Cancelling manual tracking on server as it is not relevant to Tenji")
-                        cancelManualTracking()
-                    }, 2000)
+                    // Direct play keeps the manual tracking the player starts: it is how the server follows progress.
+                    if (!directPlay) {
+                        cancelManualTrackingTimer.current = setTimeout(() => {
+                            log.info("Cancelling manual tracking on server as it is not relevant to Tenji")
+                            cancelManualTracking()
+                        }, 2000)
+                    }
 
                     const base = getServerBaseUrl(serverUrl)
                     const resolvedUrl = payload.url
@@ -864,7 +872,8 @@ export function usePlayerEventListener() {
                         .replace("{{SCHEME}}", base.startsWith("https") ? "https" : "http")
                         .replace("{{HOST}}", base.replace(/^https?:\/\//, ""))
 
-                    openStreamInPlayer(resolvedUrl, { ...payload, mediaId: payload.mediaId, episodeNumber: payload.episodeNumber })
+                    if (directPlay) log.info("Direct play (test): the TV plays the debrid link itself")
+                    openStreamInPlayer(resolvedUrl, { ...payload, mediaId: payload.mediaId, episodeNumber: payload.episodeNumber }, directPlay ? { directPlay } : undefined)
                     return
                 }
 

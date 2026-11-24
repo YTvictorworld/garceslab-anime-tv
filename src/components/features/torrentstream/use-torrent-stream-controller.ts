@@ -22,6 +22,7 @@ import {
 import { useServerStatus } from "@/atoms/server.atoms"
 import { torrentSearchAcrossProvidersAtom, torrentSearchExtraProviderIdsAtom } from "@/atoms/torrent-search.atoms"
 import { getDefaultPlaybackSource } from "@/lib/default-playback-source"
+import { rememberDebridStart } from "@/lib/player/direct-play-mode"
 import { streamPlaybackType } from "@/lib/player/direct-stream"
 import { endKeptStream, findKeptStream, probeKeptStream } from "@/lib/player/kept-direct-stream"
 import { useOpenKeptStream } from "@/lib/player/session"
@@ -529,6 +530,7 @@ export function useTorrentStreamController({ entry, mode = "stream" }: UseTorren
                 message: "Selecting best torrent...",
             })
 
+            rememberDebridStart({ mediaId, episodeNumber: episode.episodeNumber, episode, kind: "auto-select" })
             startDebridStream(
                 {
                     mediaId,
@@ -536,7 +538,7 @@ export function useTorrentStreamController({ entry, mode = "stream" }: UseTorren
                     aniDBEpisode: episode.aniDBEpisode,
                     autoSelect: true,
                     fileId: "",
-                    playbackType: streamPlaybackType(),
+                    playbackType: streamPlaybackType("debrid"),
                     clientId: getClientIdentity().clientId,
                 },
                 {
@@ -641,6 +643,13 @@ export function useTorrentStreamController({ entry, mode = "stream" }: UseTorren
                 message: params.fileId ? "Preparing selected file..." : "Analyzing selected torrent...",
             })
 
+            rememberDebridStart({
+                mediaId,
+                episodeNumber: params.episode.episodeNumber,
+                episode: params.episode,
+                kind: "manual",
+                manual: { torrent: params.torrent, fileId: params.fileId, fileIndex: params.fileIndex, batchEpisodeFiles: params.batchEpisodeFiles },
+            })
             startDebridStream(
                 {
                     mediaId,
@@ -651,7 +660,7 @@ export function useTorrentStreamController({ entry, mode = "stream" }: UseTorren
                     fileId: params.fileId ?? "",
                     fileIndex: params.fileIndex,
                     batchEpisodeFiles: params.batchEpisodeFiles,
-                    playbackType: streamPlaybackType(),
+                    playbackType: streamPlaybackType("debrid"),
                     clientId: getClientIdentity().clientId,
                 },
                 {
@@ -1060,6 +1069,8 @@ export function useTorrentStreamController({ entry, mode = "stream" }: UseTorren
         stopCurrentStream,
         startAutoSelectedStream: startPlayableAutoSelectedStream,
         startPreviousBatchStream,
+        /** A given torrent (and file) at once, with no picker (the direct-play test's "Retry via server"). */
+        startManualStream,
         streamMode,
         torrents: searchData?.torrents ?? [],
         torrentCache: searchData?.debridInstantAvailability,

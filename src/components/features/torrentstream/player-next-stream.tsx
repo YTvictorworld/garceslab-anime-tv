@@ -1,6 +1,7 @@
 import type { Anime_Entry } from "@/api/generated/types"
 import { useGetAnimeEntry } from "@/api/hooks/anime_entries.hooks"
 import { activeStreamSessionAtom, directStreamLoadingMessageAtom, torrentStreamIsPreparingAtom, torrentStreamPendingInfoAtom } from "@/lib/player"
+import { lastDebridStartFor, requestRelayForNextStart } from "@/lib/player/direct-play-mode"
 import { useAtomValue } from "jotai"
 import * as React from "react"
 import { Text } from "react-native"
@@ -8,7 +9,8 @@ import { type StreamMode, useTorrentStreamController } from "./use-torrent-strea
 
 /** The next episode's stream, started from the player instead of the show page. */
 export type NextStreamRequest = {
-    kind: "auto-select" | "previous-batch"
+    /** retry-relay: the same debrid start again, through the server (direct-play test build). */
+    kind: "auto-select" | "previous-batch" | "retry-relay"
     mode: StreamMode
     mediaId: number
     episodeNumber: number
@@ -69,6 +71,13 @@ function Starter({ entry, request, onNeedsEntry, onFailed, cancelRef }: PlayerNe
             return
         }
         torrentStream.setStreamMode(request.mode)
+        if (request.kind === "retry-relay") {
+            const record = lastDebridStartFor(request.mediaId, request.episodeNumber)
+            requestRelayForNextStart()
+            if (record?.kind === "manual" && record.manual) torrentStream.startManualStream({ episode: record.episode, ...record.manual }, "debrid")
+            else torrentStream.startAutoSelectedStream(episode, "debrid")
+            return
+        }
         if (request.kind === "auto-select") torrentStream.startAutoSelectedStream(episode, request.mode)
         else torrentStream.startPreviousBatchStream(episode, request.mode)
     }, [onNeedsEntry, request, started, torrentStream])
