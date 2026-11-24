@@ -3,6 +3,7 @@ import type { Anime_ScheduleItem } from "@/api/generated/types"
 import { useServerQuery } from "@/api/client/requests"
 import { useGetRawAnimeCollection } from "@/api/hooks/anilist.hooks"
 import { TVFocusScaleView, useTVFocus } from "@/components/tv/tv-focus"
+import { requestTVFocus } from "@/components/tv/tv-native"
 import { TVLazyImage } from "@/components/tv/tv-lazy-image"
 import { TVNavScrim } from "@/components/tv/tv-nav-scrim"
 import { MEDIA_ROW_LAYOUT, TV, tvSize } from "@/components/tv/tv-scale"
@@ -20,7 +21,7 @@ import {
     scheduleFromCollection,
 } from "@/lib/tv/schedule-days"
 import { LinearGradient } from "expo-linear-gradient"
-import { router, useIsFocused } from "expo-router"
+import { router, useFocusEffect, useIsFocused } from "expo-router"
 import * as React from "react"
 import { FlatList, Pressable, ScrollView, Text, TVFocusGuideView, View } from "react-native"
 
@@ -31,6 +32,9 @@ const CARD_WIDTH = tvSize(220)
 
 type Entry = ScheduleEntry<Anime_ScheduleItem>
 type FocusNode = React.ElementRef<typeof Pressable>
+type RegisterRef = (key: string) => (node: FocusNode | null) => void
+
+const entryKey = (entry: Entry) => `${entry.item.mediaId}-${entry.item.episodeNumber}`
 
 /** The profile's schedule (the server caches it per profile). Errors stay quiet: the screen falls back. */
 function useSchedule(enabled: boolean) {
@@ -118,7 +122,35 @@ export function TVScheduleScreen() {
     const zone = React.useMemo(timeZoneName, [])
 
     const focusedInitial = React.useCallback(() => setPreferInitial(false), [])
+
+    // Back from the anime page puts focus on the card that opened it. One
+    // ref callback per card, kept, so the memoized cards don't re-render.
+    const cardRefs = React.useRef(new Map<string, FocusNode>())
+    const refCallbacks = React.useRef(new Map<string, (node: FocusNode | null) => void>())
+    const registerRef = React.useCallback<RegisterRef>((key) => {
+        let callback = refCallbacks.current.get(key)
+        if (!callback) {
+            callback = (node) => {
+                if (node) cardRefs.current.set(key, node)
+                else cardRefs.current.delete(key)
+            }
+            refCallbacks.current.set(key, callback)
+        }
+        return callback
+    }, [])
+    const lastOpened = React.useRef<string | null>(null)
+    useFocusEffect(React.useCallback(() => {
+        const key = lastOpened.current
+        if (!key) return
+        const timer = setTimeout(() => {
+            lastOpened.current = null
+            requestTVFocus(cardRefs.current.get(key))
+        }, 120)
+        return () => clearTimeout(timer)
+    }, []))
+
     const open = React.useCallback((entry: Entry) => {
+        lastOpened.current = entryKey(entry)
         router.push(`/(app)/entry/anime/${entry.item.mediaId}`)
     }, [])
 
@@ -164,6 +196,7 @@ export function TVScheduleScreen() {
                             preferred={preferInitial && isFocused}
                             initialRef={setInitialCard}
                             onFocusInitial={focusedInitial}
+                            registerRef={registerRef}
                             onPress={open}
                         />
                     ))}
@@ -193,6 +226,7 @@ const TVScheduleDayRow = React.memo(function TVScheduleDayRow({
     preferred,
     initialRef,
     onFocusInitial,
+    registerRef,
     onPress,
 }: {
     day: ScheduleDay<Anime_ScheduleItem>
@@ -201,17 +235,19 @@ const TVScheduleDayRow = React.memo(function TVScheduleDayRow({
     preferred: boolean
     initialRef: (node: FocusNode | null) => void
     onFocusInitial: () => void
+    registerRef: RegisterRef
     onPress: (entry: Entry) => void
 }) {
     const renderItem = React.useCallback(({ item, index }: { item: Entry; index: number }) => (
         <TVScheduleCard
-            ref={index === focusIndex ? initialRef : undefined}
+            initialRef={index === focusIndex ? initialRef : undefined}
+            registerRef={registerRef(entryKey(item))}
             entry={item}
             preferred={preferred && index === focusIndex}
             onFocus={index === focusIndex ? onFocusInitial : undefined}
             onPressEntry={onPress}
         />
-    ), [focusIndex, initialRef, onFocusInitial, onPress, preferred])
+    ), [focusIndex, initialRef, onFocusInitial, onPress, preferred, registerRef])
 
     return (
         <View style={{ gap: tvSize(8) }}>
@@ -231,7 +267,7 @@ const TVScheduleDayRow = React.memo(function TVScheduleDayRow({
                         data={day.items}
                         extraData={focusIndex}
                         renderItem={renderItem}
-                        keyExtractor={entry => `${entry.item.mediaId}-${entry.item.episodeNumber}`}
+                        keyExtractor={entryKey}
                         getItemLayout={MEDIA_ROW_LAYOUT}
                         snapToAlignment="item"
                         snapToItemPadding={TV.gutter}
@@ -268,12 +304,26 @@ const CHIP = {
     gap: tvSize(5),
 } as const
 
-const TVScheduleCard = React.memo(React.forwardRef<FocusNode, {
+const TVScheduleCard = React.memo(function TVScheduleCard({
+    entry,
+    preferred,
+    initialRef,
+    registerRef,
+    onFocus,
+    onPressEntry,
+}: {
     entry: Entry
     preferred?: boolean
+    /** Set on the card focus starts on (the guide's destination). */
+    initialRef?: (node: FocusNode | null) => void
+    registerRef: (node: FocusNode | null) => void
     onFocus?: () => void
     onPressEntry: (entry: Entry) => void
-}>(function TVScheduleCard({ entry, preferred, onFocus, onPressEntry }, ref) {
+}) {
+    const ref = React.useCallback((node: FocusNode | null) => {
+        registerRef(node)
+        initialRef?.(node)
+    }, [initialRef, registerRef])
     const { item, aired, watched, airingAt } = entry
     const focus = useTVFocus(1.055, item.title)
     const time = formatAiringClock(airingAt, AIRING_TIME_ZONE)
@@ -371,4 +421,4 @@ const TVScheduleCard = React.memo(React.forwardRef<FocusNode, {
             </TVFocusScaleView>
         </Pressable>
     )
-}))
+})
