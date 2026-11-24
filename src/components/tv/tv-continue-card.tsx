@@ -1,6 +1,8 @@
 import type { AL_BaseAnime } from "@/api/generated/types"
+import { useEpisodeTag } from "@/api/hooks/episode-tags.hooks"
 import { serverStatusAtom } from "@/atoms/server.atoms"
 import type { ContinueWatchingItem } from "@/hooks/use-anime-library-collection"
+import { EPISODE_TAG_SPOKEN } from "@/lib/episode-tags/episode-tags"
 import { getContinueWatchingSpoilerActive, getEpisodeSpoilerState, getSpoilerSafeAnimeImage } from "@/lib/anime-spoilers"
 import { atom, useAtomValue } from "jotai"
 import * as React from "react"
@@ -53,6 +55,8 @@ export const TVContinueCard = React.memo(
             const episode = item.episode
             const media = episode.baseAnime
             const handlePress = onPress ?? (() => onPressItem?.(item))
+            // Specials have their own numbering: only main episodes get a tag.
+            const episodeTag = useEpisodeTag(media?.id, episode.type === "main" ? episode.episodeNumber : null)
             const title = media?.title?.userPreferred
                 ?? media?.title?.english
                 ?? media?.title?.romaji
@@ -76,6 +80,7 @@ export const TVContinueCard = React.memo(
                     preferred={preferred}
                     progressPercent={progressPercent}
                     filler={episode.episodeMetadata?.isFiller}
+                    episodeTag={episodeTag}
                     blurred={hideThumbnail}
                     blurredImage={getSpoilerSafeAnimeImage(media)}
                     recyclingKey={`${media?.id ?? "episode"}-${episode.episodeNumber}`}
@@ -124,6 +129,7 @@ export const TVUpcomingCard = React.memo(function TVUpcomingCard({ item, onPress
         ?? media.title?.romaji
         ?? "Untitled"
     const when = formatAiringTime(item.airingAt, AIRING_TIME_ZONE)
+    const episodeTag = useEpisodeTag(media.id, item.episodeNumber)
 
     return (
         <TVEpisodeCard
@@ -135,12 +141,13 @@ export const TVUpcomingCard = React.memo(function TVUpcomingCard({ item, onPress
                 ? { label: "New episode", icon: "sparkles" }
                 : { label: "Upcoming", icon: "time-outline", dimmed: true }}
             onPress={() => onPressItem(item, hasAired(item.airingAt, Date.now()))}
+            episodeTag={episodeTag}
             preferred={preferred}
             recyclingKey={`upcoming-${media.id}-${item.episodeNumber}`}
             status={status}
             accessibilityLabel={aired
-                ? `${title}, episode ${item.episodeNumber}, new, aired ${when}`
-                : `${title}, next episode ${item.episodeNumber}, airs ${when}, ${formatTimeUntil(item.airingAt, now)}`}
+                ? `${title}, episode ${item.episodeNumber}, new, aired ${when}${episodeTag ? `, ${EPISODE_TAG_SPOKEN[episodeTag]}` : ""}`
+                : `${title}, next episode ${item.episodeNumber}${episodeTag ? `, ${EPISODE_TAG_SPOKEN[episodeTag]}` : ""}, airs ${when}, ${formatTimeUntil(item.airingAt, now)}`}
         />
     )
 })
