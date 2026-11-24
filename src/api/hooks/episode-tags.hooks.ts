@@ -2,11 +2,19 @@ import { buildSeaQuery } from "@/api/client/requests"
 import { API_ENDPOINTS } from "@/api/generated/endpoints"
 import type { EpisodeTags_Response } from "@/api/generated/types"
 import { useServerUrl } from "@/atoms/server.atoms"
-import { episodeTagsRefetchInterval, visibleEpisodeTags, type EpisodeTagMap } from "@/lib/episode-tags/episode-tags"
+import { episodeTagFor, episodeTagsRefetchInterval, visibleEpisodeTags, type EpisodeTagKind, type EpisodeTagMap } from "@/lib/episode-tags/episode-tags"
+import { createRequestLimiter } from "@/lib/episode-tags/request-limit"
 import { useQuery } from "@tanstack/react-query"
 import * as React from "react"
 
 const TIMEOUT_MS = 8000
+
+/**
+ * The home screen's cards and hero, the anime page and the player share one
+ * cache entry per anime; a few requests at a time at most, so a long Continue
+ * watching row doesn't fire a burst of them at the server.
+ */
+const requestLimiter = createRequestLimiter(3)
 
 /**
  * Garceslab Anime: canon/filler/recap tags for an anime's episode cards, or
@@ -24,7 +32,7 @@ export function useEpisodeTags(mediaId: number | null | undefined): EpisodeTagMa
         retry: false,
         refetchOnWindowFocus: false,
         refetchInterval: q => episodeTagsRefetchInterval(q.state.data, q.state.dataUpdateCount),
-        queryFn: ({ signal }) => buildSeaQuery<EpisodeTags_Response>({
+        queryFn: ({ signal }) => requestLimiter.run(() => buildSeaQuery<EpisodeTags_Response>({
             serverUrl,
             endpoint: API_ENDPOINTS.ANIME_EPISODE_TAGS.GetAnimeEpisodeTags.endpoint.replace("{id}", String(mediaId)),
             method: "GET",
@@ -32,7 +40,16 @@ export function useEpisodeTags(mediaId: number | null | undefined): EpisodeTagMa
             muteError: true,
             timeoutMs: TIMEOUT_MS,
             signal,
-        }),
+        }), signal),
     })
     return React.useMemo(() => visibleEpisodeTags(query.data), [query.data])
+}
+
+/**
+ * One episode's tag (home cards, the hero, the player), from the same cache
+ * as the anime page. Undefined when there is nothing to show.
+ */
+export function useEpisodeTag(mediaId: number | null | undefined, episodeNumber: number | null | undefined): EpisodeTagKind | undefined {
+    const tags = useEpisodeTags(episodeNumber ? mediaId : null)
+    return episodeTagFor(tags, episodeNumber)
 }
