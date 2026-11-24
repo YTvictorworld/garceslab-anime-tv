@@ -121,6 +121,12 @@ Garceslab Anime TV is **not originally our code**. It is derived from:
 - **[Seanime Tenji](https://github.com/5rahim/seanime-tenji)** and
   **[Seanime](https://github.com/5rahim/seanime)**, © 5rahim and contributors.
 
+Episode tags (CANON / FILLER / RECAP on episode cards) show [MyAnimeList](https://myanimelist.net)
+episode data, which the Garceslab Anime server reads through the Jikan-compatible APIs
+[Tenrai](https://tenrai.org), [jikan-edge](https://jikan.lucashdo.com) and
+[Jikan](https://jikan.moe). The data belongs to MyAnimeList; this project is not affiliated with
+MyAnimeList or with these APIs.
+
 The original authors keep the copyright on their work, and this project does not claim
 ownership of it. All original copyright and license notices are preserved unchanged, and the
 full git history is kept, so every upstream commit keeps its author.

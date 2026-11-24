@@ -203,6 +203,19 @@ complete ("bleach"); after a first word the last one can be partial ("one pi"). 
 index has nothing (still downloading, turned off, an older server, or only filters set),
 the suggestions fall back to the first AniList results.
 
+## Episode tags
+
+On a show's page (library, Torrents and online stream lists), episode cards can carry a small
+pill in the top-right corner of the art: **CANON** (muted lilac outline), **FILLER** (orange),
+**RECAP** (grey) or **MIX** (no source reports it yet). They come from MyAnimeList data through
+the Garceslab Anime server (`GET /api/v1/anime/episode-tags/{id}`) and appear only for a show
+that has at least one filler or recap episode, so an all-canon show looks as before. The first
+visit of a show starts the server's fetch; the pills appear a few seconds later on their own.
+No data (no MyAnimeList id, an older server, the APIs down) means no pills and no message.
+Specials have no pill. The episode numbers are MyAnimeList's, so a show that MyAnimeList and
+AniList split differently (a second cour numbered 13-24 on one and 1-12 on the other) can get
+shifted pills.
+
 ## Playback
 
 **Episode cards start in place.** On a show's *Torrents* tab, OK on an episode shows the

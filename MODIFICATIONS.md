@@ -33,6 +33,17 @@ All for the LG webOS build:
   GitHub Release on version tags (`release.yml`), Dependabot, and the tracked
   `package-lock.json`.
 
+## 2026-11 (episode tags)
+
+- **Canon / filler / recap tags on TV episode cards** (`src/lib/episode-tags/episode-tags.ts`,
+  `src/api/hooks/episode-tags.hooks.ts`, `src/components/tv/tv-episode-card.tsx`, and the
+  anime page's library, Torrents and online stream lists): a CANON / FILLER / RECAP / MIX pill in
+  the top-right corner of the art, from the server's `GET /api/v1/anime/episode-tags/{id}`
+  (MyAnimeList data via Tenrai, jikan-edge and Jikan). Shown only when the server has data for
+  the anime and at least one episode is filler or recap; otherwise, or on any error, cards are
+  unchanged. While the server fetches, the app asks again every 4 s for about two minutes.
+  Tests in `tests/episode-tags.test.ts`.
+
 ## GPL-3.0 compliance checklist
 
 - [x] **Prominent modification notices with dates (§5a):** this file, `NOTICE`, the README's
