@@ -654,7 +654,7 @@ export function MangaReaderScreen({ mediaId, provider, chapterId, chapterNumber 
             ) : showUnavailableState ? (
                 <ReaderStateCard
                     title="Chapter unavailable offline"
-                    description="This chapter is not downloaded on your device yet. Open a downloaded chapter or reconnect to your Seanime server."
+                    description="This chapter is not downloaded on your device yet. Open a downloaded chapter or reconnect to your Garceslab Anime server."
                     actionLabel="Back"
                     onPress={() => router.back()}
                 />

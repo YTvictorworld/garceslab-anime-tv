@@ -237,7 +237,7 @@ function decodeErrorMessage(source: MobilePlaybackSource, resolved: Resolved | n
     const what = summary?.reasons?.length ? summary.reasons.join(", ") : describeFileCodec(resolved.mediaInfo)
     const detail = what ? ` (${what})` : ""
     if (!resolved.transcodeAvailable) {
-        return `${base}${detail}. Turn on transcoding in the Seanime server's media streaming settings to play it on this TV.`
+        return `${base}${detail}. Turn on transcoding in the server's media streaming settings to play it on this TV.`
     }
     log.warning("Decode error after the transcode fallback", source.id)
     return `${base}${detail}.`

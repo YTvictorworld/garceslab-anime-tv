@@ -2,6 +2,7 @@ import type { Profile, ProfileSession } from "@/api/generated/types"
 import { logoutProfile } from "@/api/hooks/profiles.hooks"
 import { useServerUrl, useSetServerStatus } from "@/atoms/server.atoms"
 import { endKeptStream } from "@/lib/player/kept-direct-stream"
+import { startProfilePlayerPrefsSync } from "@/lib/player/player-prefs-remote"
 import { endProfileSession, setProfileSession } from "@/lib/profile/profile-session"
 import { switchQueryCacheProfile } from "@/lib/query-persistence"
 import { useQueryClient } from "@tanstack/react-query"
@@ -22,10 +23,12 @@ export function useProfileSwitch() {
         const profile = session.profile ?? selected
         setProfileSession({ profileToken: session.profileToken, expiresAt: session.expiresAt, profile })
         switchQueryCacheProfile(queryClient, profile.id)
+        // The profile's player preferences replace this TV's (phase 4).
+        startProfilePlayerPrefsSync(serverUrl, profile.id)
         // The saved status is the previous profile's (its settings, its user).
         void setServerStatus(null)
         router.replace("/(app)/(tabs)/(library)")
-    }, [queryClient, setServerStatus])
+    }, [queryClient, serverUrl, setServerStatus])
 
     const switchProfile = React.useCallback(() => {
         // A stream the player left belongs to this profile's playback.

@@ -186,6 +186,16 @@ the app asks **"Who's watching?"** on every cold launch, after the server connec
 - Settings has **Switch profile**. `PLAYBACK_BUSY` (another profile is playing) shows
   "Another playback is in progress".
 - A stock Seanime server doesn't advertise profiles, and nothing changes.
+- **Player preferences follow the profile** (`GET/PATCH /api/v1/profiles/me/player-prefs`,
+  section `tv`; `src/lib/player/player-prefs-sync.ts`). Entering a profile replaces this TV's
+  audio and subtitle languages, ignored subtitle labels, subtitles on/off and size, ASS
+  rendering, autoplay, auto next episode, auto skip and its length, seek steps and speed with
+  the profile's saved ones. A profile without saved values takes this TV's as its first copy.
+  Changes are saved about 1.5 s after the last one, only to the profile in use. Video output,
+  external player, gestures, the Wyzie key, per-file delays and stats stay on the TV. Servers
+  without the endpoint keep the TV's preferences as before.
+- The nav bar's **Settings** tab shows the profile's avatar. The avatar grid ends with the
+  licence line and the credits the CC BY 4.0 avatars need.
 
 ## Search as you type
 

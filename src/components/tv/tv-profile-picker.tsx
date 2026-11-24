@@ -486,6 +486,7 @@ export function TVCreateProfile({ serverUrl, avatars, avatarsLoading, firstRun, 
                         ))}
                     </TVFocusGuideView>
                 )}
+                <AvatarCredits avatars={avatars} />
             </Screen>
         )
     }
@@ -537,6 +538,22 @@ export function TVCreateProfile({ serverUrl, avatars, avatarsLoading, firstRun, 
             </TVFocusGuideView>
             <Message text={error} error />
         </Screen>
+    )
+}
+
+/** The credit lines the CC BY avatars need (CC0 ones need none). */
+function AvatarCredits({ avatars }: { avatars: Avatar[] }) {
+    const credits = Array.from(new Set(avatars.map(a => a.attribution).filter((a): a is string => !!a)))
+    if (!avatars.length) return null
+    return (
+        <View style={{ marginTop: tvSize(36), maxWidth: tvSize(1300), gap: tvSize(6) }}>
+            <Text className="text-white/40" style={{ fontSize: tvSize(16), textAlign: "center" }}>
+                Avatars made with DiceBear styles under CC0 1.0 or CC BY 4.0.
+            </Text>
+            {credits.map(line => (
+                <Text key={line} className="text-white/40" style={{ fontSize: tvSize(16), textAlign: "center" }}>{line}</Text>
+            ))}
+        </View>
     )
 }
 

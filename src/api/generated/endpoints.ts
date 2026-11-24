@@ -2194,6 +2194,28 @@ export const API_ENDPOINTS = {
             endpoint: "/api/v1/profiles/me/recently-watched",
         },
     },
+    PROFILES_PLAYER: {
+        /**
+         *  @description
+         *  Route returns the current profile's player preferences (one section per client: tv, web).
+         *  Empty sections mean the profile has not saved any yet: the client keeps its local values.
+         */
+        GetMyPlayerPrefs: {
+            key: "PROFILES-PLAYER-get-my-player-prefs",
+            methods: ["GET"],
+            endpoint: "/api/v1/profiles/me/player-prefs",
+        },
+        /**
+         *  @description
+         *  Route updates the current profile's player preferences.
+         *  Only the sections and fields sent change. "tv": the fields sent replace the saved ones. "web": videoCore and mediaCore are replaced as a whole. A section set to null is cleared.
+         */
+        PatchMyPlayerPrefs: {
+            key: "PROFILES-PLAYER-patch-my-player-prefs",
+            methods: ["PATCH"],
+            endpoint: "/api/v1/profiles/me/player-prefs",
+        },
+    },
     RELEASES: {
         /**
          *  @description

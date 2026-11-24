@@ -135,7 +135,7 @@ export function useTorrentStreamController({ entry, mode = "stream" }: UseTorren
             return false
         }
         log.error("Cannot start a stream: the websocket is not connected")
-        toast.error("No live connection to the Seanime server, so the stream can't start. Check the connection and try again.")
+        toast.error("No live connection to the Garceslab Anime server, so the stream can't start. Check the connection and try again.")
         return false
     }, [isLiveConnected, serverStatus])
     const isPreparingStream = useAtomValue(torrentStreamIsPreparingAtom)

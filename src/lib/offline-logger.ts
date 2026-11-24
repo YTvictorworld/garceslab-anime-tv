@@ -259,7 +259,7 @@ export async function getOfflineLogText(): Promise<string> {
 
     if (entries.length > 0) {
         sections.push([
-            "# Seanime Tenji logs",
+            "# Garceslab Anime TV logs",
             ...entries.map(entry => JSON.stringify(sanitizeEntryForExport(entry))),
         ].join("\n"))
     }
@@ -282,7 +282,7 @@ export async function getOfflineCrashText(): Promise<string> {
 
     if (entries.length > 0) {
         sections.push([
-            "# Seanime Tenji crash report",
+            "# Garceslab Anime TV crash report",
             ...entries.map(entry => JSON.stringify(sanitizeEntryForExport(entry))),
         ].join("\n"))
     }

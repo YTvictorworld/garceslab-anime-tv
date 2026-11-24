@@ -87,6 +87,12 @@ The app id is still `app.seanime.tenji` (inherited), so installing Garceslab Ani
 **replaces** an installed Seanime Tenji instead of adding a second app. A later version will
 move to its own id; the old app will then have to be uninstalled by hand.
 
+For the whole setup (server with Docker Compose, this app, first run, profiles and PINs),
+see the server's
+[self-hosting guide](https://github.com/YTvictorworld/garceslab-anime-server/blob/main/docs/self-hosting-webos.md).
+
+<!-- Screenshot placeholder: "Who's watching?" on the TV -->
+
 ## Build it yourself
 
 ```sh
@@ -120,6 +126,11 @@ Garceslab Anime TV is **not originally our code**. It is derived from:
   including its LG webOS port; this repository is derived from its version 0.4.0;
 - **[Seanime Tenji](https://github.com/5rahim/seanime-tenji)** and
   **[Seanime](https://github.com/5rahim/seanime)**, © 5rahim and contributors.
+
+Profile avatars are served by the Garceslab Anime server: DiceBear styles under CC0 1.0, plus
+**Adventurer** by Lisa Wischofsky under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
+([source](https://www.figma.com/community/file/1184595184137881796)); the app shows these
+credits under the avatar grid.
 
 Episode tags (CANON / FILLER / RECAP on episode cards) show [MyAnimeList](https://myanimelist.net)
 episode data, which the Garceslab Anime server reads through the Jikan-compatible APIs

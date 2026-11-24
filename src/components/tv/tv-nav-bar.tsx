@@ -1,3 +1,6 @@
+import { avatarImageUrl } from "@/api/hooks/profiles.hooks"
+import { useProfileSession } from "@/atoms/profile.atoms"
+import { useServerUrl } from "@/atoms/server.atoms"
 import { useTVFocus } from "@/components/tv/tv-focus"
 import { TV, tvSize } from "@/components/tv/tv-scale"
 import { IMAGES } from "@/constants/images"
@@ -42,11 +45,14 @@ function NavItem({
     item,
     active,
     pending,
+    avatarUri,
     onPress,
 }: {
     item: (typeof ITEMS)[number]
     active: boolean
     pending: boolean
+    /** Garceslab Anime: the current profile's avatar replaces the tab's icon. */
+    avatarUri?: string | null
     onPress: () => void
 }) {
     const focusState = useTVFocus(1.05, item.label)
@@ -87,6 +93,18 @@ function NavItem({
                             size={tvSize(26)}
                             color={focused ? "#0a0a0a" : "#ffffff"}
                         />
+                    ) : avatarUri ? (
+                        <Image
+                            source={{ uri: avatarUri }}
+                            style={{
+                                width: tvSize(28),
+                                height: tvSize(28),
+                                borderRadius: tvSize(6),
+                                opacity: focused || active ? 1 : 0.7,
+                            }}
+                            contentFit="cover"
+                            accessibilityIgnoresInvertColors
+                        />
                     ) : (
                         <Ionicons
                             name={focused || active ? item.activeIcon : item.icon}
@@ -115,6 +133,9 @@ function NavItem({
 
 export function TVNavBar() {
     const segments = useSegments()
+    const serverUrl = useServerUrl()
+    const profileSession = useProfileSession()
+    const profileAvatar = avatarImageUrl(serverUrl, profileSession?.profile.avatarUrl)
     const routeKey = segments.join("/")
     const [pending, setPending] = React.useState<string | null>(null)
     const isActive = React.useCallback((key: (typeof ITEMS)[number]["key"]) => {
@@ -184,7 +205,7 @@ export function TVNavBar() {
                         source={IMAGES.logo2}
                         style={{ width: "100%", height: "100%" }}
                         contentFit="cover"
-                        accessibilityLabel="Seanime"
+                        accessibilityLabel="Garceslab Anime"
                     />
                 </View>
                 {/*<View
@@ -210,6 +231,7 @@ export function TVNavBar() {
                             item={item}
                             active={isActive(item.key)}
                             pending={pending === item.key}
+                            avatarUri={item.key === "settings" ? profileAvatar : null}
                             onPress={() => open(item)}
                         />
                     ))}
