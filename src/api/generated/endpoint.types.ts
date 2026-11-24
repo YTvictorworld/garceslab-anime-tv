@@ -1933,7 +1933,7 @@ export type RemoveFromMyCustomList_Variables = {
  * - Filename: profiles_data.go
  * - Endpoint: /api/v1/profiles/{id}/import/anilist
  * @description
- * Route imports the public AniList anime list of a user into a profile (anonymous, no token).
+ * Route imports an AniList anime list (and optionally the favourites) into a profile.
  */
 export type ImportProfileAnilist_Variables = {
     /**
@@ -1982,6 +1982,88 @@ export type ExportProfile_Variables = {
      *  The profile ID
      */
     id: number
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// profiles_library
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/**
+ * - Filepath: internal/handlers/profiles_library.go
+ * - Filename: profiles_library.go
+ * - Endpoint: /api/v1/profiles/me/favourites/{kind}/{refId}
+ * @description
+ * Route adds a favourite to the current profile.
+ */
+export type AddMyFavourite_Variables = {
+    /**
+     *  ANIME, MANGA, CHARACTER, STAFF or STUDIO
+     */
+    kind: string
+    /**
+     *  The AniList ID
+     */
+    refId: number
+}
+
+/**
+ * - Filepath: internal/handlers/profiles_library.go
+ * - Filename: profiles_library.go
+ * - Endpoint: /api/v1/profiles/me/favourites/{kind}/{refId}
+ * @description
+ * Route removes a favourite from the current profile.
+ */
+export type RemoveMyFavourite_Variables = {
+    /**
+     *  ANIME, MANGA, CHARACTER, STAFF or STUDIO
+     */
+    kind: string
+    /**
+     *  The AniList ID
+     */
+    refId: number
+}
+
+/**
+ * - Filepath: internal/handlers/profiles_library.go
+ * - Filename: profiles_library.go
+ * - Endpoint: /api/v1/profiles/me/lists/{listId}
+ * @description
+ * Route renames and/or moves one of the current profile's custom lists.
+ */
+export type UpdateMyCustomList_Variables = {
+    /**
+     *  The custom list ID
+     */
+    listId: number
+}
+
+/**
+ * - Filepath: internal/handlers/profiles_library.go
+ * - Filename: profiles_library.go
+ * - Endpoint: /api/v1/profiles/me/entries/{mediaId}
+ * @description
+ * Route returns the current profile's list entry for a media with every editable field (null if it isn't in the list).
+ */
+export type GetMyListEntry_Variables = {
+    /**
+     *  The AniList media ID
+     */
+    mediaId: number
+}
+
+/**
+ * - Filepath: internal/handlers/profiles_library.go
+ * - Filename: profiles_library.go
+ * - Endpoint: /api/v1/profiles/me/entries/{mediaId}
+ * @description
+ * Route edits (or adds) the current profile's list entry for a media: status, score, progress, dates, rewatches, private, notes and custom lists.
+ */
+export type EditMyListEntry_Variables = {
+    /**
+     *  The AniList media ID
+     */
+    mediaId: number
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

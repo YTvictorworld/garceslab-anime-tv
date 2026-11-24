@@ -3504,6 +3504,47 @@ export type ProfileCustomList = {
 }
 
 /**
+ * - Filepath: internal/profiles/localplatform/editor.go
+ * - Filename: editor.go
+ * - Package: localplatform
+ * @description
+ *  ProfileEntryDetails is one entry with every editable field.
+ */
+export type ProfileEntryDetails = {
+    id: number
+    mediaId: number
+    status: string
+    progress: number
+    scoreRaw?: number
+    repeat: number
+    private: boolean
+    hiddenFromStatusLists: boolean
+    notes?: string
+    startedAt: ProfileFuzzyDate
+    completedAt: ProfileFuzzyDate
+    customListIds?: Array<number>
+    isFavourite: boolean
+    createdAt: number
+    updatedAt: number
+}
+
+/**
+ * - Filepath: internal/profiles/localplatform/favourites.go
+ * - Filename: favourites.go
+ * - Package: localplatform
+ * @description
+ *  ProfileFavourite is one of the profile's favourites. Media is set for anime
+ *  favourites when the metadata is available.
+ */
+export type ProfileFavourite = {
+    kind: string
+    refId: number
+    position: number
+    createdAt: number
+    media?: AL_BaseAnime
+}
+
+/**
  * - Filepath: internal/profiles/localplatform/model.go
  * - Filename: model.go
  * - Package: localplatform
@@ -3551,6 +3592,26 @@ export type ProfileImportResult = {
     updated: number
     skipped: number
     errors?: Array<string>
+    favourites?: number
+}
+
+/**
+ * - Filepath: internal/profiles/localplatform/editor.go
+ * - Filename: editor.go
+ * - Package: localplatform
+ * @description
+ *  ProfileRecentlyWatched is a media the profile watched recently (its latest
+ *  watch history position) with its list entry, if any.
+ */
+export type ProfileRecentlyWatched = {
+    mediaId: number
+    episodeNumber: number
+    positionSec: number
+    duration: number
+    updatedAt: number
+    listStatus?: string
+    listProgress?: number
+    media?: AL_BaseAnime
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
