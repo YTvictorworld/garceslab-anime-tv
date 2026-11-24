@@ -18,6 +18,7 @@ export const SYNCED_PLAYER_PREF_TYPES = {
     assRendering: "boolean",
     autoPlay: "boolean",
     autoNextEpisode: "boolean",
+    skipFillerEpisodes: "boolean",
     autoSkipOpEd: "boolean",
     skipDurationSec: "number",
     buttonSeekSec: "number",

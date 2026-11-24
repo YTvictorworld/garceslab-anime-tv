@@ -22,6 +22,7 @@ import Check from "lucide-react-native/icons/check"
 import ChevronLeft from "lucide-react-native/icons/chevron-left"
 import Clapperboard from "lucide-react-native/icons/clapperboard"
 import Cpu from "lucide-react-native/icons/cpu"
+import FastForward from "lucide-react-native/icons/fast-forward"
 import Gauge from "lucide-react-native/icons/gauge"
 import List from "lucide-react-native/icons/list"
 import Mic2 from "lucide-react-native/icons/mic-vocal"
@@ -236,6 +237,14 @@ function Main(props: Props & { preferred: boolean }) {
             detail: props.prefs.autoNextEpisode ? "On" : "Off",
             icon: <SkipForward size={ICON} color="#ffffff" />,
             press: props.onToggleAutoNext,
+        },
+        {
+            // Garceslab Anime: auto next and the Next button jump over filler and
+            // recap episodes (MIX episodes are kept), when the episode tags are known.
+            label: "Skip filler and recaps",
+            detail: props.prefs.skipFillerEpisodes ? "On" : "Off",
+            icon: <FastForward size={ICON} color="#ffffff" />,
+            press: () => props.updatePrefs({ skipFillerEpisodes: !props.prefs.skipFillerEpisodes }),
         },
         {
             label: "Auto skip OP / ED",

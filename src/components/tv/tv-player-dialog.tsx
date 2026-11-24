@@ -1,6 +1,8 @@
+import { TVEpisodeTagPill } from "@/components/tv/tv-episode-tag-pill"
 import { TVButton } from "@/components/tv/tv-focus"
 import { requestTVFocus } from "@/components/tv/tv-native"
 import { tvSize } from "@/components/tv/tv-scale"
+import { EPISODE_TAG_SPOKEN, type EpisodeTagKind } from "@/lib/episode-tags/episode-tags"
 import * as React from "react"
 import { Pressable, Text, TVFocusGuideView, View } from "react-native"
 
@@ -8,6 +10,8 @@ type Props = {
     open: boolean
     eyebrow?: string
     title: string
+    /** Garceslab Anime: the canon/filler pill after the title (next-episode prompts). */
+    tag?: EpisodeTagKind
     text: string
     confirmLabel: string
     danger?: boolean
@@ -19,6 +23,7 @@ export function TVPlayerDialog({
     open,
     eyebrow,
     title,
+    tag,
     text,
     confirmLabel,
     danger,
@@ -77,12 +82,17 @@ export function TVPlayerDialog({
                             {eyebrow}
                         </Text>
                     ) : null}*/}
-                    <Text
-                        className="font-black text-white"
-                        style={{ fontSize: tvSize(30) }}
-                    >
-                        {title}
-                    </Text>
+                    {/* Margins, not gap: webOS 6 (Chromium 79) has no flexbox gap. */}
+                    <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap" }}>
+                        <Text
+                            className="font-black text-white"
+                            style={{ fontSize: tvSize(30), flexShrink: 1, marginRight: tag ? tvSize(14) : 0 }}
+                            accessibilityLabel={tag ? `${title}, ${EPISODE_TAG_SPOKEN[tag]}` : undefined}
+                        >
+                            {title}
+                        </Text>
+                        {tag ? <TVEpisodeTagPill kind={tag} size={18} style={{ alignSelf: "center" }} /> : null}
+                    </View>
                     <Text
                         className="text-white/60"
                         style={{

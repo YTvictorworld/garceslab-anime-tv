@@ -1,10 +1,12 @@
 import { BUFFER_FILL } from "@/components/features/player/constants"
 import { requestTVFocus, tvKeyAction } from "@/components/tv/tv-native"
 import { formatTime, isSkippableChapter } from "@/components/features/player/helpers"
+import { TVEpisodeTagPill } from "@/components/tv/tv-episode-tag-pill"
 import { TVFocusScaleView, useTVFocus } from "@/components/tv/tv-focus"
 import { tvSize } from "@/components/tv/tv-scale"
 import { TVStreamTelemetry } from "@/components/tv/tv-stream-telemetry"
 import { useScrubSnapshot } from "@/components/tv/use-tv-scrub"
+import { EPISODE_TAG_SPOKEN, type EpisodeTagKind } from "@/lib/episode-tags/episode-tags"
 import type { PlayerChapter, PlayerState } from "@/lib/player"
 import { formatScrubOffset, type ScrubController, type ScrubSnapshot } from "@/lib/player/scrub"
 import type { MobilePlaybackSource } from "@/lib/player/types"
@@ -60,6 +62,8 @@ function isPointerClick(event: GestureResponderEvent | undefined) {
 
 type ControlProps = {
     label: string
+    /** Read aloud instead of `label`. */
+    spokenLabel?: string
     icon: (color: string) => React.ReactNode
     onPress: () => void
     preferred?: boolean
@@ -72,6 +76,7 @@ type ControlProps = {
 const TVPlayerControl = React.forwardRef<React.ElementRef<typeof Pressable>, ControlProps>(
     ({
         label,
+        spokenLabel,
         icon,
         onPress,
         preferred,
@@ -93,7 +98,7 @@ const TVPlayerControl = React.forwardRef<React.ElementRef<typeof Pressable>, Con
                 }}
                 onBlur={focus.blur}
                 accessibilityRole="button"
-                accessibilityLabel={label}
+                accessibilityLabel={spokenLabel ?? label}
                 accessibilityState={{ disabled: Boolean(disabled) }}
                 style={{
                     width: tvSize(wide ? 156 : 92),
@@ -204,6 +209,10 @@ type Props = {
     longSeekVisible: boolean
     seekSec: number
     canPlayNext: boolean
+    /** Garceslab Anime: the playing episode's canon/filler tag, after its title. */
+    episodeTag?: EpisodeTagKind
+    /** Garceslab Anime: what the Next button plays ("Next: Episode 34") and its tag. */
+    nextEpisode?: { label: string; tag?: EpisodeTagKind }
     canShowEpisodes: boolean
     skipLabel?: string
     onSkip?: () => void
@@ -239,6 +248,8 @@ export function TVPlayerControls({
     longSeekVisible,
     seekSec,
     canPlayNext,
+    episodeTag,
+    nextEpisode,
     canShowEpisodes,
     skipLabel,
     onSkip,
@@ -504,14 +515,18 @@ export function TVPlayerControls({
                         >
                             {title}
                         </Text>
-                        <Text
-                            className="font-medium text-white/65"
-                            style={{ fontSize: tvSize(22), marginTop: tvSize(6) }}
-                            numberOfLines={1}
-                            ellipsizeMode="tail"
-                        >
-                            {episode}
-                        </Text>
+                        <View style={{ flexDirection: "row", alignItems: "center", marginTop: tvSize(6) }}>
+                            <Text
+                                className="font-medium text-white/65"
+                                style={{ fontSize: tvSize(22), flexShrink: 1 }}
+                                numberOfLines={1}
+                                ellipsizeMode="tail"
+                                accessibilityLabel={episodeTag ? `${episode}, ${EPISODE_TAG_SPOKEN[episodeTag]}` : undefined}
+                            >
+                                {episode}
+                            </Text>
+                            {episodeTag ? <TVEpisodeTagPill kind={episodeTag} size={16} style={{ alignSelf: "center", marginLeft: tvSize(12) }} /> : null}
+                        </View>
                     </View>
                     {isTorrentStream ? <TVStreamTelemetry bufferedSeconds={state.cacheSeconds} /> : null}
                 </View>
@@ -647,7 +662,9 @@ export function TVPlayerControls({
                                 onFocus={onControlFocus}
                             />
                             <TVRoundControl
-                                label="Next episode"
+                                label={nextEpisode?.label ?? "Next episode"}
+                                spokenLabel={nextEpisode?.tag ? `${nextEpisode.label}, ${EPISODE_TAG_SPOKEN[nextEpisode.tag]}` : undefined}
+                                labelAccessory={nextEpisode?.tag ? <TVEpisodeTagPill kind={nextEpisode.tag} size={15} style={{ alignSelf: "center", marginLeft: tvSize(10) }} /> : undefined}
                                 icon={(color) => <SkipForward size={tvSize(30)} color={color} />}
                                 disabled={!canPlayNext}
                                 onPress={() => run(onPlayNext)}
@@ -709,14 +726,18 @@ export function TVPlayerControls({
                 >
                     {title}
                 </Text>
-                <Text
-                    className="font-medium text-white/60"
-                    style={{ fontSize: tvSize(20), maxWidth: "75%" }}
-                    numberOfLines={1}
-                    ellipsizeMode="tail"
-                >
-                    {episode}
-                </Text>
+                <View style={{ flexDirection: "row", alignItems: "center", maxWidth: "75%" }}>
+                    <Text
+                        className="font-medium text-white/60"
+                        style={{ fontSize: tvSize(20), flexShrink: 1 }}
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
+                        accessibilityLabel={episodeTag ? `${episode}, ${EPISODE_TAG_SPOKEN[episodeTag]}` : undefined}
+                    >
+                        {episode}
+                    </Text>
+                    {episodeTag ? <TVEpisodeTagPill kind={episodeTag} size={15} style={{ alignSelf: "center", marginLeft: tvSize(12) }} /> : null}
+                </View>
             </View>
 
             <View
@@ -904,6 +925,7 @@ export function TVPlayerControls({
                         />
                         <TVPlayerControl
                             label="Next"
+                            spokenLabel={nextEpisode ? `${nextEpisode.label}${nextEpisode.tag ? `, ${EPISODE_TAG_SPOKEN[nextEpisode.tag]}` : ""}` : undefined}
                             icon={(color) => <SkipForward size={tvSize(23)} color={color} />}
                             disabled={!canPlayNext}
                             onPress={() => run(onPlayNext)}
@@ -1010,6 +1032,10 @@ function TVOverlayFade({ children }: { children: React.ReactNode }) {
 
 type RoundControlProps = {
     label: string
+    /** Read aloud instead of `label`. */
+    spokenLabel?: string
+    /** Shown after the name when focused (the next episode's tag pill). */
+    labelAccessory?: React.ReactNode
     icon: (color: string) => React.ReactNode
     onPress: () => void
     /** Play/pause: the biggest button, in the middle. */
@@ -1022,7 +1048,7 @@ type RoundControlProps = {
 
 /** A round button that turns white when focused and shows its name under it. */
 const TVRoundControl = React.forwardRef<PressableRef, RoundControlProps>(
-    ({ label, icon, onPress, primary, preferOnMount, disabled, onFocus }, ref) => {
+    ({ label, spokenLabel, labelAccessory, icon, onPress, primary, preferOnMount, disabled, onFocus }, ref) => {
         const focus = useTVFocus(1.08)
         const [preferred] = React.useState(Boolean(preferOnMount))
         const diameter = tvSize(primary ? 96 : 80)
@@ -1039,7 +1065,7 @@ const TVRoundControl = React.forwardRef<PressableRef, RoundControlProps>(
                 }}
                 onBlur={focus.blur}
                 accessibilityRole="button"
-                accessibilityLabel={label}
+                accessibilityLabel={spokenLabel ?? label}
                 accessibilityState={{ disabled: Boolean(disabled) }}
                 style={{
                     width: diameter,
@@ -1075,18 +1101,22 @@ const TVRoundControl = React.forwardRef<PressableRef, RoundControlProps>(
                         style={{
                             position: "absolute",
                             top: diameter + tvSize(12),
-                            left: -tvSize(100),
-                            right: -tvSize(100),
+                            // Room for "Next: Episode 110 (skipping filler episodes 64–109)".
+                            left: -tvSize(320),
+                            right: -tvSize(320),
+                            flexDirection: "row",
+                            justifyContent: "center",
                             alignItems: "center",
                         }}
                     >
                         <Text
                             className="font-semibold text-white"
                             numberOfLines={1}
-                            style={{ textAlign: "center", fontSize: tvSize(18) }}
+                            style={{ textAlign: "center", fontSize: tvSize(18), flexShrink: 1 }}
                         >
                             {label}
                         </Text>
+                        {labelAccessory}
                     </View>
                 ) : null}
             </Pressable>
