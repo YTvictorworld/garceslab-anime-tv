@@ -2191,6 +2191,21 @@ export const API_ENDPOINTS = {
             endpoint: "/api/v1/library/scan-summaries",
         },
     },
+    SEARCH_SUGGEST: {
+        /**
+         *  @description
+         *  Route returns anime that match the start of a title, for search as you type.
+         *  Query parameters: "q" (the typed text) and "limit" (1-25, default 8).
+         *  Matches every title and synonym of the local title index (manami-project's anime-offline-database, ODbL),
+         *  ranked exact > prefix > word prefix > substring, then TV first and by popularity. "mediaId" is the AniList id.
+         *  Returns an empty list while the index isn't downloaded or when it is disabled; clients then fall back to the AniList search.
+         */
+        SearchSuggest: {
+            key: "SEARCH-SUGGEST-search-suggest",
+            methods: ["GET"],
+            endpoint: "/api/v1/search/suggest",
+        },
+    },
     SETTINGS: {
         GetSettings: {
             key: "SETTINGS-get-settings",
