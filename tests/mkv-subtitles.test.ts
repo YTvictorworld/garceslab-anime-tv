@@ -1,9 +1,12 @@
 import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
+import http from "node:http"
+import type { AddressInfo } from "node:net"
 import test from "node:test"
 import zlib from "node:zlib"
 import { inflateRaw, inflateZlib } from "../src/lib/player/mkv/inflate.ts"
 import { parseBlock, readMkvIndex, type RangeReader, toMkvMetadata, utf8ToAssText } from "../src/lib/player/mkv/mkv-demux.ts"
+import { chunkedReader, createFetchRangeReader, createPacedReader } from "../src/lib/player/mkv/range-reader.ts"
 import { chooseStrategy, coalesceRanges, createSubtitleExtractor } from "../src/lib/player/mkv/subtitle-extractor.ts"
 import { describeStreamCodecs } from "../src/lib/player/direct-stream-format.ts"
 import type { MpvStreamedSubtitleLine } from "../modules/expo-mpv-player/src/MpvPlayer.types.ts"
@@ -229,3 +232,64 @@ test("while the video buffers, only the playhead's lines are read", async () => 
     await extractor.idle()
     assert.equal(lines.length, 50)
 })
+
+/** Serves one fixture with Range support, like the debrid CDN. */
+async function withRangeServer(name: string, run: (url: string, ranges: string[]) => Promise<void>) {
+    const bytes = new Uint8Array(readFileSync(new URL(name, FIXTURES)))
+    const ranges: string[] = []
+    const server = http.createServer((request, response) => {
+        const match = /bytes=(\d+)-(\d+)/.exec(request.headers.range ?? "")
+        if (!match) {
+            response.writeHead(416)
+            response.end()
+            return
+        }
+        ranges.push(request.headers.range!)
+        const start = Number(match[1])
+        const end = Math.min(bytes.length - 1, Number(match[2]))
+        response.writeHead(206, { "content-range": `bytes ${start}-${end}/${bytes.length}`, "content-length": end - start + 1 })
+        response.end(Buffer.from(bytes.subarray(start, end + 1)))
+    })
+    await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve))
+    try {
+        await run(`http://127.0.0.1:${(server.address() as AddressInfo).port}/${name}`, ranges)
+    } finally {
+        server.closeAllConnections()
+        await new Promise(resolve => server.close(resolve))
+    }
+}
+
+const MULTISUB_TRACKS = [
+    [3, "en", undefined, "English", true],
+    [4, "es-419", "spa", "Spanish (Latin America)", false],
+    [5, "es-ES", "spa", "Spanish (Spain)", false],
+    [6, "pt-BR", "por", "Portuguese (Brazil)", false],
+    [7, "fr", "fre", "French", false],
+    [8, "de", "ger", "German", false],
+    [9, "it", "ita", "Italian", false],
+    [10, "ar", "ara", "Arabic", false],
+    [11, "ru", "rus", "Russian", false],
+]
+
+// An Erai-raws-like MultiSub file: Tracks (~400 KiB of ASS headers) is much longer than the first 128 KiB read.
+for (const relay of [false, true]) {
+    test(`MultiSub: every subtitle track of a Tracks element past the first read is listed${relay ? " (relay-sized reads)" : ""}`, () => withRangeServer("multisub.mkv", async (url, ranges) => {
+        const paced = createPacedReader(createFetchRangeReader(url), { minGapMs: 0 })
+        const reader = relay ? chunkedReader(paced, 64 * 1024) : paced
+        const index = await readMkvIndex(reader)
+        const subtitles = index.tracks.filter(track => track.kind === "subtitle")
+        assert.deepEqual(subtitles.map(track => [track.number, track.languageIETF, track.language, track.name, track.default]), MULTISUB_TRACKS)
+        assert.ok(subtitles.every(track => track.codecId === "S_TEXT/ASS" && track.codecPrivate!.length > 40 * 1024))
+        assert.equal(index.tracks.filter(track => track.kind === "audio").length, 1)
+        const metadata = toMkvMetadata(index)
+        assert.equal(metadata.subtitleTracks!.length, 9)
+        assert.ok(metadata.subtitleTracks!.every(track => /\[Events\]/.test(track.codecPrivate!)), "each script header is complete")
+        assert.ok(ranges.length <= (relay ? 16 : 8), ranges.join(" "))
+
+        const lines: MpvStreamedSubtitleLine[] = []
+        const extractor = createSubtitleExtractor({ reader, index, backgroundGapMs: 0, onLines: received => lines.push(...received) })
+        extractor.seek(0)
+        await extractor.idle()
+        for (const [number] of MULTISUB_TRACKS) assert.equal(lines.filter(line => line.trackNumber === number).length, 5, `track ${number}`)
+    }))
+}
