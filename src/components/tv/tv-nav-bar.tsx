@@ -205,7 +205,7 @@ export function TVNavBar() {
                         source={IMAGES.logo2}
                         style={{ width: "100%", height: "100%" }}
                         contentFit="cover"
-                        accessibilityLabel="Seanime"
+                        accessibilityLabel="Garceslab Anime"
                     />
                 </View>
                 {/*<View

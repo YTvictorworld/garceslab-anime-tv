@@ -465,7 +465,7 @@ export function AnimeEntryTorrentStreamSection({ entry, resumeRef }: AnimeEntryT
                 <View className="">
                     <LuffyError
                         title="No episodes found"
-                        description="Seanime couldn't find any streamable episodes for this anime."
+                        description="Garceslab Anime couldn't find any streamable episodes for this anime."
                     />
                 </View>
             )}

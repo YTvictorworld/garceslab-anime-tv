@@ -47,7 +47,7 @@ export function isWebsocketRefusedForOrigin(status: Status | null | undefined): 
 }
 
 export const WEBSOCKET_NEEDS_PASSWORD_MESSAGE =
-    "Seanime only accepts the TV app's live connection when the server has a password. Set a server password in Seanime, then sign in again on the TV."
+    "Garceslab Anime only accepts the TV app's live connection when the server has a password. Set a server password in Garceslab Anime, then sign in again on the TV."
 
 /** On a TV, through the app's webOS service (see luna-websocket.ts) unless it turned out to be missing. */
 function openServerSocket(url: string): { socket: ServerSocket; via: "relay" | "browser" } {

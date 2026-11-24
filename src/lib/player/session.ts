@@ -885,7 +885,7 @@ export function usePlayerEventListener() {
                     const event = parseNativePlayerEvent(message.payload)
                     if (event?.type !== "open-and-await" || !pendingInfoRef.current) return
                     log.error("The server streams to MpvPrism, which this TV can't play")
-                    toast.error("The Seanime server has MpvPrism turned on, so streams go to mpv. Turn it off in the server's media player settings to stream on this TV.")
+                    toast.error("The server has MpvPrism turned on, so streams go to mpv. Turn it off in the server's media player settings to stream on this TV.")
                     resetTorrentStreamState()
                 }
             }
