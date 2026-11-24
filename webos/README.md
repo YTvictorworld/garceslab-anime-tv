@@ -60,6 +60,20 @@ ways:
 - **[Homebrew Channel](https://www.webosbrew.org/)** (rooted TVs): install the `.ipk`
   from its settings.
 
+**Side-by-side test build.** To try a build without replacing the app you use every day,
+package it under another app id; it installs as a second app with its own tile, its own
+saved server and profile, and its own relay service (`<id>.service`):
+
+```bash
+WEBOS_APP_ID=app.garceslab.anime.visualtest WEBOS_APP_TITLE="GA Visual Test" npm run build:webos
+ares-install --device tv dist/webos/app.garceslab.anime.visualtest_*.ipk
+ares-launch --device tv app.garceslab.anime.visualtest
+ares-install --device tv --remove app.garceslab.anime.visualtest   # when done
+```
+
+Without `WEBOS_APP_ID` the build is the usual `app.seanime.tenji`. Don't reuse a default
+export with `--skip-export` for a custom id (the app learns its id at export time).
+
 `dist/webos/app` is the unpacked app and `dist/webos/service` its JS service, if you'd rather
 package them with `ares-package dist/webos/app dist/webos/service`. Every way of installing
 above installs the service with the app.
@@ -506,6 +520,23 @@ transcoding.
   (`src/lib/webos/viewport-tracker.ts`, `tv-lazy-image.tsx`). On Discover that keeps
   50-95 covers in the page instead of 130-140, and in desktop Edge slowed to TV speed a
   held Right arrow no longer drops frames. Android TV and tvOS load images as before.
+
+- **Visual refresh (Garceslab Anime).** The anime page, cards and rows borrow the web
+  app's look: a tall banner faded into the page with the cover softly tinting the whole
+  page, web-like card gradients, the signal-tower *Releasing* badge on airing anime, and
+  web-like titles and spacing. Each effect has its own switch in
+  `src/lib/tv/visual-flags.ts` (what it draws and what it costs is written there); turn
+  any of them off for a build with
+  `EXPO_PUBLIC_TV_VISUAL_OFF=ambientBackdrop,cardGradients npm run build:webos`
+  (`all` restores the earlier look). None of them uses `filter: blur()`,
+  `backdrop-filter` or shadows on cards; the only animation is still the focus scale.
+- **Schedule.** The nav bar's *Schedule* tab lists the anime on the profile's lists
+  airing today and in the next six days, one row per day (*Today*, *Tomorrow*, then
+  weekdays), with the airing time in the TV's time zone (or `EXPO_PUBLIC_TV_TIME_ZONE`),
+  the episode, and whether it has aired (or been watched). Down from the nav bar lands
+  on the next episode to air; OK opens the anime; Back works as on the other tabs. The
+  list comes from the server's schedule (per profile); a server without it, or a failed
+  request, falls back to each list anime's next episode from the collection.
 
 ## Remote control
 
