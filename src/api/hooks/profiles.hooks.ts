@@ -56,12 +56,54 @@ export function createProfile(serverUrl: string | null, input: { name: string; a
     })
 }
 
-export function logoutProfile(serverUrl: string | null) {
+export function logoutProfile(serverUrl: string | null, profileToken?: string) {
     return buildSeaQuery<boolean>({
         serverUrl,
         endpoint: API_ENDPOINTS.PROFILES.ProfileLogout.endpoint,
         method: "POST",
         muteError: true,
+        profileToken,
+    })
+}
+
+/*
+ * Editing a profile needs a profile session (the server's user-data routes),
+ * which "Who's watching?" doesn't have: the TV opens one for the profile being
+ * edited (selectProfile, with its PIN) and sends its token with these.
+ */
+
+/** Renames the profile or changes its avatar. */
+export function updateProfile(serverUrl: string | null, id: number, patch: { name?: string; avatarId?: string }, profileToken: string) {
+    return buildSeaQuery<Profile, typeof patch>({
+        serverUrl,
+        endpoint: withId(API_ENDPOINTS.PROFILES.UpdateProfile.endpoint, id),
+        method: "PATCH",
+        data: patch,
+        muteError: true,
+        profileToken,
+    })
+}
+
+/** Sets or changes the PIN, or removes it with null. The server then closes the profile's sessions. */
+export function setProfilePin(serverUrl: string | null, id: number, pin: string | null, profileToken: string) {
+    return buildSeaQuery<boolean, { pin: string | null }>({
+        serverUrl,
+        endpoint: withId(API_ENDPOINTS.PROFILES.SetProfilePin.endpoint, id),
+        method: "PUT",
+        data: { pin },
+        muteError: true,
+        profileToken,
+    })
+}
+
+/** Moves the profile to the server's trash (restorable from the web for 30 days). */
+export function deleteProfile(serverUrl: string | null, id: number, profileToken: string) {
+    return buildSeaQuery<boolean>({
+        serverUrl,
+        endpoint: withId(API_ENDPOINTS.PROFILES.DeleteProfile.endpoint, id),
+        method: "DELETE",
+        muteError: true,
+        profileToken,
     })
 }
 

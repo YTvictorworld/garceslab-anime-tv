@@ -19,7 +19,7 @@ import { ActivityIndicator, Animated, BackHandler, Pressable, ScrollView, Text, 
 
 const CARD = 220
 
-function useBack(handler: (() => boolean) | null) {
+export function useBack(handler: (() => boolean) | null) {
     const ref = React.useRef(handler)
     ref.current = handler
     const enabled = handler !== null
@@ -30,7 +30,7 @@ function useBack(handler: (() => boolean) | null) {
     }, [enabled])
 }
 
-function Screen({ children, title, subtitle }: { children: React.ReactNode; title: string; subtitle?: string | null }) {
+export function Screen({ children, title, subtitle }: { children: React.ReactNode; title: string; subtitle?: string | null }) {
     return (
         <View style={{ flex: 1, backgroundColor: "#0a0a0a" }}>
             <ScrollView
@@ -55,7 +55,7 @@ function Screen({ children, title, subtitle }: { children: React.ReactNode; titl
     )
 }
 
-function Message({ text, error }: { text: string | null | undefined; error?: boolean }) {
+export function Message({ text, error }: { text: string | null | undefined; error?: boolean }) {
     if (!text) return null
     return (
         <Text
@@ -67,7 +67,7 @@ function Message({ text, error }: { text: string | null | undefined; error?: boo
     )
 }
 
-function AvatarImage({ uri, size }: { uri: string | null; size: number }) {
+export function AvatarImage({ uri, size }: { uri: string | null; size: number }) {
     return uri ? (
         <Image source={{ uri }} style={{ width: size, height: size, borderRadius: tvSize(18) }} contentFit="cover" transition={120} />
     ) : (
@@ -87,6 +87,7 @@ const ProfileTile = React.memo(function ProfileTile({
     disabled,
     busy,
     onPress,
+    onFocus,
 }: {
     label: string
     imageUri?: string | null
@@ -96,6 +97,7 @@ const ProfileTile = React.memo(function ProfileTile({
     disabled?: boolean
     busy?: boolean
     onPress: () => void
+    onFocus?: () => void
 }) {
     const focusState = useTVFocus(1.08, `profile-${label}`)
     const size = tvSize(CARD)
@@ -104,7 +106,10 @@ const ProfileTile = React.memo(function ProfileTile({
             hasTVPreferredFocus={preferred}
             disabled={disabled}
             onPress={onPress}
-            onFocus={focusState.focus}
+            onFocus={() => {
+                focusState.focus()
+                onFocus?.()
+            }}
             onBlur={focusState.blur}
             accessibilityRole="button"
             accessibilityLabel={locked ? `${label}, has a PIN` : label}
@@ -147,6 +152,50 @@ const ProfileTile = React.memo(function ProfileTile({
     )
 })
 
+/** Room kept under every tile for the Edit button, so the row doesn't move when it shows. */
+const MANAGE_SLOT = 58
+
+/**
+ * The small "Edit" button under the focused profile, the TV's stand-in for
+ * the web's hover: Down from the tile reaches it.
+ */
+function ManageButton({ name, locked, onPress, onFocus }: { name: string; locked: boolean; onPress: () => void; onFocus: () => void }) {
+    const focusState = useTVFocus(1.06, `manage-${name}`)
+    const color = focusState.focused ? "#0a0a0a" : "rgba(255,255,255,0.8)"
+    return (
+        <Pressable
+            onPress={onPress}
+            onFocus={() => {
+                focusState.focus()
+                onFocus()
+            }}
+            onBlur={focusState.blur}
+            accessibilityRole="button"
+            accessibilityLabel={locked ? `Edit ${name}. Asks for the PIN first` : `Edit ${name}`}
+        >
+            <Animated.View
+                style={[
+                    focusState.style,
+                    {
+                        height: tvSize(46),
+                        paddingHorizontal: tvSize(18),
+                        borderRadius: tvSize(99),
+                        borderWidth: tvSize(2),
+                        borderColor: focusState.focused ? "#ffffff" : "rgba(255,255,255,0.16)",
+                        backgroundColor: focusState.focused ? "#ffffff" : "rgba(255,255,255,0.06)",
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: tvSize(8),
+                    },
+                ]}
+            >
+                <Ionicons name="settings-sharp" size={tvSize(20)} color={color} />
+                <Text style={{ color, fontSize: tvSize(18), fontWeight: "600" }}>Edit</Text>
+            </Animated.View>
+        </Pressable>
+    )
+}
+
 type PickerProps = {
     serverUrl: string | null
     profiles: Profile[]
@@ -155,12 +204,19 @@ type PickerProps = {
     message?: string | null
     error?: string | null
     onSelect: (profile: Profile) => void
+    /** The Edit button under the focused profile. */
+    onManage: (profile: Profile) => void
     onAdd: () => void
     onRetry: () => void
+    /** The profile to focus first (back from editing it). */
+    initialProfileId?: number | null
 }
 
 /** "Who's watching?": one row of large cards, plus "Add profile". */
-export function TVProfilePicker({ serverUrl, profiles, loading, busyProfileId, message, error, onSelect, onAdd, onRetry }: PickerProps) {
+export function TVProfilePicker({ serverUrl, profiles, loading, busyProfileId, message, error, onSelect, onManage, onAdd, onRetry, initialProfileId }: PickerProps) {
+    // The profile whose tile (or Edit button) has the focus: only it shows Edit.
+    const firstId = profiles.some(profile => profile.id === initialProfileId) ? initialProfileId! : profiles[0]?.id ?? null
+    const [focusedId, setFocusedId] = React.useState<number | null>(firstId)
     return (
         <Screen title="Who's watching?" subtitle={message}>
             {loading ? (
@@ -168,23 +224,39 @@ export function TVProfilePicker({ serverUrl, profiles, loading, busyProfileId, m
             ) : (
                 <TVFocusGuideView autoFocus trapFocusLeft trapFocusRight style={{ maxWidth: "100%" }}>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: tvSize(40), paddingHorizontal: tvSize(20), paddingVertical: tvSize(20) }}>
-                        {profiles.map((profile, index) => (
-                            <ProfileTile
-                                key={profile.id}
-                                label={profile.name}
-                                imageUri={avatarImageUrl(serverUrl, profile.avatarUrl)}
-                                locked={profile.hasPin}
-                                preferred={index === 0}
-                                busy={busyProfileId === profile.id}
-                                onPress={() => busyProfileId === null && onSelect(profile)}
-                            />
+                        {profiles.map(profile => (
+                            <View key={profile.id} style={{ alignItems: "center", gap: tvSize(14) }}>
+                                <ProfileTile
+                                    label={profile.name}
+                                    imageUri={avatarImageUrl(serverUrl, profile.avatarUrl)}
+                                    locked={profile.hasPin}
+                                    preferred={profile.id === firstId}
+                                    busy={busyProfileId === profile.id}
+                                    onPress={() => busyProfileId === null && onSelect(profile)}
+                                    onFocus={() => setFocusedId(profile.id)}
+                                />
+                                <View style={{ height: tvSize(MANAGE_SLOT), justifyContent: "center" }}>
+                                    {focusedId === profile.id && busyProfileId === null ? (
+                                        <ManageButton
+                                            name={profile.name}
+                                            locked={profile.hasPin}
+                                            onPress={() => onManage(profile)}
+                                            onFocus={() => setFocusedId(profile.id)}
+                                        />
+                                    ) : null}
+                                </View>
+                            </View>
                         ))}
-                        <ProfileTile
-                            label="Add profile"
-                            icon="add"
-                            preferred={profiles.length === 0}
-                            onPress={() => busyProfileId === null && onAdd()}
-                        />
+                        <View style={{ alignItems: "center", gap: tvSize(14) }}>
+                            <ProfileTile
+                                label="Add profile"
+                                icon="add"
+                                preferred={profiles.length === 0}
+                                onPress={() => busyProfileId === null && onAdd()}
+                                onFocus={() => setFocusedId(null)}
+                            />
+                            <View style={{ height: tvSize(MANAGE_SLOT) }} />
+                        </View>
                     </ScrollView>
                 </TVFocusGuideView>
             )}
@@ -211,10 +283,15 @@ type PinPadProps = {
     submitLabel?: string
     onSubmit: (pin: string) => void
     onCancel: () => void
+    /**
+     * Inside a drawer (the nav bar's profile switcher): no full screen, and
+     * Back is left to the drawer, whose Modal gets it first.
+     */
+    inline?: boolean
 }
 
 /** A numeric keypad for a profile's PIN; the LG remote's number keys type too. */
-export function TVPinPad({ title, subtitle, error, busy, submitLabel = "OK", onSubmit, onCancel }: PinPadProps) {
+export function TVPinPad({ title, subtitle, error, busy, submitLabel = "OK", onSubmit, onCancel, inline }: PinPadProps) {
     const [pin, setPin] = React.useState("")
     const pinRef = React.useRef(pin)
     pinRef.current = pin
@@ -241,13 +318,15 @@ export function TVPinPad({ title, subtitle, error, busy, submitLabel = "OK", onS
         if (/^[0-9]$/.test(event.eventType)) typeDigit(event.eventType)
     })
 
-    useBack(() => {
+    useBack(inline ? null : () => {
         onCancel()
         return true
     })
 
+    const hint = subtitle ?? `Enter a ${PIN_MIN_LENGTH}–${PIN_MAX_LENGTH} digit PIN with the keypad or the remote's number keys.`
+    const Frame = inline ? InlineFrame : Screen
     return (
-        <Screen title={title} subtitle={subtitle ?? `Enter a ${PIN_MIN_LENGTH}–${PIN_MAX_LENGTH} digit PIN with the keypad or the remote's number keys.`}>
+        <Frame title={title} subtitle={hint}>
             <View accessibilityLabel={`${pin.length} digits entered`} style={{ flexDirection: "row", gap: tvSize(18), marginBottom: tvSize(34) }}>
                 {Array.from({ length: PIN_MAX_LENGTH }, (_, i) => (
                     <View
@@ -287,7 +366,24 @@ export function TVPinPad({ title, subtitle, error, busy, submitLabel = "OK", onS
             {busy ? <ActivityIndicator style={{ marginTop: tvSize(24) }} size="small" color="#ffffff" /> : null}
             <Message text={error} error />
             <Text className="text-white/35" style={{ fontSize: tvSize(17), marginTop: tvSize(22) }}>Back to cancel</Text>
-        </Screen>
+        </Frame>
+    )
+}
+
+/** TVPinPad's frame inside a drawer: the title and hint above the keypad. */
+function InlineFrame({ children, title, subtitle }: { children: React.ReactNode; title: string; subtitle?: string | null }) {
+    return (
+        <View style={{ alignItems: "center", paddingHorizontal: tvSize(30) }}>
+            <Text accessibilityRole="header" className="font-bold text-white" style={{ fontSize: tvSize(28), textAlign: "center" }}>
+                {title}
+            </Text>
+            {subtitle ? (
+                <Text className="text-white/55" style={{ fontSize: tvSize(18), marginTop: tvSize(8), marginBottom: tvSize(24), textAlign: "center" }}>
+                    {subtitle}
+                </Text>
+            ) : null}
+            {children}
+        </View>
     )
 }
 
@@ -381,7 +477,7 @@ export function TVCreateProfile({ serverUrl, avatars, avatarsLoading, firstRun, 
         return (
             <TVPinPad
                 title="Add a PIN"
-                subtitle={"The PIN keeps others from entering your profile by mistake. It doesn't protect your data: anyone can still manage profiles."}
+                subtitle={"The PIN keeps others from entering or editing your profile on the TV by mistake. It isn't a password: the web's Settings can still manage every profile."}
                 submitLabel="Save"
                 onSubmit={value => {
                     setPin(value)
@@ -397,96 +493,57 @@ export function TVCreateProfile({ serverUrl, avatars, avatarsLoading, firstRun, 
         const value = editingName ? name : username
         const trimmed = value.trim()
         return (
-            <Screen
+            <TVTextEntry
                 title={editingName ? (firstRun ? "Create your profile" : "Add a profile") : "Import an AniList list"}
                 subtitle={editingName ? "Type a name with the keyboard below." : "Type the AniList user name whose public list you want to import."}
+                value={value}
+                placeholder={editingName ? "Name" : "AniList user name"}
+                onChange={editingName ? setName : setUsername}
+                maxLength={editingName ? 32 : 40}
+                capitalize={editingName ? "words" : "none"}
             >
-                <View
-                    style={{
-                        minWidth: tvSize(600),
-                        height: tvSize(70),
-                        borderRadius: tvSize(14),
-                        borderWidth: tvSize(2),
-                        borderColor: "rgba(255,255,255,0.2)",
-                        backgroundColor: "rgba(255,255,255,0.05)",
-                        justifyContent: "center",
-                        paddingHorizontal: tvSize(22),
-                        marginBottom: tvSize(28),
+                <TVButton
+                    label={editingName ? "Next" : "Done"}
+                    variant="primary"
+                    disabled={editingName ? !trimmed : false}
+                    icon={<Ionicons name="arrow-forward" size={tvSize(22)} color="white" />}
+                    onPress={() => {
+                        if (editingName) {
+                            if (!trimmed) return
+                            setName(trimmed)
+                            setStep("avatar")
+                        } else {
+                            setUsername(trimmed)
+                            setStep("options")
+                        }
                     }}
-                >
-                    <Text accessibilityLabel={value || (editingName ? "Name, empty" : "User name, empty")} style={{ color: value ? "#ffffff" : "rgba(255,255,255,0.35)", fontSize: tvSize(30) }}>
-                        {value || (editingName ? "Name" : "AniList user name")}
-                        <Text style={{ color: "#a89fff" }}>|</Text>
-                    </Text>
-                </View>
-                {/* Keyboard first, then the actions centred under it: Down from the last keyboard row reaches them. */}
-                <View style={{ alignItems: "center", gap: tvSize(30) }}>
-                    <TVFocusGuideView autoFocus trapFocusLeft trapFocusRight trapFocusUp>
-                        <TVOnScreenKeyboard
-                            value={value}
-                            onChange={editingName ? setName : setUsername}
-                            maxLength={editingName ? 32 : 40}
-                            capitalize={editingName ? "words" : "none"}
-                            preferred
-                        />
-                    </TVFocusGuideView>
-                    <TVFocusGuideView trapFocusLeft trapFocusRight trapFocusDown style={{ flexDirection: "row", justifyContent: "center", gap: tvSize(20) }}>
-                        <TVButton
-                            label={editingName ? "Next" : "Done"}
-                            variant="primary"
-                            disabled={editingName ? !trimmed : false}
-                            icon={<Ionicons name="arrow-forward" size={tvSize(22)} color="white" />}
-                            onPress={() => {
-                                if (editingName) {
-                                    if (!trimmed) return
-                                    setName(trimmed)
-                                    setStep("avatar")
-                                } else {
-                                    setUsername(trimmed)
-                                    setStep("options")
-                                }
-                            }}
-                        />
-                        {editingName && onCancel ? (
-                            <TVButton label="Cancel" variant="ghost" onPress={onCancel} />
-                        ) : null}
-                        {!editingName ? (
-                            <TVButton label="Don't import" variant="ghost" onPress={() => {
-                                setUsername("")
-                                setStep("options")
-                            }} />
-                        ) : null}
-                    </TVFocusGuideView>
-                </View>
-            </Screen>
+                />
+                {editingName && onCancel ? (
+                    <TVButton label="Cancel" variant="ghost" onPress={onCancel} />
+                ) : null}
+                {!editingName ? (
+                    <TVButton label="Don't import" variant="ghost" onPress={() => {
+                        setUsername("")
+                        setStep("options")
+                    }} />
+                ) : null}
+            </TVTextEntry>
         )
     }
 
     if (step === "avatar") {
         return (
             <Screen title="Choose an avatar" subtitle={`For ${name}. Press OK on the one you like.`}>
-                {avatarsLoading ? (
-                    <ActivityIndicator size="large" color="#a89fff" />
-                ) : avatars.length === 0 ? (
-                    <Message text="The server has no avatars to choose from." error />
-                ) : (
-                    <TVFocusGuideView autoFocus trapFocusLeft trapFocusRight style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: tvSize(22), maxWidth: tvSize(1500) }}>
-                        {avatars.map((item, index) => (
-                            <AvatarChoice
-                                key={item.id}
-                                avatar={item}
-                                uri={avatarImageUrl(serverUrl, item.url)}
-                                selected={item.id === avatarId}
-                                preferred={avatarId ? item.id === avatarId : index === 0}
-                                onPress={() => {
-                                    setAvatarId(item.id)
-                                    setStep("options")
-                                }}
-                            />
-                        ))}
-                    </TVFocusGuideView>
-                )}
-                <AvatarCredits avatars={avatars} />
+                <TVAvatarGrid
+                    serverUrl={serverUrl}
+                    avatars={avatars}
+                    loading={avatarsLoading}
+                    selectedId={avatarId}
+                    onPick={item => {
+                        setAvatarId(item.id)
+                        setStep("options")
+                    }}
+                />
             </Screen>
         )
     }
@@ -541,8 +598,96 @@ export function TVCreateProfile({ serverUrl, avatars, avatarsLoading, firstRun, 
     )
 }
 
+type TextEntryProps = {
+    title: string
+    subtitle: string
+    value: string
+    placeholder: string
+    onChange: (value: string) => void
+    maxLength: number
+    capitalize: "words" | "none"
+    error?: string | null
+    /** The buttons under the keyboard. */
+    children: React.ReactNode
+}
+
+/** A text field typed with the on-screen keyboard, then the actions centred under it. */
+export function TVTextEntry({ title, subtitle, value, placeholder, onChange, maxLength, capitalize, error, children }: TextEntryProps) {
+    return (
+        <Screen title={title} subtitle={subtitle}>
+            <View
+                style={{
+                    minWidth: tvSize(600),
+                    height: tvSize(70),
+                    borderRadius: tvSize(14),
+                    borderWidth: tvSize(2),
+                    borderColor: "rgba(255,255,255,0.2)",
+                    backgroundColor: "rgba(255,255,255,0.05)",
+                    justifyContent: "center",
+                    paddingHorizontal: tvSize(22),
+                    marginBottom: tvSize(28),
+                }}
+            >
+                <Text accessibilityLabel={value || `${placeholder}, empty`} style={{ color: value ? "#ffffff" : "rgba(255,255,255,0.35)", fontSize: tvSize(30) }}>
+                    {value || placeholder}
+                    <Text style={{ color: "#a89fff" }}>|</Text>
+                </Text>
+            </View>
+            {/* Keyboard first, then the actions centred under it: Down from the last keyboard row reaches them. */}
+            <View style={{ alignItems: "center", gap: tvSize(30) }}>
+                <TVFocusGuideView autoFocus trapFocusLeft trapFocusRight trapFocusUp>
+                    <TVOnScreenKeyboard
+                        value={value}
+                        onChange={onChange}
+                        maxLength={maxLength}
+                        capitalize={capitalize}
+                        preferred
+                    />
+                </TVFocusGuideView>
+                <TVFocusGuideView trapFocusLeft trapFocusRight trapFocusDown style={{ flexDirection: "row", justifyContent: "center", gap: tvSize(20) }}>
+                    {children}
+                </TVFocusGuideView>
+            </View>
+            <Message text={error} error />
+        </Screen>
+    )
+}
+
+/** The avatar grid of "Create your profile" and "Edit profile", with the credits under it. */
+export function TVAvatarGrid({ serverUrl, avatars, loading, selectedId, onPick }: {
+    serverUrl: string | null
+    avatars: Avatar[]
+    loading: boolean
+    selectedId: string | null
+    onPick: (avatar: Avatar) => void
+}) {
+    return (
+        <>
+            {loading ? (
+                <ActivityIndicator size="large" color="#a89fff" />
+            ) : avatars.length === 0 ? (
+                <Message text="The server has no avatars to choose from." error />
+            ) : (
+                <TVFocusGuideView autoFocus trapFocusLeft trapFocusRight style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: tvSize(22), maxWidth: tvSize(1500) }}>
+                    {avatars.map((item, index) => (
+                        <AvatarChoice
+                            key={item.id}
+                            avatar={item}
+                            uri={avatarImageUrl(serverUrl, item.url)}
+                            selected={item.id === selectedId}
+                            preferred={selectedId ? item.id === selectedId : index === 0}
+                            onPress={() => onPick(item)}
+                        />
+                    ))}
+                </TVFocusGuideView>
+            )}
+            <AvatarCredits avatars={avatars} />
+        </>
+    )
+}
+
 /** The credit lines the CC BY avatars need (CC0 ones need none). */
-function AvatarCredits({ avatars }: { avatars: Avatar[] }) {
+export function AvatarCredits({ avatars }: { avatars: Avatar[] }) {
     const credits = Array.from(new Set(avatars.map(a => a.attribution).filter((a): a is string => !!a)))
     if (!avatars.length) return null
     return (
@@ -557,7 +702,7 @@ function AvatarCredits({ avatars }: { avatars: Avatar[] }) {
     )
 }
 
-function AvatarChoice({ avatar, uri, selected, preferred, onPress }: { avatar: Avatar; uri: string | null; selected: boolean; preferred?: boolean; onPress: () => void }) {
+export function AvatarChoice({ avatar, uri, selected, preferred, onPress }: { avatar: Avatar; uri: string | null; selected: boolean; preferred?: boolean; onPress: () => void }) {
     const focusState = useTVFocus(1.1, `avatar-${avatar.id}`)
     const size = tvSize(132)
     return (

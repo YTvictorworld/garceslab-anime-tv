@@ -49,7 +49,8 @@ export function TVConfirmDrawer({
                     <TVButton
                         label="Cancel"
                         variant="secondary"
-                        preferred
+                        // Focused when the drawer opens (not the drawer's Close button), on every route.
+                        hasTVPreferredFocus
                         onPress={() => onOpenChange(false)}
                     />
                     <TVButton

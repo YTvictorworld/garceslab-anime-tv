@@ -32,6 +32,12 @@ type SeaQuery<D> = {
     bypassOfflineCheck?: boolean
     timeoutMs?: number
     signal?: AbortSignal | readonly (AbortSignal | undefined)[]
+    /**
+     * Garceslab Anime: send the request as this profile session instead of the
+     * app's current one ("Who's watching?" edits a profile with a session of its
+     * own, while no profile is selected). A refusal doesn't end the app's session.
+     */
+    profileToken?: string
 }
 
 function createSeaError(message: string, status?: number): SeaError {
@@ -109,12 +115,13 @@ export async function buildSeaQuery<T, D = unknown>(
         bypassOfflineCheck,
         timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
         signal,
+        profileToken,
     }: SeaQuery<D>): Promise<T | undefined> {
     const url = new URL(getServerBaseUrl(serverUrl) + endpoint)
     const resolvedAuthToken = authToken ?? getStoredServerAuthToken()
     const startedAt = Date.now()
     // The profile this request is sent as: a refusal ends only that session, not one selected since.
-    const requestProfileToken = getProfileToken()
+    const requestProfileToken = profileToken ?? getProfileToken()
 
     // append params to the url if they exist and it's a GET request
     if (params && method === "GET") {
@@ -132,6 +139,7 @@ export async function buildSeaQuery<T, D = unknown>(
             "Content-Type": "application/json",
             // Includes the client identity headers.
             ...getServerAuthHeaders(resolvedAuthToken),
+            ...(profileToken ? { "X-Seanime-Profile": profileToken } : {}),
         },
     }
 
