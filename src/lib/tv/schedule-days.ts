@@ -88,22 +88,24 @@ export type GroupScheduleOptions = {
 }
 
 /**
- * Today and the next `days - 1` days, each with the episodes airing that day
- * (aired ones included), in airing order. Days with nothing airing are kept,
- * so the screen can say so; the same episode listed twice counts once.
+ * The episodes airing on each of `keys` (calendar days in the time zone), in
+ * airing order. Days with nothing airing are kept, so the screen can say so;
+ * the same episode listed twice counts once.
  */
-export function groupScheduleByDay<T extends ScheduleItemLike>(
+export function groupScheduleByKeys<T extends ScheduleItemLike>(
     items: readonly T[] | null | undefined,
-    { now, days = 7, timeZone, progressOf }: GroupScheduleOptions,
-): ScheduleDay<T>[] {
-    const keys = nextDayKeys(dayKey(now, timeZone), days)
+    keys: readonly string[],
+    { now, timeZone, progressOf }: Omit<GroupScheduleOptions, "days">,
+): Map<string, ScheduleEntry<T>[]> {
     const byKey = new Map<string, ScheduleEntry<T>[]>(keys.map(key => [key, []]))
+    if (keys.length === 0) return byKey
+    // Quick reject before the (slower) Intl call: well outside the days asked for.
+    const first = Date.parse(`${keys[0]}T00:00:00Z`) - 2 * DAY_MS
+    const last = Date.parse(`${keys[keys.length - 1]}T00:00:00Z`) + 3 * DAY_MS
     const seen = new Set<string>()
     for (const item of items ?? []) {
         const airingAt = item.dateTime ? Date.parse(item.dateTime) : NaN
-        if (!Number.isFinite(airingAt)) continue
-        // Quick reject before the (slower) Intl call: well outside the window.
-        if (airingAt < now - 2 * DAY_MS || airingAt > now + (days + 1) * DAY_MS) continue
+        if (!Number.isFinite(airingAt) || airingAt < first || airingAt > last) continue
         const list = byKey.get(dayKey(airingAt, timeZone))
         if (!list) continue
         const id = `${item.mediaId}:${item.episodeNumber}`
@@ -117,16 +119,126 @@ export function groupScheduleByDay<T extends ScheduleItemLike>(
             watched: progress >= item.episodeNumber && item.episodeNumber > 0,
         })
     }
+    for (const list of byKey.values()) {
+        list.sort((left, right) => left.airingAt - right.airingAt || left.item.title.localeCompare(right.item.title))
+    }
+    return byKey
+}
+
+/** Today and the next `days - 1` days, each with the episodes airing that day. */
+export function groupScheduleByDay<T extends ScheduleItemLike>(
+    items: readonly T[] | null | undefined,
+    { now, days = 7, timeZone, progressOf }: GroupScheduleOptions,
+): ScheduleDay<T>[] {
+    const keys = nextDayKeys(dayKey(now, timeZone), days)
+    const byKey = groupScheduleByKeys(items, keys, { now, timeZone, progressOf })
     return keys.map((key, index) => ({
         key,
         ...dayLabels(key, index),
-        items: (byKey.get(key) ?? []).sort((left, right) =>
-            left.airingAt - right.airingAt || left.item.title.localeCompare(right.item.title)),
+        items: byKey.get(key) ?? [],
     }))
 }
 
+/** 0 = Sunday … 6 = Saturday, of a "YYYY-MM-DD" key. */
+function weekdayOf(key: string) {
+    const [year, month, day] = key.split("-").map(Number)
+    return new Date(Date.UTC(year, month - 1, day)).getUTCDay()
+}
+
+/**
+ * The first day of the week holding `key`, `weekOffset` weeks away. Weeks
+ * start on Monday (1) like the web's calendar, or on Sunday (0).
+ */
+export function weekStartKey(key: string, weekOffset = 0, weekStartsOn: 0 | 1 = 1) {
+    const back = (weekdayOf(key) - weekStartsOn + 7) % 7
+    const [year, month, day] = key.split("-").map(Number)
+    return new Date(Date.UTC(year, month - 1, day - back + weekOffset * 7)).toISOString().slice(0, 10)
+}
+
+export type ScheduleWeekDay<T extends ScheduleItemLike> = {
+    key: string
+    /** "Mon". */
+    weekday: string
+    /** "Nov 24". */
+    dateLabel: string
+    isToday: boolean
+    /** Before today. */
+    isPast: boolean
+    items: ScheduleEntry<T>[]
+}
+
+export type ScheduleWeek<T extends ScheduleItemLike> = {
+    /** "Nov 23 – 29, 2026", "Nov 30 – Dec 6, 2026", "Dec 28, 2026 – Jan 3, 2027". */
+    label: string
+    days: ScheduleWeekDay<T>[]
+    /** The week holding today. */
+    isCurrent: boolean
+}
+
+function shortDate(key: string, withYear = false) {
+    const [year, month, day] = key.split("-").map(Number)
+    return new Date(Date.UTC(year, month - 1, day, 12)).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        ...(withYear ? { year: "numeric" } : null),
+        timeZone: "UTC",
+    })
+}
+
+function weekLabel(first: string, last: string) {
+    const [firstYear, firstMonth] = first.split("-")
+    const [lastYear, lastMonth, lastDay] = last.split("-")
+    if (firstYear !== lastYear) return `${shortDate(first, true)} – ${shortDate(last, true)}`
+    if (firstMonth !== lastMonth) return `${shortDate(first)} – ${shortDate(last)}, ${lastYear}`
+    return `${shortDate(first)} – ${Number(lastDay)}, ${lastYear}`
+}
+
+/**
+ * The web calendar's week, for the TV: seven days from the week's first day
+ * (Monday by default), `weekOffset` weeks from the one holding today, each
+ * with its episodes in airing order.
+ */
+export function buildScheduleWeek<T extends ScheduleItemLike>(
+    items: readonly T[] | null | undefined,
+    {
+        now,
+        weekOffset = 0,
+        weekStartsOn = 1,
+        timeZone,
+        progressOf,
+    }: Omit<GroupScheduleOptions, "days"> & { weekOffset?: number; weekStartsOn?: 0 | 1 },
+): ScheduleWeek<T> {
+    const today = dayKey(now, timeZone)
+    const keys = nextDayKeys(weekStartKey(today, weekOffset, weekStartsOn), 7)
+    const byKey = groupScheduleByKeys(items, keys, { now, timeZone, progressOf })
+    return {
+        label: weekLabel(keys[0], keys[6]),
+        isCurrent: weekOffset === 0,
+        days: keys.map(key => {
+            const [year, month, day] = key.split("-").map(Number)
+            return {
+                key,
+                weekday: new Date(Date.UTC(year, month - 1, day, 12)).toLocaleDateString("en-US", { weekday: "short", timeZone: "UTC" }),
+                dateLabel: shortDate(key),
+                isToday: key === today,
+                isPast: key < today,
+                items: byKey.get(key) ?? [],
+            }
+        }),
+    }
+}
+
+/**
+ * AniList's ~100 px `medium` cover for a `large` (or `extraLarge`) cover URL,
+ * for small thumbnails; other URLs are returned as they are.
+ */
+export function smallCoverUrl(url: string | null | undefined) {
+    if (!url) return undefined
+    return url.replace(/\/cover\/(large|extraLarge)\//, "/cover/medium/")
+}
+
 /** Where focus starts: the first episode still to air, else the latest one that aired. */
-export function initialScheduleFocus(days: readonly ScheduleDay<ScheduleItemLike>[]) {
+export function initialScheduleFocus(days: readonly { items: readonly { aired: boolean }[] }[]) {
     let last: { day: number; index: number } | null = null
     for (let day = 0; day < days.length; day++) {
         const items = days[day].items

@@ -43,9 +43,16 @@ export const TV_VISUAL_FLAG_INFO = {
         cost: "None (text styles only).",
     },
     scheduleTab: {
-        effect: "A Schedule entry in the TV nav bar: the profile's list anime airing in the "
-            + "coming days, grouped by day.",
-        cost: "None while closed. The screen loads one server request.",
+        effect: "A Schedule entry in the TV nav bar: the web's calendar as a week grid (Monday "
+            + "to Sunday) of the profile's list anime, with previous/next week buttons.",
+        cost: "None while closed. The screen loads one server request; thumbnails are "
+            + "AniList's ~100 px `medium` covers.",
+    },
+    scheduleDayArt: {
+        effect: "Schedule: each day column shows its first episode's cover, dim, behind its "
+            + "header (the web calendar's day background); brighter for today.",
+        cost: "Low. Up to seven `large` covers at low opacity with a static gradient each; "
+            + "nothing animates (the web's rotating background is left out).",
     },
 } as const satisfies Record<string, { effect: string; cost: string }>
 
@@ -62,6 +69,7 @@ export const DEFAULT_TV_VISUAL_FLAGS: Readonly<TVVisualFlags> = {
     releasingBadge: true,
     typography: true,
     scheduleTab: true,
+    scheduleDayArt: true,
 }
 
 /**

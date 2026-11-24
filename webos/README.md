@@ -530,13 +530,18 @@ transcoding.
   `EXPO_PUBLIC_TV_VISUAL_OFF=ambientBackdrop,cardGradients npm run build:webos`
   (`all` restores the earlier look). None of them uses `filter: blur()`,
   `backdrop-filter` or shadows on cards; the only animation is still the focus scale.
-- **Schedule.** The nav bar's *Schedule* tab lists the anime on the profile's lists
-  airing today and in the next six days, one row per day (*Today*, *Tomorrow*, then
-  weekdays), with the airing time in the TV's time zone (or `EXPO_PUBLIC_TV_TIME_ZONE`),
-  the episode, and whether it has aired (or been watched). Down from the nav bar lands
-  on the next episode to air; OK opens the anime; Back works as on the other tabs. The
-  list comes from the server's schedule (per profile); a server without it, or a failed
-  request, falls back to each list anime's next episode from the collection.
+- **Schedule.** The nav bar's *Schedule* tab is the web's release calendar as a week
+  grid: seven day columns, Monday to Sunday like the web, today outlined in lilac, each
+  day listing its episodes with a small cover (AniList's `medium` size), the airing time
+  in the TV's time zone (or `EXPO_PUBLIC_TV_TIME_ZONE`), the title, the episode and
+  whether it has aired or been watched. *Previous week*, *This week* and *Next week* move
+  up to four weeks either way. (The web shows a month; at TV distance a month's cells
+  would only fit a line of text per episode, so the TV shows a week that fills the
+  screen.) Arrows move up and down a day and across days (empty days are skipped);
+  focus starts on the next episode to air; OK opens the anime and Back returns to the
+  same episode; Back on the tab works as on the other tabs. The list comes from the
+  server's schedule (per profile); a server without it, or a failed request, falls back
+  to each list anime's next episode from the collection.
 
 ## Remote control
 

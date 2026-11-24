@@ -26,6 +26,7 @@ test("named effects turn off, in any case and separator, unknown names are ignor
     assert.equal(flags.releasingBadge, true)
     assert.equal(flags.typography, true)
     assert.equal(flags.scheduleTab, true)
+    assert.equal(flags.scheduleDayArt, true)
 })
 
 test("`all` turns every effect off without touching the defaults", () => {

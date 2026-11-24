@@ -1,7 +1,10 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import {
+    buildScheduleWeek,
     dayKey,
+    smallCoverUrl,
+    weekStartKey,
     formatAiringClock,
     groupScheduleByDay,
     initialScheduleFocus,
@@ -105,4 +108,62 @@ test("an older server's schedule comes from the collection's next episodes", () 
     assert.equal(items[0].image, "large-1")
     assert.equal(items[0].isSeasonFinale, true)
     assert.equal(items[1].isMovie, true)
+})
+
+test("weeks start on Monday like the web's calendar, or on Sunday", () => {
+    assert.equal(weekStartKey("2026-11-24"), "2026-11-23") // Tuesday -> Monday
+    assert.equal(weekStartKey("2026-11-23"), "2026-11-23")
+    assert.equal(weekStartKey("2026-11-29"), "2026-11-23") // Sunday ends the week
+    assert.equal(weekStartKey("2026-11-29", 0, 0), "2026-11-29")
+    assert.equal(weekStartKey("2026-11-24", 1), "2026-11-30")
+    assert.equal(weekStartKey("2026-11-24", -1), "2026-11-16")
+    assert.equal(weekStartKey("2026-12-31", 1), "2027-01-04")
+})
+
+test("the week grid has seven days with today marked and episodes per day", () => {
+    const week = buildScheduleWeek([
+        item(1, 5, "2026-11-23T20:00:00Z"), // Monday, aired
+        item(2, 3, "2026-11-25T02:30:00Z"), // Tuesday 22:30 in La Paz
+        item(3, 9, "2026-11-29T15:00:00Z"), // Sunday
+        item(4, 1, "2026-11-30T15:00:00Z"), // next Monday
+    ], { now: NOW, timeZone: LA_PAZ, progressOf: id => (id === 1 ? 5 : undefined) })
+    assert.equal(week.label, "Nov 23 – 29, 2026")
+    assert.equal(week.isCurrent, true)
+    assert.deepEqual(week.days.map(day => day.weekday), ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"])
+    assert.deepEqual(week.days.map(day => day.isToday), [false, true, false, false, false, false, false])
+    assert.deepEqual(week.days.map(day => day.isPast), [true, false, false, false, false, false, false])
+    assert.deepEqual(week.days.map(day => day.items.map(entry => entry.item.mediaId)), [[1], [2], [], [], [], [], [3]])
+    assert.equal(week.days[0].items[0].watched, true)
+    assert.equal(week.days[0].dateLabel, "Nov 23")
+})
+
+test("the next and previous weeks, across months and years", () => {
+    const next = buildScheduleWeek([item(4, 1, "2026-11-30T15:00:00Z")], { now: NOW, timeZone: LA_PAZ, weekOffset: 1 })
+    assert.equal(next.label, "Nov 30 – Dec 6, 2026")
+    assert.equal(next.isCurrent, false)
+    assert.deepEqual(next.days[0].items.map(entry => entry.item.mediaId), [4])
+    assert.ok(next.days.every(day => !day.isToday && !day.isPast))
+
+    const newYear = buildScheduleWeek([], { now: Date.parse("2026-12-30T12:00:00Z"), timeZone: "UTC" })
+    assert.equal(newYear.label, "Dec 28, 2026 – Jan 3, 2027")
+
+    const previous = buildScheduleWeek([], { now: NOW, timeZone: LA_PAZ, weekOffset: -1 })
+    assert.ok(previous.days.every(day => day.isPast))
+})
+
+test("focus in the week grid starts on the next episode to air", () => {
+    const week = buildScheduleWeek([
+        item(1, 5, "2026-11-23T20:00:00Z"),
+        item(3, 9, "2026-11-29T15:00:00Z"),
+    ], { now: NOW, timeZone: LA_PAZ })
+    assert.deepEqual(initialScheduleFocus(week.days), { day: 6, index: 0 })
+})
+
+test("thumbnails use AniList's medium cover", () => {
+    assert.equal(
+        smallCoverUrl("https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx1-abc.png"),
+        "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx1-abc.png",
+    )
+    assert.equal(smallCoverUrl("https://example.com/x.png"), "https://example.com/x.png")
+    assert.equal(smallCoverUrl(""), undefined)
 })
