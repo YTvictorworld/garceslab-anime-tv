@@ -1,6 +1,8 @@
 import { requestTVFocus } from "@/components/tv/tv-native"
 import { TVFavouriteButton } from "@/components/tv/tv-favourite-button"
 import { TVLazyImage } from "@/components/tv/tv-lazy-image"
+import { isAiringStatus, TVReleasingBadge } from "@/components/tv/tv-releasing-badge"
+import { TV_VISUAL } from "@/lib/tv/visual-flags"
 import type {
     Anime_Episode,
     AL_AnimeDetailsById_Media_Characters_Edges,
@@ -45,6 +47,23 @@ import { getEpisodeSpoilerState } from "@/lib/anime-spoilers"
 import { altTitle, cleanHtml, listStatus, mediaTitle, startLabel } from "@/lib/media-metadata"
 import { router, useFocusEffect } from "expo-router"
 import { useAtom } from "jotai/react"
+
+/**
+ * animeBackdrop: the web entry page's banner, taller and faded into the page
+ * by static gradients. Off, the header keeps its earlier 500 px banner.
+ */
+const BACKDROP = TV_VISUAL.animeBackdrop
+const HERO_HEIGHT = tvSize(BACKDROP ? 580 : 500)
+/**
+ * ambientBackdrop (webOS): the cover, upscaled from AniList's ~100 px `medium`
+ * size so it comes out soft without a CSS blur, very dim behind the whole page
+ * in a layer that doesn't scroll. The banner then fades out through a CSS mask
+ * (drawn once; scrolling only moves the layer) instead of into flat black.
+ */
+const AMBIENT = TV_VISUAL.ambientBackdrop && Platform.OS === "web"
+const BANNER_MASK = AMBIENT
+    ? { WebkitMaskImage: "linear-gradient(to bottom, #000 0%, #000 58%, transparent 100%)" } as object
+    : null
 
 type Props = {
     initialView?: AnimeEntryView
@@ -246,11 +265,19 @@ export function TVAnimeEntryScreen({
     const nextEpisodeToPlay = unwatchedMainEpisodes[0] || mainEpisodes[0]
     const serverNextEpisode = serverGroups.unwatched[0] || serverGroups.main[0]
 
+    // animeBackdrop: AniList's `large` cover (230 px) is enough for the 220 px
+    // cover and as a banner fallback; `extraLarge` is about four times the pixels.
     const heroImage = entry.media?.bannerImage
+        ?? (BACKDROP ? entry.media?.coverImage?.large : undefined)
         ?? entry.media?.coverImage?.extraLarge
         ?? entry.media?.coverImage?.large
-    const coverImage = entry.media?.coverImage?.extraLarge
+    const coverImage = (BACKDROP ? entry.media?.coverImage?.large : undefined)
+        ?? entry.media?.coverImage?.extraLarge
         ?? entry.media?.coverImage?.large
+    const ambientImage = AMBIENT && !(serverStatus?.settings?.anilist?.blurAdultContent && entry.media?.isAdult)
+        ? entry.media?.coverImage?.medium ?? entry.media?.coverImage?.large
+        : undefined
+    const airingStatus = TV_VISUAL.releasingBadge && isAiringStatus(entry.media?.status) ? entry.media?.status : null
     const heroTitle = mediaTitle(entry.media)
     const heroAltTitle = altTitle(entry.media)
     const heroDescription = cleanHtml(entry.media?.description)
@@ -258,7 +285,8 @@ export function TVAnimeEntryScreen({
     const heroMeta = [
         date,
         entry.media?.season?.replaceAll("_", " "),
-        entry.media?.status?.replaceAll("_", " "),
+        // The Releasing badge shows the status itself.
+        airingStatus ? null : entry.media?.status?.replaceAll("_", " "),
         entry.media?.format?.replaceAll("_", " "),
         entry.media?.genres?.slice(0, 3).join("  ·  "),
     ].filter(Boolean).join("  ·  ")
@@ -311,6 +339,23 @@ export function TVAnimeEntryScreen({
 
     return (
         <View style={{ flex: 1, backgroundColor: "#0a0a0a" }}>
+            {ambientImage ? (
+                <View pointerEvents="none" style={{ position: "absolute", inset: 0, overflow: "hidden" }}>
+                    <Image
+                        source={{ uri: ambientImage }}
+                        style={{ position: "absolute", inset: 0, opacity: 0.2 }}
+                        contentFit="cover"
+                        cachePolicy="memory-disk"
+                        transition={0}
+                        accessibilityIgnoresInvertColors
+                    />
+                    <LinearGradient
+                        colors={["rgba(10,10,10,0.35)", "rgba(10,10,10,0.75)", "rgba(10,10,10,0.9)"]}
+                        locations={[0, 0.5, 1]}
+                        style={{ position: "absolute", inset: 0 }}
+                    />
+                </View>
+            ) : null}
             <ScrollView
                 style={{ flex: 1 }}
                 fadingEdgeLength={{ start: TV.navInset + tvSize(18), end: 0 }}
@@ -319,33 +364,62 @@ export function TVAnimeEntryScreen({
             >
                 <View
                     style={{
-                        height: tvSize(500),
+                        height: HERO_HEIGHT,
                         overflow: "hidden",
-                        backgroundColor: "#121212",
+                        backgroundColor: ambientImage ? "transparent" : "#121212",
                     }}
                 >
                     {heroImage ? (
-                        <Image
-                            source={{ uri: heroImage }}
-                            style={{ position: "absolute", inset: 0 }}
-                            contentFit="cover"
-                            cachePolicy="memory-disk"
-                            priority="high"
-                            transition={120}
-                        />
+                        <View style={[{ position: "absolute", inset: 0 }, ambientImage ? BANNER_MASK : null]}>
+                            <Image
+                                source={{ uri: heroImage }}
+                                style={{ position: "absolute", inset: 0 }}
+                                contentFit="cover"
+                                cachePolicy="memory-disk"
+                                priority="high"
+                                transition={120}
+                            />
+                            {BACKDROP ? (
+                                <>
+                                    {/* The web's banner gradients: left (under the text), top, bottom. */}
+                                    <LinearGradient
+                                        colors={["rgba(10,10,10,0.94)", "rgba(10,10,10,0.62)", "rgba(10,10,10,0)"]}
+                                        locations={[0, 0.42, 0.88]}
+                                        start={{ x: 0, y: 0.5 }}
+                                        end={{ x: 1, y: 0.5 }}
+                                        style={{ position: "absolute", inset: 0 }}
+                                    />
+                                    <LinearGradient
+                                        colors={["rgba(10,10,10,0.55)", "rgba(10,10,10,0)"]}
+                                        style={{ position: "absolute", left: 0, right: 0, top: 0, height: tvSize(170) }}
+                                    />
+                                    {ambientImage ? null : (
+                                        <LinearGradient
+                                            colors={["rgba(10,10,10,0)", "rgba(10,10,10,0.8)", "#0a0a0a"]}
+                                            locations={[0, 0.55, 1]}
+                                            style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: "70%" }}
+                                        />
+                                    )}
+                                </>
+                            ) : null}
+                        </View>
                     ) : null}
-                    <LinearGradient
-                        colors={["rgba(10,10,10,0.96)", "rgba(10,10,10,0.58)", "rgba(10,10,10,0.04)"]}
-                        locations={[0, 0.48, 1]}
-                        start={{ x: 0, y: 0.5 }}
-                        end={{ x: 1, y: 0.5 }}
-                        style={{ position: "absolute", inset: 0 }}
-                    />
-                    <LinearGradient
-                        colors={["transparent", "rgba(10,10,10,0.26)", "#0a0a0a"]}
-                        locations={[0, 0.72, 1]}
-                        style={{ position: "absolute", inset: 0 }}
-                    />
+                    {BACKDROP ? null : (
+                        <>
+                            <LinearGradient
+                                colors={["rgba(10,10,10,0.96)", "rgba(10,10,10,0.58)", "rgba(10,10,10,0.04)"]}
+                                locations={[0, 0.48, 1]}
+                                start={{ x: 0, y: 0.5 }}
+                                end={{ x: 1, y: 0.5 }}
+                                style={{ position: "absolute", inset: 0 }}
+                            />
+                            <LinearGradient
+                                colors={["transparent", "rgba(10,10,10,0.26)", "#0a0a0a"]}
+                                locations={[0, 0.72, 1]}
+                                style={{ position: "absolute", inset: 0 }}
+                            />
+                        </>
+                    )}
                     <View
                         style={{
                             position: "absolute",
@@ -384,11 +458,13 @@ export function TVAnimeEntryScreen({
                                 borderWidth: tvSize(2),
                                 borderColor: "transparent",
                                 backgroundColor: "#181818",
+                                // One shadow on one static element; the cards have none.
                                 shadowColor: "#000000",
                                 shadowOpacity: 0.42,
                                 shadowRadius: tvSize(18),
                                 shadowOffset: { width: 0, height: tvSize(10) },
                                 elevation: 16,
+                                ...(BACKDROP ? { borderColor: "rgba(255,255,255,0.08)" } : null),
                             }}
                         >
                             {coverImage ? (
@@ -421,7 +497,15 @@ export function TVAnimeEntryScreen({
                         >
                             <Text
                                 className="font-black text-white"
-                                style={{ fontSize: tvSize(46), lineHeight: tvSize(52) }}
+                                style={TV_VISUAL.typography ? {
+                                    fontSize: tvSize(50),
+                                    lineHeight: tvSize(58),
+                                    letterSpacing: tvSize(-0.6),
+                                    // The web's title shadow: static text, drawn once.
+                                    textShadowColor: "rgba(0,0,0,0.35)",
+                                    textShadowRadius: tvSize(10),
+                                    textShadowOffset: { width: 0, height: tvSize(1) },
+                                } : { fontSize: tvSize(46), lineHeight: tvSize(52) }}
                                 numberOfLines={2}
                             >
                                 {heroTitle}
@@ -435,10 +519,18 @@ export function TVAnimeEntryScreen({
                                     {heroAltTitle}
                                 </Text>
                             ) : null}
-                            {heroMeta ? (
-                                <Text className="font-medium text-white/60" style={{ fontSize: tvSize(20) }}>
-                                    {heroMeta}
-                                </Text>
+                            {heroMeta || airingStatus ? (
+                                <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: tvSize(18) }}>
+                                    {airingStatus ? <TVReleasingBadge status={airingStatus} /> : null}
+                                    {heroMeta ? (
+                                        <Text
+                                            className={TV_VISUAL.typography ? "font-medium text-white/70" : "font-medium text-white/60"}
+                                            style={{ fontSize: tvSize(20) }}
+                                        >
+                                            {heroMeta}
+                                        </Text>
+                                    ) : null}
+                                </View>
                             ) : null}
                             {heroDescription ? (
                                 <Text

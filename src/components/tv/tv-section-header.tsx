@@ -1,4 +1,5 @@
 import { TV, tvSize } from "@/components/tv/tv-scale"
+import { TV_VISUAL } from "@/lib/tv/visual-flags"
 import * as React from "react"
 import { Text, View } from "react-native"
 
@@ -32,18 +33,40 @@ export const TVSectionHeader = React.memo(function TVSectionHeader({
                 <View
                     style={{
                         flexDirection: "row",
-                        alignItems: "baseline",
+                        alignItems: TV_VISUAL.typography ? "center" : "baseline",
                         gap: tvSize(12),
                     }}
                 >
-                    <Text className="font-bold text-white" style={{ fontSize: tvSize(30) }}>
+                    <Text
+                        className="font-bold text-white"
+                        style={TV_VISUAL.typography
+                            ? { fontSize: tvSize(31), lineHeight: tvSize(38), letterSpacing: tvSize(-0.3) }
+                            : { fontSize: tvSize(30) }}
+                    >
                         {title}
                     </Text>
-                    {count !== undefined ? (
+                    {count !== undefined ? (TV_VISUAL.typography ? (
+                        // The web's count pill: quieter than the title, still readable from the couch.
+                        <View
+                            style={{
+                                alignSelf: "center",
+                                minWidth: tvSize(34),
+                                paddingHorizontal: tvSize(10),
+                                paddingVertical: tvSize(2),
+                                borderRadius: tvSize(99),
+                                backgroundColor: "rgba(255,255,255,0.08)",
+                                alignItems: "center",
+                            }}
+                        >
+                            <Text className="font-semibold text-white/55" style={{ fontSize: tvSize(17), lineHeight: tvSize(23) }}>
+                                {count}
+                            </Text>
+                        </View>
+                    ) : (
                         <Text className="font-medium text-white/35" style={{ fontSize: tvSize(20) }}>
                             {count}
                         </Text>
-                    ) : null}
+                    )) : null}
                 </View>
                 {after}
             </View>

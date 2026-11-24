@@ -11,6 +11,16 @@
  * JASSUB), bundle the JS service for Node 8, then write the IPK.
  *
  * Flags: --skip-export  reuse dist/webos/www from a previous run
+ *
+ * Side-by-side test builds: WEBOS_APP_ID (and optionally WEBOS_APP_TITLE)
+ * package the app under another id, so it installs next to the daily app
+ * instead of replacing it, e.g.
+ *
+ *   WEBOS_APP_ID=app.garceslab.anime.visualtest WEBOS_APP_TITLE="GA Visual Test" npm run build:webos
+ *
+ * The relay service is renamed with it (`<id>.service`) and the app is told
+ * its id at export time (EXPO_PUBLIC_WEBOS_APP_ID), so don't combine a custom
+ * id with --skip-export of a default build. Without them the build is unchanged.
  */
 import fs from "node:fs"
 import path from "node:path"
@@ -193,6 +203,20 @@ async function main() {
     const pkg = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"))
     const appinfo = JSON.parse(fs.readFileSync(path.join(webosDir, "appinfo.json"), "utf8"))
     appinfo.version = pkg.version
+    const customId = process.env.WEBOS_APP_ID?.trim()
+    if (customId) {
+        // webOS ids: lowercase letters, digits, dots and dashes, starting with a letter.
+        if (!/^[a-z][a-z0-9.-]*$/.test(customId)) {
+            throw new Error(`WEBOS_APP_ID "${customId}" is not a valid webOS app id (lowercase letters, digits, "." and "-")`)
+        }
+        appinfo.id = customId
+        appinfo.title = process.env.WEBOS_APP_TITLE?.trim() || `${appinfo.title} (${customId})`
+        // Read by luna-websocket.ts, inlined by the Expo export.
+        process.env.EXPO_PUBLIC_WEBOS_APP_ID = customId
+        log(`Side-by-side build: ${appinfo.id} "${appinfo.title}"`)
+    } else {
+        delete process.env.EXPO_PUBLIC_WEBOS_APP_ID
+    }
     // Checked first so a bad image fails the build before the slow export.
     const images = Object.entries(APPINFO_IMAGES).filter(([field]) => appinfo[field])
     for (const [field, size] of images) checkPng(path.join(webosDir, appinfo[field]), field, size)
