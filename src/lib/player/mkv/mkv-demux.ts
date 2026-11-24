@@ -78,7 +78,10 @@ export type MkvIndex = {
     cues: MkvCue[]
     /** The file has a Cues element at all. */
     hasCues: boolean
+    /** Listed when the Attachments element was in the header reads; see readAttachedFiles. */
     attachments: MkvAttachment[]
+    /** Where the Attachments element is, for reading the fonts later. */
+    attachmentsElement: { start: number; dataStart: number; size: number } | null
     chapters: Array<{ start: number; title?: string }>
     /** Where the first Cluster starts, when the header walk reached it. */
     firstClusterPosition: number | null
@@ -254,46 +257,55 @@ function parseChapters(window: ByteWindow, chapters: ElementHeader): MkvIndex["c
     return out
 }
 
-/**
- * The AttachedFile entries: names and where their data is, without reading
- * the data. Each entry is a few small reads (the name comes before the data).
- */
-async function listAttachments(reader: RangeReader, attachments: ElementHeader): Promise<MkvAttachment[]> {
+/** The AttachedFile entries in `window` (names and where their data is), without reading more. */
+function parseAttachments(window: ByteWindow, attachments: ElementHeader): MkvAttachment[] {
     const out: MkvAttachment[] = []
-    const end = attachments.dataStart + (attachments.size ?? 0)
-    let at = attachments.dataStart
-    while (at < end && out.length < MAX_ATTACHMENTS) {
-        const window = await readWindow(reader, at, 1024)
-        const file = readElementHeader(window, at)
-        if (!file || file.size === null) break
-        if (file.id === ID.AttachedFile) {
-            const entry: MkvAttachment = { name: "", mediaType: "", dataStart: 0, size: 0 }
-            let field = file.dataStart
-            let current = window
-            const fileEnd = file.dataStart + file.size
-            while (field < fileEnd) {
-                let header = readElementHeader(current, field)
-                if (!header) {
-                    current = await readWindow(reader, field, 1024)
-                    header = readElementHeader(current, field)
-                }
-                if (!header || header.size === null) break
-                if (header.id === ID.FileData) {
-                    entry.dataStart = header.dataStart
-                    entry.size = header.size
-                } else if (header.id === ID.FileName || header.id === ID.FileMediaType) {
-                    if (!hasData(current, header)) current = await readWindow(reader, field, header.dataStart - field + header.size)
-                    const value = readString(dataOf(current, header))
-                    if (header.id === ID.FileName) entry.name = value
-                    else entry.mediaType = value
-                }
-                field = header.dataStart + header.size
+    for (const file of children(window, attachments)) {
+        if (file.id !== ID.AttachedFile || out.length >= MAX_ATTACHMENTS) continue
+        const entry: MkvAttachment = { name: "", mediaType: "", dataStart: 0, size: 0 }
+        for (const field of children(window, file)) {
+            if (field.id === ID.FileData) {
+                entry.dataStart = field.dataStart
+                entry.size = field.size ?? 0
+            } else if (field.id === ID.FileName) {
+                entry.name = readString(dataOf(window, field))
+            } else if (field.id === ID.FileMediaType) {
+                entry.mediaType = readString(dataOf(window, field))
             }
-            if (entry.size > 0) out.push(entry)
         }
-        at = file.dataStart + file.size
+        if (entry.size > 0) out.push(entry)
     }
     return out
+}
+
+export type AttachedFile = MkvAttachment & { data: Uint8Array }
+
+/**
+ * Reads the Attachments element in a few large reads (the CDN rate-limits
+ * many small ones) and returns its files. Null when it is bigger than
+ * `maxBytes`, or the file has none.
+ */
+export async function readAttachedFiles(reader: RangeReader, index: MkvIndex, { maxBytes = 40 * 1024 * 1024, chunkBytes = 8 * 1024 * 1024 } = {}): Promise<AttachedFile[] | null> {
+    const element = index.attachmentsElement
+    if (!element) return []
+    const total = element.dataStart - element.start + element.size
+    if (total > maxBytes) return null
+    const bytes = new Uint8Array(total)
+    let filled = 0
+    while (filled < total) {
+        const part = await reader.read(element.start + filled, Math.min(chunkBytes, total - filled))
+        if (part.length === 0) break
+        bytes.set(part.subarray(0, total - filled), filled)
+        filled += part.length
+    }
+    const window = { offset: element.start, bytes: bytes.subarray(0, filled) }
+    const header = readElementHeader(window, element.start)
+    if (!header || header.id !== ID.Attachments) throw new MkvError("No Attachments element where the SeekHead said")
+    const files = parseAttachments(window, header)
+    index.attachments = files
+    return files
+        .filter(file => file.dataStart + file.size <= window.offset + window.bytes.length)
+        .map(file => ({ ...file, data: window.bytes.slice(file.dataStart - window.offset, file.dataStart - window.offset + file.size) }))
 }
 
 /** Whether an attachment is a font libass can use. */
@@ -304,10 +316,10 @@ export function isFontAttachment(attachment: Pick<MkvAttachment, "name" | "media
 /**
  * Reads the file's header: the EBML header, the Segment's top-level
  * elements up to the first Cluster, and whatever the SeekHead points at
- * past them (Cues at the end of the file, usually). `withAttachments` also
- * lists the attached files.
+ * past them (Cues at the end of the file, usually). Attachments are only
+ * located; readAttachedFiles reads them.
  */
-export async function readMkvIndex(reader: RangeReader, { withAttachments = true } = {}): Promise<MkvIndex> {
+export async function readMkvIndex(reader: RangeReader): Promise<MkvIndex> {
     const head = await readWindow(reader, 0, HEAD_BYTES)
     const ebml = readElementHeader(head, 0)
     if (!ebml || ebml.id !== ID.EBML || ebml.size === null) throw new MkvError("Not a Matroska file (no EBML header)")
@@ -332,6 +344,7 @@ export async function readMkvIndex(reader: RangeReader, { withAttachments = true
         cues: [],
         hasCues: false,
         attachments: [],
+        attachmentsElement: null,
         chapters: [],
         firstClusterPosition: null,
     }
@@ -379,7 +392,9 @@ export async function readMkvIndex(reader: RangeReader, { withAttachments = true
                 index.chapters = parseChapters(window, header)
                 break
             case ID.Attachments:
-                if (withAttachments) index.attachments = await listAttachments(reader, header)
+                // No reads here: the fonts are read later in large pieces (readAttachedFiles).
+                if (header.size !== null) index.attachmentsElement = { start: header.start, dataStart: header.dataStart, size: header.size }
+                if (hasData(window, header)) index.attachments = parseAttachments(window, header)
                 break
         }
     }

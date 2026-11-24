@@ -6,18 +6,35 @@
  */
 import type { RangeReader } from "./mkv-demux.ts"
 
-export type RangeFetchErrorKind = "cors" | "network" | "http" | "no-range" | "timeout" | "relay"
+export type RangeFetchErrorKind = "cors" | "network" | "http" | "no-range" | "timeout" | "relay" | "rate-limit"
 
 export class RangeFetchError extends Error {
     readonly kind: RangeFetchErrorKind
     readonly status?: number
+    /** From a Retry-After header, when the response let us read it. */
+    readonly retryAfterMs?: number
 
-    constructor(kind: RangeFetchErrorKind, message: string, status?: number) {
+    constructor(kind: RangeFetchErrorKind, message: string, status?: number, retryAfterMs?: number) {
         super(message)
         this.name = "RangeFetchError"
         this.kind = kind
         this.status = status
+        this.retryAfterMs = retryAfterMs
     }
+}
+
+/** The CDN asks us to slow down (429 Too Many Requests, 503 Service Unavailable). */
+export function isRateLimited(error: unknown) {
+    return error instanceof RangeFetchError && (error.kind === "rate-limit" || error.status === 429 || error.status === 503)
+}
+
+/** Retry-After as milliseconds: delay-seconds or an HTTP date. */
+export function parseRetryAfter(value: string | null | undefined, now = Date.now()): number | undefined {
+    if (!value) return undefined
+    const trimmed = value.trim()
+    if (/^\d+$/.test(trimmed)) return Number(trimmed) * 1000
+    const date = Date.parse(trimmed)
+    return Number.isFinite(date) ? Math.max(0, date - now) : undefined
 }
 
 /** Errors that another try won't fix: stop and say so. */
@@ -97,7 +114,9 @@ export function createFetchRangeReader(url: string, options: FetchRangeReaderOpt
             }
             if (response.status !== 206) {
                 controller?.abort()
-                throw new RangeFetchError("http", `HTTP ${response.status}`, response.status)
+                // Retry-After is only readable when the CDN exposes it to CORS requests.
+                const retryAfter = parseRetryAfter(response.headers.get("retry-after"), now())
+                throw new RangeFetchError("http", `HTTP ${response.status}`, response.status, retryAfter)
             }
             // Content-Range is only readable when the CDN exposes it to CORS requests.
             size ??= totalFromContentRange(response.headers.get("content-range"))
@@ -149,4 +168,115 @@ export function base64ToBytes(data: string): Uint8Array {
     const bytes = new Uint8Array(binary.length)
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
     return bytes
+}
+
+export type PacedReaderStats = {
+    /** Requests sent to the CDN (retries included). */
+    requests: number
+    /** 429 and 503 answers. */
+    rateLimited: number
+    retries: number
+    bytes: number
+    /** Size of the read in flight, or null. */
+    currentRead: number | null
+    /** While backing off: until when (epoch ms) and why. */
+    backoffUntil: number | null
+    backoffReason: string | null
+    /** Reads waiting their turn. */
+    queued: number
+    lastError: string | null
+}
+
+export type PacedReaderOptions = {
+    /** Least time between two requests. */
+    minGapMs?: number
+    /** Tries per read before giving up (429/503 and network errors). */
+    maxAttempts?: number
+    baseBackoffMs?: number
+    maxBackoffMs?: number
+    now?: () => number
+    sleep?: (ms: number) => Promise<void>
+    onStats?: (stats: PacedReaderStats) => void
+}
+
+/**
+ * One read at a time, at least `minGapMs` apart: the debrid CDN throttles
+ * a client that sends many requests while its <video> streams from it too.
+ * A 429 or 503 waits for Retry-After (or 2 s, 4 s, … up to 60 s) and tries
+ * again quietly; a network error too. Errors another try won't fix (CORS,
+ * no Range support, an expired link) are thrown at once.
+ */
+export function createPacedReader(reader: RangeReader, options: PacedReaderOptions = {}): RangeReader & { stats: () => PacedReaderStats } {
+    const minGapMs = options.minGapMs ?? 1000
+    const maxAttempts = options.maxAttempts ?? 6
+    const baseBackoffMs = options.baseBackoffMs ?? 2000
+    const maxBackoffMs = options.maxBackoffMs ?? 60_000
+    const now = options.now ?? (() => Date.now())
+    const sleep = options.sleep ?? (ms => new Promise<void>(resolve => setTimeout(resolve, ms)))
+    const stats: PacedReaderStats = {
+        requests: 0, rateLimited: 0, retries: 0, bytes: 0, currentRead: null, backoffUntil: null, backoffReason: null, queued: 0, lastError: null,
+    }
+    const report = () => options.onStats?.({ ...stats })
+    let lastRequestAt = -Infinity
+    let chain: Promise<unknown> = Promise.resolve()
+
+    const run = async (start: number, length: number): Promise<Uint8Array> => {
+        for (let attempt = 1; ; attempt++) {
+            const wait = lastRequestAt + minGapMs - now()
+            if (wait > 0) await sleep(wait)
+            lastRequestAt = now()
+            stats.requests++
+            stats.currentRead = length
+            report()
+            try {
+                const bytes = await reader.read(start, length)
+                stats.bytes += bytes.length
+                stats.currentRead = null
+                stats.backoffUntil = null
+                stats.backoffReason = null
+                report()
+                return bytes
+            } catch (error) {
+                stats.currentRead = null
+                const limited = isRateLimited(error)
+                const retryable = limited || (error instanceof RangeFetchError && (error.kind === "network" || error.kind === "timeout"))
+                    || (error instanceof RangeFetchError && error.kind === "http" && (error.status ?? 0) >= 500)
+                stats.lastError = error instanceof Error ? error.message : String(error)
+                if (limited) stats.rateLimited++
+                if (!retryable || attempt >= maxAttempts) {
+                    stats.backoffUntil = null
+                    stats.backoffReason = null
+                    report()
+                    if (limited) {
+                        throw new RangeFetchError("rate-limit", `The CDN kept answering ${(error as RangeFetchError).status ?? 429} after ${attempt} tries`, (error as RangeFetchError).status)
+                    }
+                    throw error
+                }
+                const hinted = error instanceof RangeFetchError ? error.retryAfterMs : undefined
+                const delay = Math.min(maxBackoffMs, hinted ?? baseBackoffMs * 2 ** (attempt - 1))
+                stats.retries++
+                stats.backoffUntil = now() + delay
+                stats.backoffReason = limited ? `HTTP ${(error as RangeFetchError).status ?? 429}${hinted !== undefined ? " (Retry-After)" : ""}` : stats.lastError
+                report()
+                await sleep(delay)
+                // The wait was the gap.
+                lastRequestAt = -Infinity
+            }
+        }
+    }
+
+    return {
+        size: reader.size,
+        stats: () => ({ ...stats }),
+        read: (start, length) => {
+            stats.queued++
+            const result = chain.then(() => {
+                stats.queued--
+                return run(start, length)
+            })
+            // The next read waits for this one, whether it worked or not.
+            chain = result.catch(() => undefined)
+            return result
+        },
+    }
 }

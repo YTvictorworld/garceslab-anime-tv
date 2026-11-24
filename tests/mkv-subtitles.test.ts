@@ -4,7 +4,7 @@ import test from "node:test"
 import zlib from "node:zlib"
 import { inflateRaw, inflateZlib } from "../src/lib/player/mkv/inflate.ts"
 import { parseBlock, readMkvIndex, type RangeReader, toMkvMetadata, utf8ToAssText } from "../src/lib/player/mkv/mkv-demux.ts"
-import { chooseStrategy, createSubtitleExtractor } from "../src/lib/player/mkv/subtitle-extractor.ts"
+import { chooseStrategy, coalesceRanges, createSubtitleExtractor } from "../src/lib/player/mkv/subtitle-extractor.ts"
 import { describeStreamCodecs } from "../src/lib/player/direct-stream-format.ts"
 import type { MpvStreamedSubtitleLine } from "../modules/expo-mpv-player/src/MpvPlayer.types.ts"
 
@@ -31,11 +31,11 @@ function fileReader(name: string) {
     return reader
 }
 
-async function extractAll(name: string, strategy: "auto" | "cues" | "scan" = "auto", seekTo = 0) {
+async function extractAll(name: string, strategy: "auto" | "cues" | "scan" = "auto", seekTo = 0, extra: Partial<Parameters<typeof createSubtitleExtractor>[0]> = {}) {
     const reader = fileReader(name)
     const index = await readMkvIndex(reader)
     const lines: MpvStreamedSubtitleLine[] = []
-    const extractor = createSubtitleExtractor({ reader, index, strategy, lookaheadSec: 1000, onLines: received => lines.push(...received) })
+    const extractor = createSubtitleExtractor({ reader, index, strategy, lookaheadSec: 1000, backgroundGapMs: 0, onLines: received => lines.push(...received), ...extra })
     extractor.seek(seekTo)
     await extractor.idle()
     // The scan reads up to the lookahead from the seek point; keep going to the end.
@@ -113,10 +113,8 @@ for (const name of ["ffmpeg-sample.mkv", "mkvmerge-sample.mkv", "mkvmerge-zlib.m
         assert.equal(stats.strategy, "cues")
         checkLines(lines, 4, 5)
         assert.equal(stats.errors.length, 0, stats.errors.join("; "))
-        // Small reads around each subtitle block, never whole clusters: a few per indexed cluster.
-        const extractorCalls = reader.calls.slice(reader.calls.length - stats.requests)
-        assert.ok(extractorCalls.every(([, length]) => length <= 48 * 1024), JSON.stringify(extractorCalls))
-        assert.ok(stats.requests <= stats.total * 2, `${stats.requests} requests for ${stats.total} blocks`)
+        // The CDN rate-limits many small reads: the blocks of this small file merge into one or two.
+        assert.ok(stats.requests <= 2, `${stats.requests} requests for ${stats.total} blocks`)
         if (name === "mkvmerge-zlib.mkv") assert.equal(index.tracks[3].compression?.algo, 0)
     })
 }
@@ -143,7 +141,8 @@ test("a seek far ahead reads lines there first", async () => {
     const reader = fileReader("mkvmerge-sample.mkv")
     const index = await readMkvIndex(reader)
     const batches: MpvStreamedSubtitleLine[][] = []
-    const extractor = createSubtitleExtractor({ reader, index, concurrency: 1, onLines: lines => batches.push(lines) })
+    // Small reads, so the order shows.
+    const extractor = createSubtitleExtractor({ reader, index, mergeGapBytes: 0, maxReadBytes: 64 * 1024, backgroundGapMs: 0, onLines: lines => batches.push(lines) })
     extractor.seek(45)
     await extractor.idle()
     assert.ok(batches[0].every(line => line.start >= 35), JSON.stringify(batches[0].map(line => line.start)))
@@ -182,4 +181,51 @@ test("laced blocks split into frames", () => {
 
 test("SRT markup becomes ASS overrides", () => {
     assert.equal(utf8ToAssText("<b>Hi</b> &amp; <font color=\"#fff\">bye</font>\r\nnext"), "{\\b1}Hi{\\b0} & bye\\Nnext")
+})
+
+for (const name of ["ffmpeg-sample.mkv", "mkvmerge-sample.mkv", "mkvmerge-zlib.mkv"]) {
+    test(`${name}: one read per block (nothing merged) still finds every block`, async () => {
+        // Each read starts after its cluster's header, whose length is then found from the block.
+        const { lines, stats } = await extractAll(name, "cues", 0, { mergeGapBytes: 0, maxReadBytes: 16 * 1024 })
+        checkLines(lines, 4, 5)
+        assert.equal(stats.errors.length, 0, stats.errors.join("; "))
+        assert.ok(stats.requests >= 20, `${stats.requests} requests`)
+    })
+}
+
+test("nearby ranges merge up to the size cap, far ones don't", () => {
+    const ranges = [
+        { minStart: 0, maxEnd: 100 },
+        { minStart: 500, maxEnd: 600 },
+        { minStart: 5000, maxEnd: 5100 },
+        { minStart: 5200, maxEnd: 9000 },
+        { minStart: 9100, maxEnd: 9200 },
+    ]
+    assert.deepEqual(coalesceRanges(ranges, 1000, 10_000).map(read => [read.start, read.end, read.items.length]), [[0, 600, 2], [5000, 9200, 3]])
+    assert.deepEqual(coalesceRanges(ranges, 1000, 4000).map(read => [read.start, read.end]), [[0, 600], [5000, 9000], [9100, 9200]])
+    assert.deepEqual(coalesceRanges(ranges, 100_000, 100_000).map(read => read.items.length), [5])
+})
+
+test("the scan reads the file in large chunks", async () => {
+    const { lines, stats } = await extractAll("mkvmerge-nocues.mkv", "scan", 0, { scanChunkBytes: 128 * 1024 })
+    checkLines(lines, 4, 5)
+    assert.ok(stats.requests <= 6, `${stats.requests} requests`)
+})
+
+test("while the video buffers, only the playhead's lines are read", async () => {
+    const reader = fileReader("mkvmerge-sample.mkv")
+    const index = await readMkvIndex(reader)
+    const lines: MpvStreamedSubtitleLine[] = []
+    const extractor = createSubtitleExtractor({
+        reader, index, mergeGapBytes: 0, maxReadBytes: 16 * 1024, foregroundSec: 10, backgroundGapMs: 0,
+        onLines: received => lines.push(...received),
+    })
+    extractor.setBackgroundPaused(true)
+    extractor.seek(30)
+    await extractor.idle()
+    assert.ok(lines.length > 0)
+    assert.ok(lines.every(line => line.start >= 20 && line.start <= 40), JSON.stringify(lines.map(line => line.start)))
+    extractor.setBackgroundPaused(false)
+    await extractor.idle()
+    assert.equal(lines.length, 50)
 })

@@ -695,12 +695,20 @@ streams play as usual.
   starting its direct stream. No server change is needed.
 - **Video:** the link goes straight into the TV's `<video>`.
 - **Subtitles:** read on the TV from the MKV with HTTP Range requests
-  (`src/lib/player/mkv/`): the header (Tracks, Cues, attachments) first, then only the
-  subtitle blocks. When the Cues index the subtitle blocks (mkvmerge and ffmpeg write
-  them), each line is one small read, near the playhead first and then the rest of the
-  file in the background. Otherwise whole clusters are read a minute ahead of playback
-  (this downloads the file twice; the diagnostics say which way was used). ASS is drawn
-  with JASSUB/libass with the file's fonts, SRT as text. Image subtitles (PGS) are not read.
+  (`src/lib/player/mkv/`): the header (Tracks, Cues) first, then only the subtitle blocks.
+  TorBox's CDN answers **429** to a client that sends many requests while its `<video>`
+  streams from it, so the reads are few and large: the blocks the Cues point at are
+  merged into one read when less than 2 MiB lies between them (at most 6 MiB a read), one
+  request at a time and at least 1 s apart (`EXPO_PUBLIC_DIRECT_PLAY_MIN_GAP_MS` at build
+  time changes the gap). The lines from the playhead up to 90 s ahead come first; the rest
+  of the file follows in the background (2 s between reads), which stops while the video
+  buffers or seeks. A 429 or 503 waits for Retry-After (when the CDN lets the page read
+  it) or 2 s, 4 s, … up to 60 s and tries again quietly; reading only gives up, with the
+  dialog below, after several failures in a row **and** with no lines near the playhead.
+  Without Cues for the subtitle blocks, the file is read in 4 MiB chunks a minute ahead of
+  playback (a second download, paced to playback). Fonts (the Attachments element) are
+  read in a few large reads after the first subtitle reads. ASS is drawn with
+  JASSUB/libass with the file's fonts, SRT as text. Image subtitles (PGS) are not read.
 - **CORS:** the reads use `fetch` first. If the CDN doesn't allow the app's origin, the
   ranges go through the app's JS service (`range` method), never the video, and a toast
   says so.
@@ -712,8 +720,9 @@ streams play as usual.
   subtitles: CORS on subtitle fetch") with **Retry via server**, which starts the same
   release through the server's direct stream. A playback error shows the same button.
 - **Diagnostics:** press **Info** (the player stats) to show the direct-play panel: reader
-  path and CORS, container and muxer, codecs, subtitle tracks with lines read, strategy,
-  reads and bytes, fonts, audio tracks and `audioTracks` support and switches, buffered
+  path and CORS, container and muxer, codecs, **CDN requests, 429/503 answers, retries,
+  bytes, the read in flight and any backoff**, subtitle tracks with lines read, strategy,
+  fonts, audio tracks and `audioTracks` support and switches, buffered
   ranges, the last seek's latency, MediaError and errors. The same summary goes to the
   debug log (see below) every minute and when the episode closes, prefixed
   `[direct-play] Direct play summary`. It never contains the link.

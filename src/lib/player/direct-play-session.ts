@@ -17,17 +17,27 @@ import { canUseRelayRanges, createRelayRangeReader } from "@/lib/webos/luna-rang
 import React from "react"
 import { describeStreamCodecs, directStreamChapters } from "./direct-stream"
 import { describeRanges, directPlayDiagnostics, summarizeDiagnostics } from "./direct-play-diagnostics"
-import { isFontAttachment, isTextSubtitle, type MkvIndex, MkvError, readMkvIndex, type RangeReader, toMkvMetadata } from "./mkv/mkv-demux"
-import { createFetchRangeReader, isFatalRangeError, RangeFetchError, type ReaderEvent } from "./mkv/range-reader"
+import { isFontAttachment, isTextSubtitle, type MkvIndex, MkvError, readAttachedFiles, readMkvIndex, type RangeReader, toMkvMetadata } from "./mkv/mkv-demux"
+import { chunkedReader, createFetchRangeReader, createPacedReader, isFatalRangeError, RangeFetchError, type ReaderEvent } from "./mkv/range-reader"
 import { createSubtitleExtractor, type SubtitleExtractor } from "./mkv/subtitle-extractor"
 import type { MobilePlaybackSource, WebPlaybackPlan } from "./types"
 
 const log = logger("direct-play")
 
-/** Past this the video starts without the file's subtitles (and says so). */
-const HEADER_TIMEOUT_MS = 10_000
-const MAX_FONT_BYTES = 12 * 1024 * 1024
-const MAX_FONTS_TOTAL = 40 * 1024 * 1024
+/** Past this the video starts without the file's subtitles (and says so); reads are paced and may back off. */
+const HEADER_TIMEOUT_MS = 25_000
+/** Attachments bigger than this are not read (all fonts come in one go). */
+const MAX_ATTACHMENTS_BYTES = 40 * 1024 * 1024
+/** Fonts wait this long, so the first subtitle reads go out before them. */
+const FONTS_DELAY_MS = 4000
+/**
+ * Least time between two subtitle/header/font requests to the CDN, which
+ * throttles a client whose <video> also streams from it. Build-time
+ * override: EXPO_PUBLIC_DIRECT_PLAY_MIN_GAP_MS.
+ */
+const MIN_GAP_MS = Number(process.env.EXPO_PUBLIC_DIRECT_PLAY_MIN_GAP_MS) || 1000
+/** The relay service takes at most this per call. */
+const RELAY_CALL_BYTES = 1024 * 1024
 const SUMMARY_INTERVAL_MS = 60_000
 const POLL_MS = 1000
 
@@ -44,6 +54,7 @@ function describeError(error: unknown): string {
             case "http": return `the CDN answered ${error.message}${error.status === 403 || error.status === 410 ? " (link expired?)" : ""}`
             case "timeout": return `the CDN did not answer (${error.message})`
             case "relay": return `the app's relay service failed (${error.message})`
+            case "rate-limit": return `the CDN kept rate-limiting the reads (${error.message})`
             default: return `network error (${error.message})`
         }
     }
@@ -125,19 +136,48 @@ function createFontStore(): MpvFontData & { add: (font: Uint8Array) => void; cle
     }
 }
 
+/**
+ * The session's one reader: paced (one request at a time, MIN_GAP_MS apart,
+ * backing off on 429/503), on the page's fetch, or on the relay service
+ * once CORS turned out to block fetch.
+ */
+function createSessionReader(url: string) {
+    let relay: RangeReader | null = null
+    const fetchReader = createFetchRangeReader(url, { onRead: countingRead })
+    const paced = createPacedReader({
+        read: (start, length) => (relay ?? fetchReader).read(start, length),
+        size: () => (relay ?? fetchReader).size(),
+    }, {
+        minGapMs: MIN_GAP_MS,
+        onStats: network => directPlayDiagnostics.update({ network }),
+    })
+    // Over the relay, each call is at most 1 MiB, and each one is paced.
+    const relayChunks = chunkedReader(paced, RELAY_CALL_BYTES)
+    const reader: RangeReader = {
+        read: (start, length) => (relay ? relayChunks : paced).read(start, length),
+        size: paced.size,
+    }
+    return {
+        reader,
+        useRelay: () => {
+            relay = createRelayRangeReader(url, countingRead)
+        },
+    }
+}
+
 /** Reads the header with the page's fetch, or through the relay service when CORS blocks that. */
 async function openFile(url: string): Promise<{ reader: RangeReader; index: MkvIndex; path: "fetch" | "relay" }> {
     const began = Date.now()
-    const fetchReader = createFetchRangeReader(url, { onRead: countingRead })
+    const session = createSessionReader(url)
     try {
-        const index = await withTimeout(readMkvIndex(fetchReader), HEADER_TIMEOUT_MS, "Reading the file's header")
+        const index = await withTimeout(readMkvIndex(session.reader), HEADER_TIMEOUT_MS, "Reading the file's header")
         directPlayDiagnostics.update(d => ({
             headerMs: Date.now() - began,
             headerRequests: d.reads.count,
             headerBytes: d.reads.bytes,
             cors: [...d.cors, "fetch with Range from the app works (the CDN allows this origin)"],
         }))
-        return { reader: fetchReader, index, path: "fetch" }
+        return { reader: session.reader, index, path: "fetch" }
     } catch (error) {
         if (!(error instanceof RangeFetchError && error.kind === "cors")) throw error
         directPlayDiagnostics.update(d => ({ cors: [...d.cors, "fetch with Range is blocked by CORS"] }))
@@ -145,46 +185,43 @@ async function openFile(url: string): Promise<{ reader: RangeReader; index: MkvI
         log.warning("CORS blocks the subtitle reads; using the app's relay service for them")
         toast.warning("Direct play: CORS blocks reading subtitles from the CDN, so they go through the app's service (video still direct).", { visibilityTime: 6000 })
         const relayBegan = Date.now()
-        const relayReader = createRelayRangeReader(url, countingRead)
-        const index = await withTimeout(readMkvIndex(relayReader), HEADER_TIMEOUT_MS * 2, "Reading the file's header through the service")
+        session.useRelay()
+        const index = await withTimeout(readMkvIndex(session.reader), HEADER_TIMEOUT_MS * 2, "Reading the file's header through the service")
         directPlayDiagnostics.update(d => ({
             headerMs: Date.now() - relayBegan,
             headerRequests: d.reads.count,
             headerBytes: d.reads.bytes,
             cors: [...d.cors, "the relay service reads the ranges fine"],
         }))
-        return { reader: relayReader, index, path: "relay" }
+        return { reader: session.reader, index, path: "relay" }
     }
 }
 
-/** Fonts the file carries, read after playback starts and handed to libass as they come. */
+/** Fonts the file carries: the Attachments element in a few large reads, handed to libass as they come. */
 async function loadFonts(reader: RangeReader, index: MkvIndex, store: ReturnType<typeof createFontStore>, cancelled: () => boolean) {
-    const fonts = index.attachments.filter(isFontAttachment)
-    directPlayDiagnostics.update(d => ({ fonts: { ...d.fonts, listed: fonts.length } }))
-    let total = 0
-    for (const font of fonts) {
+    if (!index.attachmentsElement) return
+    try {
+        const files = await readAttachedFiles(reader, index, { maxBytes: MAX_ATTACHMENTS_BYTES, chunkBytes: 6 * 1024 * 1024 })
         if (cancelled()) return
-        if (font.size > MAX_FONT_BYTES || total + font.size > MAX_FONTS_TOTAL) {
-            directPlayDiagnostics.update(d => ({ fonts: { ...d.fonts, error: `skipped ${font.name} (${(font.size / 1048576).toFixed(1)} MiB, over the spike's limit)` } }))
-            continue
+        if (files === null) {
+            directPlayDiagnostics.update(d => ({ fonts: { ...d.fonts, error: `attachments over ${MAX_ATTACHMENTS_BYTES / 1048576} MiB, not read` } }))
+            return
         }
-        try {
-            const data = await reader.read(font.dataStart, font.size)
-            if (cancelled()) return
-            total += data.length
-            store.add(data)
-            directPlayDiagnostics.update(d => ({ fonts: { ...d.fonts, loaded: d.fonts.loaded + 1, bytes: d.fonts.bytes + data.length } }))
-        } catch (error) {
-            directPlayDiagnostics.update(d => ({ fonts: { ...d.fonts, error: `${font.name}: ${describeError(error)}` } }))
-            if (isFatalRangeError(error)) return
+        const fonts = files.filter(isFontAttachment)
+        directPlayDiagnostics.update(d => ({ fonts: { ...d.fonts, listed: fonts.length } }))
+        for (const font of fonts) {
+            store.add(font.data)
+            directPlayDiagnostics.update(d => ({ fonts: { ...d.fonts, loaded: d.fonts.loaded + 1, bytes: d.fonts.bytes + font.data.length } }))
         }
+    } catch (error) {
+        directPlayDiagnostics.update(d => ({ fonts: { ...d.fonts, error: describeError(error) } }))
     }
 }
 
 type BrowserAudioTrackList = { length: number; [index: number]: { enabled: boolean; label?: string; language?: string }; addEventListener?: (type: string, listener: () => void) => void; removeEventListener?: (type: string, listener: () => void) => void }
 
 /** Follows the page's <video> for the diagnostics: buffering, seeks, errors, audio tracks. */
-function watchVideo(cancelled: () => boolean): () => void {
+function watchVideo(cancelled: () => boolean, onBuffering: (buffering: boolean) => void): () => void {
     let video: HTMLVideoElement | null = null
     let seekStarted = 0
     let lastTime = 0
@@ -203,7 +240,10 @@ function watchVideo(cancelled: () => boolean): () => void {
             element.addEventListener(type, listener)
             detach.push(() => element.removeEventListener(type, listener))
         }
+        // The background subtitle reads give the video the line while it buffers or seeks.
+        on("waiting", () => onBuffering(true))
         on("seeking", () => {
+            onBuffering(true)
             seekStarted = Date.now()
             awaitingPlaying = true
             directPlayDiagnostics.update(d => ({ seeks: d.seeks + 1, lastSeek: { from: lastTime, to: element.currentTime, seekedMs: null, playingMs: null } }))
@@ -213,6 +253,7 @@ function watchVideo(cancelled: () => boolean): () => void {
             directPlayDiagnostics.update(d => d.lastSeek ? { lastSeek: { ...d.lastSeek, seekedMs: ms } } : {})
         })
         on("playing", () => {
+            onBuffering(false)
             if (!awaitingPlaying) return
             awaitingPlaying = false
             const ms = Date.now() - seekStarted
@@ -286,7 +327,8 @@ async function startSession(source: MobilePlaybackSource, isCurrent: () => boole
 
     let disposed = false
     const cancelled = () => disposed || !isCurrent()
-    const stopWatching = watchVideo(cancelled)
+    let pauseBackground: (buffering: boolean) => void = () => {}
+    const stopWatching = watchVideo(cancelled, buffering => pauseBackground(buffering))
     const summaryTimer = setInterval(() => logSummary("periodic"), SUMMARY_INTERVAL_MS)
     const fonts = createFontStore()
     let extractor: SubtitleExtractor | null = null
@@ -383,7 +425,11 @@ async function startSession(source: MobilePlaybackSource, isCurrent: () => boole
     })
     const subtitleReader = extractor
     subtitleReader.seek(source.resumePositionSec ?? 0)
-    void loadFonts(reader, index, fonts, cancelled)
+    pauseBackground = buffering => subtitleReader.setBackgroundPaused(buffering)
+    // After the first subtitle reads: they share one paced queue.
+    setTimeout(() => {
+        if (!cancelled()) void loadFonts(reader, index, fonts, cancelled)
+    }, FONTS_DELAY_MS)
 
     plan.streamedSubtitles = store.streamed
     plan.audioTracks = codecs.audioTracks

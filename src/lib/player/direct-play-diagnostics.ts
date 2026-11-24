@@ -4,6 +4,7 @@
  * the debrid URL: it carries the account's access token.
  * Kept free of React Native (and of `@/` imports) so the tests load it.
  */
+import type { PacedReaderStats } from "./mkv/range-reader.ts"
 import type { ExtractorStats } from "./mkv/subtitle-extractor.ts"
 
 export type DirectPlaySubtitleTrack = {
@@ -33,6 +34,8 @@ export type DirectPlayDiagnostics = {
     subtitleTracks: DirectPlaySubtitleTrack[]
     audioTracks: DirectPlayAudioTrack[]
     extractor: ExtractorStats | null
+    /** The paced reader's counts: every subtitle, header and font request to the CDN. */
+    network: PacedReaderStats | null
     fonts: { listed: number; loaded: number; bytes: number; error?: string }
     /** The <video>'s audioTracks API. */
     audioApi: { available: boolean; count: number; enabled: number; changes: number; lastChange: string | null }
@@ -65,6 +68,7 @@ function fresh(sourceId: string | null): DirectPlayDiagnostics {
         subtitleTracks: [],
         audioTracks: [],
         extractor: null,
+        network: null,
         fonts: { listed: 0, loaded: 0, bytes: 0 },
         audioApi: { available: false, count: 0, enabled: -1, changes: 0, lastChange: null },
         buffered: "",
@@ -126,6 +130,9 @@ export function describeRanges(ranges: { length: number; start: (i: number) => n
     return parts.join(", ")
 }
 
+const kib = (bytes: number) => (bytes / 1024).toFixed(0)
+const mib = (bytes: number) => (bytes / 1048576).toFixed(1)
+
 /** One line per finding, for the log and for reading off a screenshot. */
 export function summarizeDiagnostics(d: DirectPlayDiagnostics): string[] {
     const lines: string[] = []
@@ -141,8 +148,13 @@ export function summarizeDiagnostics(d: DirectPlayDiagnostics): string[] {
     for (const cors of d.cors) lines.push(`cors: ${cors}`)
     const subs = d.subtitleTracks.map(track => `#${track.number} ${track.codec}${track.language ? ` ${track.language}` : ""}${track.supported ? `: ${x?.lines[track.number] ?? 0} lines` : " (not read)"}`)
     lines.push(`subtitle tracks: ${subs.length ? subs.join("; ") : "none"}`)
+    const n = d.network
+    if (n) {
+        const backoff = n.backoffUntil !== null ? `BACKING OFF ${Math.max(0, (n.backoffUntil - Date.now()) / 1000).toFixed(0)} s (${n.backoffReason ?? "?"})` : "no backoff"
+        lines.push(`CDN requests (subs+header+fonts): ${n.requests}, 429/503: ${n.rateLimited}, retries: ${n.retries}, ${mib(n.bytes)} MiB; reading now: ${n.currentRead !== null ? `${kib(n.currentRead)} KiB` : "—"}; queued ${n.queued}; ${backoff}`)
+    }
     if (x) {
-        lines.push(`subtitles: ${x.strategy} (${x.reason}); ${x.done}/${x.total || "?"} ${x.strategy === "scan" ? "clusters" : "blocks"}, ${x.requests} reads, ${(x.bytes / 1024).toFixed(0)} KiB, first line after ${x.firstLineMs ?? "—"} ms, ahead ${Number.isFinite(x.readAhead) ? `${x.readAhead.toFixed(0)} s` : "all"}${x.finished ? ", finished" : ""}${x.stopped ? ", STOPPED" : ""}`)
+        lines.push(`subtitles: ${x.strategy} (${x.reason}); ${x.done}/${x.total || "?"} ${x.strategy === "scan" ? "clusters" : "blocks"} in ${x.requests} reads (last ${kib(x.lastReadBytes)} KiB), ${mib(x.bytes)} MiB, first line after ${x.firstLineMs ?? "—"} ms, ahead ${Number.isFinite(x.readAhead) ? `${x.readAhead.toFixed(0)} s` : "all"}${x.backgroundPaused ? ", background paused (buffering)" : ""}${x.consecutiveFailures ? `, ${x.consecutiveFailures} failed in a row` : ""}${x.finished ? ", finished" : ""}${x.stopped ? ", STOPPED" : ""}`)
     }
     lines.push(`fonts: ${d.fonts.loaded}/${d.fonts.listed} loaded (${(d.fonts.bytes / 1024).toFixed(0)} KiB)${d.fonts.error ? `, ${d.fonts.error}` : ""}`)
     const audio = d.audioTracks.map(track => `#${track.number} ${track.codec}${track.language ? ` ${track.language}` : ""}${track.default ? " (default)" : ""}`)

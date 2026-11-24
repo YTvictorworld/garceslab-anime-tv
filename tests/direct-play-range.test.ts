@@ -7,7 +7,7 @@ import test from "node:test"
 import { resolve as resolveUrl } from "node:url"
 import { describeRanges, directPlayDiagnostics, summarizeDiagnostics } from "../src/lib/player/direct-play-diagnostics.ts"
 import { readMkvIndex } from "../src/lib/player/mkv/mkv-demux.ts"
-import { chunkedReader, createFetchRangeReader, isFatalRangeError, RangeFetchError, totalFromContentRange } from "../src/lib/player/mkv/range-reader.ts"
+import { chunkedReader, createFetchRangeReader, createPacedReader, isFatalRangeError, parseRetryAfter, RangeFetchError, totalFromContentRange } from "../src/lib/player/mkv/range-reader.ts"
 import { createSubtitleExtractor } from "../src/lib/player/mkv/subtitle-extractor.ts"
 import { createRangeHandler } from "../webos/service/range.ts"
 
@@ -128,4 +128,127 @@ test("the diagnostics summary names every finding without the URL", () => {
     assert.match(text, /last seek: 10 → 900 s, seeked after 850 ms, playing after 1400 ms/)
     assert.doesNotMatch(text, /https?:/)
     assert.equal(describeRanges({ length: 2, start: i => [0, 100][i], end: i => [35.25, 130][i] }), "0.0–35.3, 100.0–130.0")
+})
+
+/** A fake clock: sleep() moves time on at once and records the waits. */
+function fakeClock() {
+    let time = 1_000_000
+    const waits: number[] = []
+    return {
+        now: () => time,
+        sleep: async (ms: number) => {
+            waits.push(Math.round(ms))
+            time += ms
+        },
+        waits,
+    }
+}
+
+function scriptedReader(answers: Array<"ok" | RangeFetchError>) {
+    const calls: number[] = []
+    return {
+        calls,
+        reader: {
+            size: () => null,
+            read: async (start: number, length: number) => {
+                calls.push(start)
+                const answer = answers.shift() ?? "ok"
+                if (answer !== "ok") throw answer
+                return new Uint8Array(length)
+            },
+        },
+    }
+}
+
+test("Retry-After is read as seconds or as an HTTP date", () => {
+    assert.equal(parseRetryAfter("7"), 7000)
+    assert.equal(parseRetryAfter(new Date(10_000 + 30_000).toUTCString(), 10_000), 30_000)
+    assert.equal(parseRetryAfter("soon"), undefined)
+    assert.equal(parseRetryAfter(null), undefined)
+})
+
+test("paced reads go one at a time, at least the gap apart", async () => {
+    const clock = fakeClock()
+    const { reader, calls } = scriptedReader([])
+    const paced = createPacedReader(reader, { minGapMs: 1000, now: clock.now, sleep: clock.sleep })
+    await Promise.all([paced.read(0, 10), paced.read(100, 10), paced.read(200, 10)])
+    assert.deepEqual(calls, [0, 100, 200])
+    assert.deepEqual(clock.waits, [1000, 1000])
+    assert.equal(paced.stats().requests, 3)
+    assert.equal(paced.stats().bytes, 30)
+})
+
+test("a 429 waits for Retry-After, then 2 s, 4 s… and retries quietly", async () => {
+    const clock = fakeClock()
+    const limited = (retryAfterMs?: number) => new RangeFetchError("http", "HTTP 429", 429, retryAfterMs)
+    const { reader, calls } = scriptedReader([limited(5000), limited(), limited(), "ok"])
+    const seen: number[] = []
+    const paced = createPacedReader(reader, { minGapMs: 0, now: clock.now, sleep: clock.sleep, onStats: stats => seen.push(stats.backoffUntil ?? 0) })
+    const bytes = await paced.read(0, 4)
+    assert.equal(bytes.length, 4)
+    assert.equal(calls.length, 4)
+    // Retry-After first; then the exponential steps for the 2nd and 3rd failures.
+    assert.deepEqual(clock.waits, [5000, 4000, 8000])
+    const stats = paced.stats()
+    assert.equal(stats.rateLimited, 3)
+    assert.equal(stats.retries, 3)
+    assert.equal(stats.backoffUntil, null)
+    assert.ok(seen.some(until => until > 0), "the backoff was reported while waiting")
+})
+
+test("backoff is capped and ends in a rate-limit error after the last try", async () => {
+    const clock = fakeClock()
+    const limited = () => new RangeFetchError("http", "HTTP 503", 503)
+    const { reader } = scriptedReader(Array.from({ length: 10 }, limited))
+    const paced = createPacedReader(reader, { minGapMs: 0, maxAttempts: 7, now: clock.now, sleep: clock.sleep })
+    await assert.rejects(paced.read(0, 4), (error: unknown) => error instanceof RangeFetchError && error.kind === "rate-limit" && !isFatalRangeError(error))
+    assert.deepEqual(clock.waits, [2000, 4000, 8000, 16000, 32000, 60000])
+})
+
+test("fatal errors are not retried", async () => {
+    const clock = fakeClock()
+    const { reader, calls } = scriptedReader([new RangeFetchError("http", "HTTP 403", 403)])
+    const paced = createPacedReader(reader, { minGapMs: 0, now: clock.now, sleep: clock.sleep })
+    await assert.rejects(paced.read(0, 4), (error: unknown) => error instanceof RangeFetchError && error.status === 403)
+    assert.equal(calls.length, 1)
+})
+
+test("rate limits only stop the subtitles when they persist and the playhead has no lines", async () => {
+    const reader = {
+        size: () => SAMPLE.length,
+        read: async (start: number, length: number) => SAMPLE.subarray(start, start + length),
+    }
+    const index = await readMkvIndex(reader)
+    const limited = () => new RangeFetchError("rate-limit", "The CDN kept answering 429", 429)
+
+    // Never a line: the third failure in a row is reported.
+    let fatal: unknown = null
+    let attempts = 0
+    const failing = { size: reader.size, read: async () => { attempts++; throw limited() } }
+    const stuck = createSubtitleExtractor({ reader: failing, index, isFatal: isFatalRangeError, backgroundGapMs: 0, onFatal: error => fatal = error, onLines: () => {} })
+    stuck.seek(10)
+    await stuck.idle()
+    assert.equal(attempts, 3)
+    assert.ok(fatal instanceof RangeFetchError && fatal.kind === "rate-limit")
+
+    // Lines at the playhead were read first: later failures stay quiet and reading goes on.
+    let reads = 0
+    let reported = false
+    const flaky = {
+        size: reader.size,
+        read: async (start: number, length: number) => {
+            reads++
+            if (reads >= 2 && reads <= 6) throw limited()
+            return reader.read(start, length)
+        },
+    }
+    let count = 0
+    const patient = createSubtitleExtractor({
+        reader: flaky, index, isFatal: isFatalRangeError, backgroundGapMs: 0, mergeGapBytes: 0, maxReadBytes: 64 * 1024, foregroundSec: 5,
+        onFatal: () => reported = true, onLines: lines => count += lines.length,
+    })
+    patient.seek(0)
+    await patient.idle()
+    assert.equal(reported, false)
+    assert.equal(count, 50)
 })

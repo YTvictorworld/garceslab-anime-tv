@@ -9,7 +9,7 @@
  * itself always goes from the CDN to the TV's player directly.
  *
  *   range {url, start, length} → {returnValue: true, status, contentRange, data}
- *                                or {returnValue: false, errorCode: "range:…", errorText}
+ *                                or {returnValue: false, errorCode: "range:…", errorText, status?, retryAfter?}
  *
  * The URL is never logged: debrid links carry the account's access token.
  */
@@ -66,7 +66,7 @@ export function createRangeHandler(modules: {
             settled = true
             message.respond(response)
         }
-        const fail = (code: string, text: string) => answer({ returnValue: false, errorCode: `range:${code}`, errorText: text })
+        const fail = (code: string, text: string, extra: Record<string, unknown> = {}) => answer({ returnValue: false, errorCode: `range:${code}`, errorText: text, ...extra })
 
         let request: HttpRequest
         try {
@@ -83,7 +83,8 @@ export function createRangeHandler(modules: {
                 if (status !== 206) {
                     // A 200 is the whole file: stop at once rather than download it.
                     response.destroy()
-                    return fail(status === 200 ? "no-range" : "http", `HTTP ${status}`)
+                    const retryAfter = response.headers["retry-after"]
+                    return fail(status === 200 ? "no-range" : "http", `HTTP ${status}`, { status, retryAfter: typeof retryAfter === "string" ? retryAfter : null })
                 }
                 const chunks: BufferLike[] = []
                 let size = 0
