@@ -78,7 +78,7 @@ export function ServerLocalAnimeList() {
         >
             <View className="flex-row items-center justify-between">
                 <Text className="p-4 text-xl font-bold text-foreground">
-                    On Seanime Server{" "}
+                    On the server{" "}
                     <Text className="ml-4 text-xl text-muted-foreground">{visibleRecords.length}</Text>
                 </Text>
             </View>

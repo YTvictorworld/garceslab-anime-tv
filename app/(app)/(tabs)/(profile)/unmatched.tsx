@@ -89,7 +89,7 @@ export default function UnmatchedScreen() {
                 <View className="flex-1 items-center justify-center px-6 gap-3">
                     <Ionicons name="wifi-outline" size={48} color="rgba(255,255,255,0.25)" />
                     <Text className="text-white text-base font-semibold text-center">Server Offline</Text>
-                    <Text className="text-white/40 text-sm text-center">Please connect to the Seanime server to resolve unmatched files.</Text>
+                    <Text className="text-white/40 text-sm text-center">Please connect to the Garceslab Anime server to resolve unmatched files.</Text>
                 </View>
             </View>
         )

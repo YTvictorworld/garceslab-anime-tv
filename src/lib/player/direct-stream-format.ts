@@ -221,7 +221,7 @@ export function streamFailureMessage(codecs: StreamCodecs): string {
     if (codecs.videoProblems.length > 0) wanted.push("8-bit H.264 or HEVC video")
     if (codecs.riskyAudio.length > 0) wanted.push("AAC, AC-3 or E-AC-3 audio")
     const marked = hasFlac(codecs.riskyAudio) ? " (the release list marks FLAC ones)" : ""
-    parts.push(`Seanime can't transcode torrent or debrid streams, so pick another release${wanted.length ? ` with ${wanted.join(" and ")}` : ""}${marked}.`)
-    parts.push("Or download the episode to your library from Seanime's web interface: the server can transcode library files.")
+    parts.push(`Garceslab Anime can't transcode torrent or debrid streams, so pick another release${wanted.length ? ` with ${wanted.join(" and ")}` : ""}${marked}.`)
+    parts.push("Or download the episode to your library from the Garceslab Anime web interface: the server can transcode library files.")
     return parts.join(" ")
 }

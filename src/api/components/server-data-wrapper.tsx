@@ -163,7 +163,7 @@ export function ServerDataWrapper({ children }: { children: React.ReactNode }) {
             <View className="items-center gap-1.5 max-w-2xl">
                 <Text className="text-white text-base font-semibold">The server needs a password</Text>
                 <Text className="text-white/45 text-sm text-center">
-                    This server has no password, so it turns this app away. Set a server password in Seanime
+                    This server has no password, so it turns this app away. Set a server password in Garceslab Anime
                     ([server] password in config.toml), restart the server, then enter the address again.
                 </Text>
             </View>
@@ -235,7 +235,7 @@ export function ServerDataWrapper({ children }: { children: React.ReactNode }) {
             <View className="items-center gap-2">
                 <Text className="text-center text-xl font-bold text-white">Server update required</Text>
                 <Text className="text-center text-sm leading-5 text-white/55">
-                    This version of Seanime Tenji requires a Seanime server with the version {MIN_SERVER_VERSION} or newer. This Seanime server is
+                    This version of the Garceslab Anime TV app requires a Garceslab Anime server with the version {MIN_SERVER_VERSION} or newer. This server is
                     running {_serverStatus.version || "an unknown version"}.
                 </Text>
             </View>

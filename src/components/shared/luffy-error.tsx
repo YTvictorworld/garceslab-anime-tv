@@ -13,7 +13,7 @@ export function LuffyError({ title = "Oops!", description, children }: LuffyErro
         <View className="mt-10 w-full items-center gap-4 px-8">
             <View style={{ width: 128, height: 128 }}>
                 <Image
-                    source={IMAGES.luffy01}
+                    source={IMAGES.logo2}
                     resizeMode="contain"
                     style={{ width: "100%", height: "100%" }}
                 />

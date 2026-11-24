@@ -132,7 +132,7 @@ export function MangaEntryChaptersView({
         return (
             <LuffyError
                 title="No providers"
-                description="No manga provider extensions are installed. Install one from the extension manager on your Seanime server."
+                description="No manga provider extensions are installed. Install one from the extension manager on your Garceslab Anime server."
             />
         )
     }

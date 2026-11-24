@@ -118,7 +118,7 @@ export default function Screen() {
                         showErrorToast("This server requires a password")
                     }
                 } else if (isUntrustedOriginError(error)) {
-                    showError("This server has no password, so it turns the TV app away. Set a server password in Seanime "
+                    showError("This server has no password, so it turns the TV app away. Set a server password in Garceslab Anime "
                         + "([server] password in config.toml), restart the server, then connect again.")
                 } else if (isConnectivityError(error)) {
                     showError(Platform.isTV
@@ -183,7 +183,7 @@ export default function Screen() {
                     <CardHeader className="items-center">
                         {/*<CardTitle className="pb-2 text-center">Configuration</CardTitle>*/}
                         <CardDescription>
-                            <Text>Enter your Seanime server URL and password.</Text>
+                            <Text>Enter your Garceslab Anime server URL and password.</Text>
                         </CardDescription>
                     </CardHeader>
                     <CardContent>

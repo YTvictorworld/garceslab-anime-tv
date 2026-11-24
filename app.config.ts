@@ -41,7 +41,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
             supportsTablet: true,
             bundleIdentifier: process.env.EXPO_IOS_BUNDLE_ID || "app.seanime.tenji",
             infoPlist: {
-                NSLocalNetworkUsageDescription: "Seanime needs local network access to connect to your server on your home network.",
+                NSLocalNetworkUsageDescription: "Garceslab Anime needs local network access to connect to your server on your home network.",
                 UIBackgroundModes: [
                     "audio",
                 ],

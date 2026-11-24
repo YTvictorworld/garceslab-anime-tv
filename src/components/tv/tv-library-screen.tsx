@@ -225,7 +225,7 @@ export function TVLibraryScreen() {
         if (localMedia.length > 0) {
             items.push({
                 key: "server-local",
-                title: "On Seanime Server",
+                title: "On the server",
                 media: localMedia,
                 badgeById: localBadges,
                 metaById: localMeta,

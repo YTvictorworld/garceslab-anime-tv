@@ -115,6 +115,17 @@ export function setPlayerPreferences(update: Partial<PlayerPreferences>) {
     const current = getPlayerPreferences()
     const next = { ...current, ...update }
     storage.set(STORAGE_KEY, JSON.stringify(next))
+    for (const listener of Array.from(changeListeners)) listener()
+}
+
+// Garceslab Anime: the profile sync (player-prefs-remote.ts) saves changes to the server.
+const changeListeners = new Set<() => void>()
+
+export function subscribePlayerPreferences(listener: () => void): () => void {
+    changeListeners.add(listener)
+    return () => {
+        changeListeners.delete(listener)
+    }
 }
 
 export function usePlayerPreferences() {

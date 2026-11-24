@@ -116,7 +116,7 @@ export async function checkForOtaUpdateManually(): Promise<void> {
     try {
         const result = await Updates.checkForUpdateAsync()
         if (!result.isAvailable || result.isRollBackToEmbedded) {
-            toast.info("Seanime is up to date")
+            toast.info("Garceslab Anime is up to date")
             return
         }
 
@@ -196,13 +196,13 @@ async function fetchAndPromptReload(updateId: string | undefined, otaVersion: st
     try {
         const ready = await downloadOta()
         if (!ready) {
-            toast.info("Seanime is already up to date")
+            toast.info("Garceslab Anime is already up to date")
             return
         }
 
         const versionLabel = otaVersion ? `OTA ${otaVersion}` : "The update"
         Alert.alert(
-            "Restart Seanime?",
+            "Restart Garceslab Anime?",
             `${versionLabel} has been downloaded and will load after restart.`,
             [
                 { text: "Later", style: "cancel" },

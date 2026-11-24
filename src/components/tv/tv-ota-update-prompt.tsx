@@ -42,7 +42,7 @@ export function TVOtaUpdatePrompt() {
         void downloadOta()
             .then(ready => {
                 if (!ready) {
-                    toast.info("Seanime is already up to date")
+                    toast.info("Garceslab Anime is already up to date")
                     setInfo(null)
                     setStage("ready")
                     return
@@ -62,7 +62,7 @@ export function TVOtaUpdatePrompt() {
         setStage("restarting")
         void restartOta().catch(error => {
             console.error(error)
-            toast.error(`Failed to restart Seanime: ${errorText(error)}`)
+            toast.error(`Failed to restart Garceslab Anime: ${errorText(error)}`)
             setStage("restart")
         })
     }, [busy])
@@ -72,7 +72,7 @@ export function TVOtaUpdatePrompt() {
         ? ` ${Math.round(downloadProgress * 100)}%`
         : ""
     const title = stage === "restart" || stage === "restarting"
-        ? "Restart Seanime?"
+        ? "Restart Garceslab Anime?"
         : "Update available"
     const text = stage === "ready"
         ? `${version} is ready to install.`

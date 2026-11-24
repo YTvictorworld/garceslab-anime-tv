@@ -251,7 +251,7 @@ export function TVServerSetup({
                         >
                             {passwordRequired
                                 ? serverUrl
-                                : "Enter the address of your Seanime server."}
+                                : "Enter the address of your Garceslab Anime server."}
                         </Text>
                     </View>
 

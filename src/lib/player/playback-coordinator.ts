@@ -161,7 +161,7 @@ export function usePlaybackCoordinator(entry: Anime_Entry | undefined) {
                 episodeNumber: episode.episodeNumber,
             })
             Alert.alert(
-                "Seanime Server unavailable",
+                "Server unavailable",
                 "Start Seanime Server Mobile. Without internet, enable its offline mode before starting the server.",
             )
             return
