@@ -3075,6 +3075,31 @@ export type Status = {
     currentProfile?: Profile
 }
 
+/**
+ * - Filepath: internal/handlers/profiles_viewers.go
+ * - Filename: profiles_viewers.go
+ * - Package: handlers
+ * @description
+ *  ViewerRelayedPlayback is the playback that holds the relayed lane.
+ */
+export type ViewerRelayedPlayback = {
+    profileId: number
+    profileName: string
+}
+
+/**
+ * - Filepath: internal/handlers/profiles_viewers.go
+ * - Filename: profiles_viewers.go
+ * - Package: handlers
+ * @description
+ *  ViewerSessionsResponse is the "Now watching" list.
+ */
+export type ViewerSessionsResponse = {
+    max: number
+    sessions?: Array<ViewerSession>
+    relayed?: ViewerRelayedPlayback
+}
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Hibikecustomsource
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -5724,6 +5749,57 @@ export type Report_WebSocketLog = {
     eventType: string
     payload?: Record<string, any>
     timestamp?: string
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Sessions
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/**
+ * - Filepath: internal/profiles/sessions/sessions.go
+ * - Filename: sessions.go
+ * - Package: sessions
+ * @description
+ *  ViewerSession is a snapshot of one viewer session.
+ */
+export type ViewerSession = {
+    id: string
+    profileId: number
+    profileName: string
+    device: string
+    mediaId: number
+    episodeNumber: number
+    mediaTitle: string
+    state: ViewerState
+    startedAt?: string
+    lastSeen?: string
+    tracking?: ViewerTracking
+    disconnected: boolean
+}
+
+/**
+ * - Filepath: internal/profiles/sessions/sessions.go
+ * - Filename: sessions.go
+ * - Package: sessions
+ * @description
+ *  ViewerState is the state of a session.
+ */
+export type ViewerState = "preparing" | "ready" | "playing"
+
+/**
+ * - Filepath: internal/profiles/sessions/sessions.go
+ * - Filename: sessions.go
+ * - Package: sessions
+ * @description
+ *  ViewerTracking is the per-session manual progress tracking (upstream's
+ *  playbackmanager manual tracking, which is global).
+ */
+export type ViewerTracking = {
+    mediaId: number
+    episodeNumber: number
+    mediaTitle: string
+    totalEpisodes: number
+    currentProgress: number
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
