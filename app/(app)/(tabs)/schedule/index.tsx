@@ -7,6 +7,7 @@ import { useServerStatus } from "@/atoms/server.atoms"
 import { EpisodeCard } from "@/components/features/anime/episode-card"
 import { MediaEntryCard } from "@/components/features/media/media-entry-card"
 import { SafeView } from "@/components/layout/layout-view"
+import { TVScheduleScreen } from "@/components/tv/tv-schedule-screen"
 import { TabFadeView } from "@/components/layout/tab-fade-view"
 import { LabeledSwitch } from "@/components/shared/labeled-switch"
 import { OfflineBanner } from "@/components/shared/offline-banner"
@@ -25,7 +26,7 @@ import { router } from "expo-router"
 import { useAtom } from "jotai/react"
 import sortBy from "lodash/sortBy"
 import * as React from "react"
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, Text, useWindowDimensions, View } from "react-native"
+import { ActivityIndicator, FlatList, Platform, Pressable, RefreshControl, Text, useWindowDimensions, View } from "react-native"
 import Animated, { FadeIn } from "react-native-reanimated"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
@@ -35,6 +36,12 @@ const SHELF_SPACING = 12
 const SHELF_PADDING = 16
 
 export default function ScheduleScreen() {
+    // Garceslab Anime: the TV has its own, remote-friendly schedule.
+    if (Platform.isTV) return <TVScheduleScreen />
+    return <MobileScheduleScreen />
+}
+
+function MobileScheduleScreen() {
     const isConnected = useIsServerConnected()
     const {
         data: schedule,

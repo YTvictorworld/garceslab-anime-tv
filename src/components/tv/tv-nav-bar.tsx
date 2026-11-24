@@ -4,19 +4,27 @@ import { useServerUrl } from "@/atoms/server.atoms"
 import { useTVFocus } from "@/components/tv/tv-focus"
 import { TV, tvSize } from "@/components/tv/tv-scale"
 import { IMAGES } from "@/constants/images"
+import { TV_VISUAL } from "@/lib/tv/visual-flags"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { Image } from "expo-image"
 import { router, useSegments } from "expo-router"
 import * as React from "react"
 import { ActivityIndicator, Animated, Pressable, Text, TVFocusGuideView, View } from "react-native"
 
-const ITEMS = [
+const ALL_ITEMS = [
     {
         key: "anime",
         label: "Anime",
         icon: "tv-outline" as const,
         activeIcon: "tv" as const,
         href: "/(app)/(tabs)/(library)" as const,
+    },
+    {
+        key: "schedule",
+        label: "Schedule",
+        icon: "calendar-outline" as const,
+        activeIcon: "calendar" as const,
+        href: "/(app)/(tabs)/schedule" as const,
     },
     {
         key: "discover",
@@ -40,6 +48,9 @@ const ITEMS = [
         href: "/(app)/(tabs)/(profile)" as const,
     },
 ]
+
+/** Garceslab Anime: the Schedule tab follows its flag (see visual-flags.ts). */
+const ITEMS = ALL_ITEMS.filter(item => item.key !== "schedule" || TV_VISUAL.scheduleTab)
 
 function NavItem({
     item,
@@ -140,10 +151,12 @@ export function TVNavBar() {
     const [pending, setPending] = React.useState<string | null>(null)
     const isActive = React.useCallback((key: (typeof ITEMS)[number]["key"]) => {
         if (key === "discover") return routeKey.includes("discover")
+        if (key === "schedule") return routeKey.includes("schedule")
         if (key === "lists") return routeKey.includes("my-lists")
         if (key === "settings") return routeKey.includes("(profile)") && !routeKey.includes("my-lists")
         return routeKey.includes("(library)")
             || (!routeKey.includes("discover")
+                && !routeKey.includes("schedule")
                 && !routeKey.includes("my-lists")
                 && !routeKey.includes("(profile)"))
     }, [routeKey])
