@@ -11,6 +11,13 @@ export default function LibraryLayout() {
                         headerShown: false,
                     }}
                 />
+                <Stack.Screen
+                    name="search"
+                    options={{
+                        headerShown: false,
+                        animation: "fade",
+                    }}
+                />
             </Stack>
         </LayoutContainerView>
     )
