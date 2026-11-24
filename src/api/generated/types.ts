@@ -1975,6 +1975,7 @@ export type Avatar = {
     creator: string
     source: string
     origin: string
+    attribution?: string
     /**
      * Filled at load time: URLPrefix + File
      */
@@ -5485,6 +5486,7 @@ export type ProfileAuditEntry = {
     targetProfileId: number
     targetName: string
     action: string
+    detail?: string
     createdAt: number
 }
 
@@ -5668,6 +5670,19 @@ export type Report_WebSocketLog = {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /**
+ * - Filepath: internal/profiles/settings/player.go
+ * - Filename: player.go
+ * - Package: settings
+ * @description
+ *  PlayerPrefs is profile_settings.value.player.
+ */
+export type PlayerPrefs = {
+    tv?: TVPlayerPrefs
+    web?: WebPlayerPrefs
+    updatedAt?: number
+}
+
+/**
  * - Filepath: internal/profiles/settings/settings.go
  * - Filename: settings.go
  * - Package: settings
@@ -5707,6 +5722,46 @@ export type ProfileSettings = {
     markWatchingOnStart?: boolean
     completedAction?: string
     player?: Record<string, any>
+}
+
+/**
+ * - Filepath: internal/profiles/settings/player.go
+ * - Filename: player.go
+ * - Package: settings
+ * @description
+ *  TVPlayerPrefs are the TV app's player preferences that follow the profile.
+ *  Every field is optional: nil = the app's default (or its local value).
+ */
+export type TVPlayerPrefs = {
+    preferredAudioLanguages?: string
+    preferredSubtitleLanguages?: string
+    ignoredSubtitleLabels?: string
+    showSubtitles?: boolean
+    subtitleFontSize?: number
+    assRendering?: boolean
+    autoPlay?: boolean
+    autoNextEpisode?: boolean
+    autoSkipOpEd?: boolean
+    skipDurationSec?: number
+    buttonSeekSec?: number
+    doubleTapSeekSec?: number
+    speed?: number
+    longPressFastForwardSpeed?: number
+}
+
+/**
+ * - Filepath: internal/profiles/settings/player.go
+ * - Filename: player.go
+ * - Package: settings
+ * @description
+ *  WebPlayerPrefs are the web player's preferences: the video core settings
+ *  (languages, subtitle and caption styles, video enhancement) and the media
+ *  core preferences (autoplay, auto next, auto skip, volume, speed). They are
+ *  stored as the web app writes them (JSON objects, size-capped).
+ */
+export type WebPlayerPrefs = {
+    videoCore?: Record<string, any>
+    mediaCore?: Record<string, any>
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
