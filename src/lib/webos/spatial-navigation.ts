@@ -8,6 +8,7 @@
  * (remember the last focused child) and `destinations`.
  */
 
+import { revealSpan } from "./reveal-span"
 import { animateScroll, scrollTarget } from "./scroll-animator"
 
 export type Direction = "up" | "down" | "left" | "right"
@@ -235,13 +236,6 @@ export function nearestScroller(el: Element): { node: HTMLElement; x: boolean; y
     return null
 }
 
-/** The scroll offset that keeps the span [from, to] at least `margin` inside [start, start + size]. */
-function revealSpan(start: number, size: number, from: number, to: number, margin: number) {
-    if (from - margin < start) return from - margin
-    if (to + margin > start + size) return to + margin - size
-    return start
-}
-
 /**
  * Scrolls every scrollable ancestor so the element sits away from the edges.
  * Measured against where each scroller is heading rather than where it is,
@@ -269,7 +263,8 @@ export function revealElement(el: HTMLElement) {
         if (scrollY) {
             const top = target.top - box.top + node.scrollTop
             const margin = Math.min(box.height * 0.2, 200)
-            next.y = revealSpan(heading.y, node.clientHeight, top, top + target.height, margin)
+            // Anything on the first screen brings the page back to its top (see revealSpan).
+            next.y = revealSpan(heading.y, node.clientHeight, top, top + target.height, margin, true)
         }
 
         if ((next.x ?? heading.x) !== heading.x || (next.y ?? heading.y) !== heading.y) {
@@ -348,16 +343,26 @@ export function moveFocus(direction: Direction, options: { reveal?: boolean } = 
         if (guides.get(guide)?.config.destinations?.length && !guide.contains(current)) elements.push(guide)
     }
 
-    let best: HTMLElement | null = null
-    for (const { element } of rankCandidates(rectOf(current), elements, direction)) {
-        const usable = element.hasAttribute(GUIDE_ATTRIBUTE) && !element.matches(FOCUSABLE_SELECTOR)
-            ? isRendered(element)
-            : isFocusable(element, root)
-        if (usable && !inHiddenScreen(element)) {
-            best = element
-            break
+    const pick = (candidates: HTMLElement[]) => {
+        for (const { element } of rankCandidates(rectOf(current), candidates, direction)) {
+            const usable = element.hasAttribute(GUIDE_ATTRIBUTE) && !element.matches(FOCUSABLE_SELECTOR)
+                ? isRendered(element)
+                : isFocusable(element, root)
+            if (usable && !inHiddenScreen(element)) return element
         }
+        return null
     }
+
+    // Up and down stay in the page that scrolls under the floating nav bar (and
+    // the home screen's search button) while it has rows that way: a row scrolled
+    // out of sight above is farther than the bar on screen, which took focus
+    // halfway up the page. At the top of the page they reach the bar as before.
+    let best: HTMLElement | null = null
+    if (direction === "up" || direction === "down") {
+        const page = scrollableAncestor(current, "y")
+        if (page && scope.contains(page)) best = pick(elements.filter(el => page.contains(el)))
+    }
+    if (!best) best = pick(elements)
     if (!best) return false
 
     return focusElement(redirectIntoGuides(best, current, root), options)

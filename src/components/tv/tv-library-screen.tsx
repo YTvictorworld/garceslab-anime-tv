@@ -13,8 +13,6 @@ import {
     TVContinueCard,
     TVHeroCarousel,
     type TVHeroItem,
-    TVInput,
-    TVMediaGrid,
     TVPageSkeleton,
     TVSectionHeader,
     TVShelf,
@@ -29,6 +27,7 @@ import {
     pickTrendingHeroItems,
     trendingShelfIndex,
 } from "@/components/tv/tv-home-feed"
+import { useTVFocus } from "@/components/tv/tv-focus"
 import { SCRIM_SCROLL_THRESHOLD, TVNavScrim, useScrolledPast } from "@/components/tv/tv-nav-scrim"
 import type { TVMediaMeta } from "@/components/tv/tv-shelf"
 import { pickUpcomingEpisodes, type UpcomingEpisode } from "@/components/tv/tv-upcoming-episodes"
@@ -41,12 +40,10 @@ import { getContinueWatchingSpoilerActive, getEpisodeSpoilerState, getSpoilerSaf
 import { Ionicons } from "@/lib/icons/Ionicons"
 import { cleanHtml, mediaTitle } from "@/lib/media-metadata"
 import { getServerLocalEpisodeCount, parseServerLocalAnimeEntry, useIsServerConnected, useServerLocalAnimeRecords } from "@/lib/offline"
-import { filterEntriesByTitle } from "@/lib/utils/filtering"
 import { router, useFocusEffect, useIsFocused } from "expo-router"
 import { useAtomValue, useSetAtom } from "jotai"
 import * as React from "react"
-import { BackHandler, FlatList, Platform, ScrollView, Text, TVFocusGuideView, View } from "react-native"
-import Animated, { Extrapolation, interpolate, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue } from "react-native-reanimated"
+import { Animated, BackHandler, FlatList, Platform, Pressable, ScrollView, Text, TVFocusGuideView, View } from "react-native"
 
 type Shelf = {
     key: string
@@ -93,20 +90,53 @@ type ContinueRowItem =
     | { kind: "upcoming"; item: UpcomingEpisode<AL_BaseAnime> }
 
 /**
- * webOS: the search box and the nav scrim fade with CSS transitions when the
- * screen scrolls past the top (useScrolledPast), not with Reanimated styles
- * that follow every scroll frame from JavaScript there. Plain views then.
+ * The library's search button, left of the nav bar and as tall as it: it
+ * opens the library search (like Discover's "Search anime" opens its search).
+ * It used to be a 480 px wide text field there, which ran into the centred
+ * nav bar on the TV, whose font is wider than a desktop browser's. A round
+ * button leaves room to spare whatever the font. It stays put and visible
+ * when the page scrolls, like the nav bar; Up reaches it from the hero, at
+ * the top of the page (see moveFocus in spatial-navigation.ts).
  */
-const CSS_SCROLL_FADE = Platform.OS === "web"
-const SearchBox = (CSS_SCROLL_FADE ? View : Animated.View) as typeof Animated.View
-const LibraryScrollView = (CSS_SCROLL_FADE ? ScrollView : Animated.ScrollView) as typeof Animated.ScrollView
-const SEARCH_FADE = {
-    transitionProperty: "opacity, transform",
-    transitionDuration: "240ms",
-    transitionTimingFunction: "ease-out",
+function LibrarySearchButton() {
+    const focusState = useTVFocus(1.08, "library-search")
+    // As tall as the nav bar's pill.
+    const size = tvSize(54)
+    return (
+        <View
+            pointerEvents="box-none"
+            style={{ position: "absolute", top: TV.navTop, left: TV.gutter, zIndex: 210 }}
+        >
+            <Pressable
+                onPress={() => router.push("/(app)/(tabs)/(library)/search" as never)}
+                onFocus={focusState.focus}
+                onBlur={focusState.blur}
+                accessibilityRole="button"
+                accessibilityLabel="Search your anime library"
+            >
+                {({ focused }) => (
+                    <Animated.View
+                        style={[
+                            focusState.style,
+                            {
+                                width: size,
+                                height: size,
+                                borderRadius: size / 2,
+                                borderWidth: tvSize(2),
+                                borderColor: focused ? "#ffffff" : "rgba(255,255,255,0.08)",
+                                backgroundColor: focused ? "#ffffff" : "rgba(10,10,12,0.92)",
+                                alignItems: "center",
+                                justifyContent: "center",
+                            },
+                        ]}
+                    >
+                        <Ionicons name="search" size={tvSize(26)} color={focused ? "#0a0a0a" : "rgba(255,255,255,0.75)"} />
+                    </Animated.View>
+                )}
+            </Pressable>
+        </View>
+    )
 }
-const SEARCH_SHOWN = { ...SEARCH_FADE, opacity: 1, transform: [{ translateY: 0 }] } as object
-const SEARCH_HIDDEN = { ...SEARCH_FADE, opacity: 0, transform: [{ translateY: -tvSize(20) }] } as object
 
 /** Outside the component: the React Compiler skips a component containing `import()`. */
 function warmEntryScreen() {
@@ -128,20 +158,7 @@ export function TVLibraryScreen() {
     const setPlaybackIntent = useSetAtom(animeEntryPlaybackIntentAtom)
     const localRecords = useServerLocalAnimeRecords()
     const { data: watchHistory } = useGetContinuityWatchHistory()
-    const [search, setSearch] = React.useState("")
-    const deferredSearch = React.useDeferredValue(search)
-    const scrollY = useSharedValue(0)
-    const scrollHandler = useAnimatedScrollHandler({
-        onScroll: (event) => {
-            scrollY.value = event.contentOffset.y
-        },
-    })
-    const searchSlideDistance = tvSize(20)
-    const searchAnimatedStyle = useAnimatedStyle(() => {
-        const opacity = interpolate(scrollY.value, [0, 80], [1, 0], Extrapolation.CLAMP)
-        const translateY = interpolate(scrollY.value, [0, 80], [0, -searchSlideDistance], Extrapolation.CLAMP)
-        return { opacity, transform: [{ translateY }] }
-    })
+    // webOS: the nav scrim fades in past the top (a CSS transition, see useScrolledPast).
     const [scrolled, onWebScroll] = useScrolledPast(SCRIM_SCROLL_THRESHOLD)
     const {
         libraryCollectionList,
@@ -169,13 +186,6 @@ export function TVLibraryScreen() {
         )
     }, [continueWatchingList, libraryCollectionList, showTrending, trending.data?.Page?.media])
     const trendingMedia = React.useMemo(() => trendingItems.map(item => item.media), [trendingItems])
-
-    const allEntries = React.useMemo(() => libraryCollectionList.flatMap(list => list?.entries ?? []), [libraryCollectionList])
-    const searchMedia = React.useMemo(() => {
-        if (!deferredSearch.trim()) return []
-        return filterEntriesByTitle(allEntries, deferredSearch).map(item => item.media).filter((media): media is AL_BaseAnime => !!media)
-    }, [allEntries, deferredSearch])
-    const searching = search.trim().length > 0
 
     // webOS: the show page's code runs the first time it is required, which
     // made the first show opened noticeably slower than the rest on a TV.
@@ -468,7 +478,7 @@ export function TVLibraryScreen() {
         return <TVPageSkeleton hero />
     }
 
-    if (!shelves.length && !continueRow.length && !searching) {
+    if (!shelves.length && !continueRow.length) {
         // webOS: trending is still loading and will fill the screen.
         if (showTrending && trending.isLoading) {
             return <TVPageSkeleton hero />
@@ -508,122 +518,82 @@ export function TVLibraryScreen() {
 
     return (
         <View style={{ flex: 1, backgroundColor: "#0a0a0a" }}>
-            {isConnected ? (
-                <SearchBox
-                    pointerEvents="box-none"
-                    style={[{
-                        position: "absolute",
-                        top: TV.navTop,
-                        left: TV.gutter,
-                        width: tvSize(480),
-                        zIndex: 210,
-                    }, CSS_SCROLL_FADE ? (scrolled ? SEARCH_HIDDEN : SEARCH_SHOWN) : searchAnimatedStyle]}
-                >
-                    <TVInput
-                        value={search}
-                        onChangeText={setSearch}
-                        placeholder="Search your anime library"
-                        placeholderTextColor="rgba(255,255,255,0.35)"
-                        autoCorrect={false}
-                        autoCapitalize="none"
-                        returnKeyType="search"
-                        preferred={heroItems.length === 0}
-                        floating
-                        containerStyle={{ borderRadius: tvSize(99) }}
-                        icon={(
-                            <Ionicons
-                                name="search"
-                                size={tvSize(22)}
-                                color="rgba(255,255,255,0.58)"
-                            />
-                        )}
-                    />
-                </SearchBox>
-            ) : null}
+            {isConnected ? <LibrarySearchButton /> : null}
 
-            {searching ? (
-                <TVMediaGrid
-                    media={searchMedia}
-                    query={deferredSearch}
-                    topInset={TV.navInset}
-                    emptyText="Try another title from your AniList library."
-                />
-            ) : (
-                <LibraryScrollView
-                    style={{ flex: 1 }}
-                    fadingEdgeLength={{ start: TV.navInset + tvSize(18), end: 0 }}
-                    contentContainerStyle={{
-                        paddingBottom: tvSize(90),
-                        gap: TV.sectionGap,
-                    }}
-                    showsVerticalScrollIndicator={false}
-                    onScroll={CSS_SCROLL_FADE ? onWebScroll : scrollHandler}
-                    scrollEventThrottle={16}
-                >
-                    <View style={{ gap: tvSize(34), paddingBottom: tvSize(8) }}>
-                        <View
-                            style={{
-                                minHeight: heroItems.length > 0 || heroLoading ? tvSize(560) : tvSize(32),
-                            }}
-                        >
-                            <TVHeroCarousel items={heroItems} active={isFocused} preferred loading={heroLoading} />
-                        </View>
-
-                        {continueRow.length > 0 ? (
-                            <View style={{ gap: tvSize(12) }}>
-                                <TVSectionHeader
-                                    title="Continue watching"
-                                    count={continueRow.length}
-                                />
-                                <TVFocusGuideView trapFocusLeft trapFocusRight>
-                                    <FlatList
-                                        horizontal
-                                        data={continueRow}
-                                        extraData={startCardStatus}
-                                        renderItem={renderContinue}
-                                        getItemLayout={EPISODE_ROW_LAYOUT}
-                                        keyExtractor={(row, index) => {
-                                            if (row.kind === "upcoming") return `upcoming-${row.item.media.id}-${row.item.episodeNumber}`
-                                            const item = row.item
-                                            return item.episode.localFile?.path || `${item.episode.baseAnime?.id ?? "episode"}-${item.episode.type}-${item.episode.episodeNumber}-${index}`
-                                        }}
-                                        snapToAlignment="item"
-                                        snapToItemPadding={TV.gutter}
-                                        style={[{ flexGrow: 0 }, ROW_OVERFLOW]}
-                                        contentContainerStyle={{
-                                            paddingHorizontal: TV.gutter,
-                                            paddingTop: tvSize(10),
-                                            paddingBottom: tvSize(14),
-                                            gap: TV.cardGap,
-                                        }}
-                                        showsHorizontalScrollIndicator={false}
-                                        removeClippedSubviews={false}
-                                        initialNumToRender={6}
-                                        maxToRenderPerBatch={6}
-                                        windowSize={5}
-                                    />
-                                </TVFocusGuideView>
-                            </View>
-                        ) : null}
+            <ScrollView
+                style={{ flex: 1 }}
+                fadingEdgeLength={{ start: TV.navInset + tvSize(18), end: 0 }}
+                contentContainerStyle={{
+                    paddingBottom: tvSize(90),
+                    gap: TV.sectionGap,
+                }}
+                showsVerticalScrollIndicator={false}
+                onScroll={Platform.OS === "web" ? onWebScroll : undefined}
+                scrollEventThrottle={16}
+            >
+                <View style={{ gap: tvSize(34), paddingBottom: tvSize(8) }}>
+                    <View
+                        style={{
+                            minHeight: heroItems.length > 0 || heroLoading ? tvSize(560) : tvSize(32),
+                        }}
+                    >
+                        <TVHeroCarousel items={heroItems} active={isFocused} preferred loading={heroLoading} />
                     </View>
 
-                    {shelves.map((shelf, index) => (
-                        <TVShelf
-                            key={shelf.key}
-                            title={shelf.title}
-                            media={shelf.media}
-                            badgeById={shelf.badgeById}
-                            metaById={shelf.metaById}
-                            hideLibraryBadge={shelf.hideLibraryBadge}
-                            hideProgress={shelf.hideProgress}
-                            showAudienceScore={shelf.showAudienceScore}
-                            onMediaPress={shelf.onMediaPress}
-                            first={heroItems.length === 0 && index === 0}
-                        />
-                    ))}
-                </LibraryScrollView>
-            )}
-            {!searching ? <TVNavScrim shown={scrolled} /> : null}
+                    {continueRow.length > 0 ? (
+                        <View style={{ gap: tvSize(12) }}>
+                            <TVSectionHeader
+                                title="Continue watching"
+                                count={continueRow.length}
+                            />
+                            <TVFocusGuideView trapFocusLeft trapFocusRight>
+                                <FlatList
+                                    horizontal
+                                    data={continueRow}
+                                    extraData={startCardStatus}
+                                    renderItem={renderContinue}
+                                    getItemLayout={EPISODE_ROW_LAYOUT}
+                                    keyExtractor={(row, index) => {
+                                        if (row.kind === "upcoming") return `upcoming-${row.item.media.id}-${row.item.episodeNumber}`
+                                        const item = row.item
+                                        return item.episode.localFile?.path || `${item.episode.baseAnime?.id ?? "episode"}-${item.episode.type}-${item.episode.episodeNumber}-${index}`
+                                    }}
+                                    snapToAlignment="item"
+                                    snapToItemPadding={TV.gutter}
+                                    style={[{ flexGrow: 0 }, ROW_OVERFLOW]}
+                                    contentContainerStyle={{
+                                        paddingHorizontal: TV.gutter,
+                                        paddingTop: tvSize(10),
+                                        paddingBottom: tvSize(14),
+                                        gap: TV.cardGap,
+                                    }}
+                                    showsHorizontalScrollIndicator={false}
+                                    removeClippedSubviews={false}
+                                    initialNumToRender={6}
+                                    maxToRenderPerBatch={6}
+                                    windowSize={5}
+                                />
+                            </TVFocusGuideView>
+                        </View>
+                    ) : null}
+                </View>
+
+                {shelves.map((shelf, index) => (
+                    <TVShelf
+                        key={shelf.key}
+                        title={shelf.title}
+                        media={shelf.media}
+                        badgeById={shelf.badgeById}
+                        metaById={shelf.metaById}
+                        hideLibraryBadge={shelf.hideLibraryBadge}
+                        hideProgress={shelf.hideProgress}
+                        showAudienceScore={shelf.showAudienceScore}
+                        onMediaPress={shelf.onMediaPress}
+                        first={heroItems.length === 0 && index === 0}
+                    />
+                ))}
+            </ScrollView>
+            <TVNavScrim shown={scrolled} />
             {streamStart?.phase === "starting" ? (
                 <TVContinueStreamStarter
                     key={streamStart.id}

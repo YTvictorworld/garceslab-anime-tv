@@ -2,18 +2,23 @@ import type { SeaError } from "@/api/client/requests"
 import type { Profile } from "@/api/generated/types"
 import {
     createProfile,
+    deleteProfile,
     importAnilistList,
     importServerAccountList,
+    logoutProfile,
     selectProfile,
+    setProfilePin,
+    updateProfile,
     useGetAvatarCatalog,
     useGetProfiles,
 } from "@/api/hooks/profiles.hooks"
 import { useGetStatus } from "@/api/hooks/status.hooks"
 import { useServerUrl } from "@/atoms/server.atoms"
+import { TVEditProfile } from "@/components/tv/tv-profile-editor"
 import { type CreateProfileInput, TVCreateProfile, TVPinPad, TVProfilePicker } from "@/components/tv/tv-profile-picker"
 import { profileErrorMessage, serverHasProfiles } from "@/lib/profile/profile-errors"
 import { getProfileSessionEnd, setProfileSession } from "@/lib/profile/profile-session"
-import { useProfileSwitch } from "@/lib/profile/use-profile-switch"
+import { takePendingProfileEntry, useProfileSwitch } from "@/lib/profile/use-profile-switch"
 import { logger } from "@/lib/utils/logger"
 import { toast } from "@/lib/utils/toast"
 import { router } from "expo-router"
@@ -33,7 +38,19 @@ function errorCode(error: unknown): string | null {
     return typeof code === "string" ? code : null
 }
 
-type Mode = { kind: "pick" } | { kind: "pin"; profile: Profile } | { kind: "create" }
+type Mode =
+    | { kind: "pick" }
+    | { kind: "pin"; profile: Profile }
+    | { kind: "create" }
+    /** Its PIN, before editing a profile that has one. */
+    | { kind: "manage-pin"; profile: Profile }
+    /** "Edit profile", with a session of the edited profile (see openEditor). */
+    | { kind: "edit"; profile: Profile; token: string }
+
+/** The edit session is gone (PIN changed elsewhere, profile deleted): start over from the picker. */
+function isSessionError(code: string | null) {
+    return code === "PROFILE_REQUIRED" || code === "PROFILE_INVALID_TOKEN" || code === "PROFILE_NOT_FOUND" || code === "PROFILE_DELETED"
+}
 
 /**
  * Garceslab Anime: "Who's watching?", on every cold launch of the TV app
@@ -53,7 +70,7 @@ export default function SelectProfileScreen() {
     const profiles = React.useMemo(() => profilesQuery.data ?? [], [profilesQuery.data])
     const [mode, setMode] = React.useState<Mode>({ kind: "pick" })
     const creating = mode.kind === "create" || (statusKnown && needsSetup)
-    const avatars = useGetAvatarCatalog(!!serverUrl && hasProfiles && creating)
+    const avatars = useGetAvatarCatalog(!!serverUrl && hasProfiles && (creating || mode.kind === "edit"))
 
     const [busyProfileId, setBusyProfileId] = React.useState<number | null>(null)
     const [pinError, setPinError] = React.useState<string | null>(null)
@@ -62,15 +79,26 @@ export default function SelectProfileScreen() {
     const [createBusy, setCreateBusy] = React.useState(false)
     const [createProgress, setCreateProgress] = React.useState<string | null>(null)
     const [ended] = React.useState(getProfileSessionEnd)
+    const [editBusy, setEditBusy] = React.useState(false)
+    const [editError, setEditError] = React.useState<string | null>(null)
+    // The profile to focus in the picker after editing it.
+    const [lastEditedId, setLastEditedId] = React.useState<number | null>(null)
+
+    // The nav bar's switcher already opened the next profile: enter it, no picker.
+    const [pendingEntry] = React.useState(takePendingProfileEntry)
+    React.useEffect(() => {
+        if (pendingEntry) enterProfile(pendingEntry.session, pendingEntry.profile)
+    }, [enterProfile, pendingEntry])
 
     React.useEffect(() => {
+        if (pendingEntry) return
         if (!serverUrl) {
             router.replace("/(out)/set-server-url")
             return
         }
         // A stock Seanime server (or one with profiles off): nothing to pick.
         if (statusKnown && !hasProfiles) router.replace("/(app)/(tabs)/(library)")
-    }, [hasProfiles, serverUrl, statusKnown])
+    }, [hasProfiles, pendingEntry, serverUrl, statusKnown])
 
     React.useEffect(() => {
         if (errorCode(profilesQuery.error) === "UNAUTHENTICATED" || errorCode(status.error) === "UNAUTHENTICATED") {
@@ -116,6 +144,123 @@ export default function SelectProfileScreen() {
         }
         void enter(profile)
     }, [enter])
+
+    /**
+     * Editing needs a session of the edited profile: the server's profile
+     * routes take one, and "Who's watching?" has none. Opening it asks for the
+     * profile's PIN, if it has one, as entering it does: the PIN keeps others
+     * from changing the profile on the TV by mistake too.
+     */
+    const openEditor = React.useCallback(async (profile: Profile, pin?: string) => {
+        setBusyProfileId(profile.id)
+        setPinError(null)
+        setPickError(null)
+        setEditError(null)
+        try {
+            const session = await selectProfile(serverUrl, profile.id, pin)
+            if (!session?.profileToken) throw new Error("The server didn't open the profile")
+            setLastEditedId(profile.id)
+            setMode({ kind: "edit", profile: session.profile ?? profile, token: session.profileToken })
+        }
+        catch (error) {
+            log.warning("Opening the profile to edit it failed", errorCode(error))
+            const code = errorCode(error)
+            if (code === "PROFILE_PIN_REQUIRED") {
+                setMode({ kind: "manage-pin", profile })
+            } else if (pin !== undefined) {
+                setPinError(errorText(error, "Couldn't open the profile"))
+            } else {
+                setPickError(errorText(error, "Couldn't open the profile"))
+            }
+            if (code === "PROFILE_NOT_FOUND" || code === "PROFILE_DELETED") {
+                setMode({ kind: "pick" })
+                void profilesQuery.refetch()
+            }
+        }
+        finally {
+            setBusyProfileId(null)
+        }
+    }, [profilesQuery, serverUrl])
+
+    const onManage = React.useCallback((profile: Profile) => {
+        if (profile.hasPin) {
+            setPinError(null)
+            setMode({ kind: "manage-pin", profile })
+            return
+        }
+        void openEditor(profile)
+    }, [openEditor])
+
+    /** Back to the picker; the edit session ends (the device no longer shows as in that profile). */
+    const closeEditor = React.useCallback((token: string | null) => {
+        if (token) void logoutProfile(serverUrl, token).catch(() => undefined)
+        setEditError(null)
+        setMode({ kind: "pick" })
+        void profilesQuery.refetch()
+    }, [profilesQuery, serverUrl])
+
+    /** Runs one change with the edit session; false (and a message) when it failed. */
+    const runEdit = React.useCallback(async (action: (token: string, profile: Profile) => Promise<Profile | null>) => {
+        if (mode.kind !== "edit") return false
+        setEditBusy(true)
+        setEditError(null)
+        try {
+            const updated = await action(mode.token, mode.profile)
+            if (updated) setMode(current => current.kind === "edit" ? { ...current, profile: updated } : current)
+            return true
+        }
+        catch (error) {
+            const code = errorCode(error)
+            log.warning("Editing the profile failed", code)
+            if (isSessionError(code)) {
+                setPickError("The profile changed meanwhile. Open it again to edit it.")
+                closeEditor(null)
+            } else {
+                setEditError(errorText(error, "Couldn't save the change"))
+            }
+            return false
+        }
+        finally {
+            setEditBusy(false)
+        }
+    }, [closeEditor, mode])
+
+    const onRename = React.useCallback((name: string) => runEdit(async (token, profile) => {
+        return (await updateProfile(serverUrl, profile.id, { name }, token)) ?? null
+    }), [runEdit, serverUrl])
+
+    const onAvatar = React.useCallback((avatarId: string) => runEdit(async (token, profile) => {
+        return (await updateProfile(serverUrl, profile.id, { avatarId }, token)) ?? null
+    }), [runEdit, serverUrl])
+
+    const onPin = React.useCallback((pin: string | null) => runEdit(async (token, profile) => {
+        await setProfilePin(serverUrl, profile.id, pin, token)
+        // A new PIN closes the profile's sessions, this one too: open a new one with it.
+        const session = await selectProfile(serverUrl, profile.id, pin ?? undefined)
+        if (!session?.profileToken) throw new Error("The server didn't open the profile")
+        const next = session.profile ?? { ...profile, hasPin: !!pin }
+        setMode(current => current.kind === "edit" ? { ...current, token: session.profileToken } : current)
+        toast.success(pin ? `${profile.name}'s PIN was saved` : `${profile.name}'s PIN was removed`)
+        return next
+    }), [runEdit, serverUrl])
+
+    const onDelete = React.useCallback(() => {
+        if (mode.kind !== "edit") return
+        const { profile, token } = mode
+        setEditBusy(true)
+        setEditError(null)
+        void deleteProfile(serverUrl, profile.id, token)
+            .then(() => {
+                toast.success(`${profile.name} was moved to the trash`)
+                setLastEditedId(null)
+                closeEditor(token)
+            })
+            .catch((error) => {
+                log.warning("Deleting the profile failed", errorCode(error))
+                setEditError(errorText(error, "Couldn't delete the profile"))
+            })
+            .finally(() => setEditBusy(false))
+    }, [closeEditor, mode, serverUrl])
 
     const onCreate = React.useCallback(async (input: CreateProfileInput) => {
         setCreateBusy(true)
@@ -169,7 +314,7 @@ export default function SelectProfileScreen() {
         }
     }, [enterProfile, serverUrl])
 
-    if (!statusKnown && !status.data) {
+    if (pendingEntry || (!statusKnown && !status.data)) {
         return <View className="bg-background flex-1" />
     }
 
@@ -185,6 +330,42 @@ export default function SelectProfileScreen() {
                 error={createError}
                 onCreate={input => void onCreate(input)}
                 onCancel={needsSetup ? undefined : () => setMode({ kind: "pick" })}
+            />
+        )
+    }
+
+    if (mode.kind === "edit") {
+        return (
+            <TVEditProfile
+                key={mode.profile.id}
+                serverUrl={serverUrl}
+                profile={mode.profile}
+                otherNames={profiles.filter(profile => profile.id !== mode.profile.id).map(profile => profile.name)}
+                avatars={avatars.data ?? []}
+                avatarsLoading={avatars.isLoading}
+                busy={editBusy}
+                error={editError}
+                onRename={onRename}
+                onAvatar={onAvatar}
+                onPin={onPin}
+                onDelete={onDelete}
+                onDone={() => closeEditor(mode.token)}
+            />
+        )
+    }
+
+    if (mode.kind === "manage-pin") {
+        return (
+            <TVPinPad
+                title={`Enter ${mode.profile.name}'s PIN`}
+                subtitle="To edit this profile. Type its 4 to 6 digit PIN with the keypad or the remote's number keys."
+                error={pinError}
+                busy={busyProfileId !== null}
+                onSubmit={pin => void openEditor(mode.profile, pin)}
+                onCancel={() => {
+                    setPinError(null)
+                    setMode({ kind: "pick" })
+                }}
             />
         )
     }
@@ -213,6 +394,8 @@ export default function SelectProfileScreen() {
             message={ended === "expired" || ended === "rejected" ? "Your session ended. Choose a profile to continue." : null}
             error={pickError ?? (profilesQuery.error ? errorText(profilesQuery.error, "Couldn't load the profiles") : null)}
             onSelect={onSelect}
+            onManage={onManage}
+            initialProfileId={lastEditedId}
             onAdd={() => {
                 setCreateError(null)
                 setMode({ kind: "create" })
