@@ -28,7 +28,7 @@ import { TorrentStreamPickerSheet } from "./torrent-stream-picker-sheet"
 import { TorrentStreamView } from "./torrent-stream-view"
 import { TVPillButton, TV, tvSize, TVTorrentStreamPickerDrawer } from "@/components/tv"
 import { useTorrentStreamController } from "./use-torrent-stream-controller"
-import { type ContinueStartResult, streamStartStatusAtom, TVStreamStartWatch } from "@/components/tv/tv-continue-stream-starter"
+import { type ContinueStartResult, TVStreamStartWatch, useStreamStartStatus } from "@/components/tv/tv-continue-stream-starter"
 import type { TVEpisodeCardStatus } from "@/components/tv/tv-episode-card"
 import type { Anime_Episode } from "@/api/generated/types"
 import { useIsFocused } from "expo-router"
@@ -79,17 +79,22 @@ export function AnimeEntryTorrentStreamSection({ entry, resumeRef }: AnimeEntryT
     const cardStartRef = React.useRef(cardStart)
     cardStartRef.current = cardStart
     const cancelCardStartRef = React.useRef<(() => void) | null>(null)
-    const cardStartStatus = useAtomValue(streamStartStatusAtom)
+    const cardStartStatus = useStreamStartStatus()
     const isFocused = useIsFocused()
     const lockRef = React.useRef({ locked: torrentStream.isEpisodeSelectionLocked, episode: torrentStream.loadingEpisodeNumber })
     lockRef.current = { locked: torrentStream.isEpisodeSelectionLocked, episode: torrentStream.loadingEpisodeNumber }
 
-    /** webOS: the card starts its episode (see CARD_STARTS); one at a time. */
+    /**
+     * webOS: the card starts its episode (see CARD_STARTS); one at a time.
+     * Busy only while a start of this page runs: a "preparing" or lock an
+     * earlier session left is cleared by the card's start, not obeyed.
+     */
+    const { hasOwnStartInFlight } = torrentStream
     const pressEpisodeOnCard = React.useCallback((episode: Anime_Episode) => {
         const current = cardStartRef.current
         const busyEpisode = current?.phase === "starting"
             ? current.episodeNumber
-            : lockRef.current.locked ? lockRef.current.episode : null
+            : lockRef.current.locked && hasOwnStartInFlight() ? lockRef.current.episode : null
         if (busyEpisode !== null) {
             if (busyEpisode !== episode.episodeNumber) {
                 toast.info(`Episode ${busyEpisode} is already starting. Press Back to cancel it first.`)
@@ -97,7 +102,7 @@ export function AnimeEntryTorrentStreamSection({ entry, resumeRef }: AnimeEntryT
             return
         }
         setCardStart({ id: Date.now(), episodeNumber: episode.episodeNumber, phase: "starting" })
-    }, [])
+    }, [hasOwnStartInFlight])
 
     const onCardStartResult = React.useCallback((result: ContinueStartResult) => {
         const current = cardStartRef.current

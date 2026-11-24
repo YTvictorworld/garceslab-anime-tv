@@ -31,7 +31,7 @@ import { useTVFocus } from "@/components/tv/tv-focus"
 import { SCRIM_SCROLL_THRESHOLD, TVNavScrim, useScrolledPast } from "@/components/tv/tv-nav-scrim"
 import type { TVMediaMeta } from "@/components/tv/tv-shelf"
 import { pickUpcomingEpisodes, type UpcomingEpisode } from "@/components/tv/tv-upcoming-episodes"
-import { type ContinueStartResult, streamStartStatusAtom, TVContinueStreamStarter } from "@/components/tv/tv-continue-stream-starter"
+import { type ContinueStartResult, TVContinueStreamStarter, useStreamStartStatus } from "@/components/tv/tv-continue-stream-starter"
 import type { TVEpisodeCardStatus } from "@/components/tv/tv-episode-card"
 import { toast } from "@/lib/utils/toast"
 import { getWatchHistoryResumePercent, WEB_TV_RESUME_RULE } from "@/lib/player/resume-position"
@@ -272,7 +272,7 @@ export function TVLibraryScreen() {
     const streamStartRef = React.useRef(streamStart)
     streamStartRef.current = streamStart
     const cancelStartRef = React.useRef<(() => void) | null>(null)
-    const startStatus = useAtomValue(streamStartStatusAtom)
+    const startStatus = useStreamStartStatus()
 
     /** The show's page, with the episode started there as if pressed (or nothing started). */
     const openEntry = React.useCallback((mediaId: number, view: AnimeEntryView, intent?: AnimeEntryPlaybackIntent["kind"], episodeNumber?: number) => {

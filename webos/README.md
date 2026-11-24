@@ -116,7 +116,11 @@ before the library lists:
   the player left running, the TV's audio checks and resume positions all apply. While
   one card is starting, other cards don't start anything. Back cancels the start and
   ends the server's stream. If it fails (no release, a server error, no news from the
-  server for 2 minutes), the card shows why for 15 seconds; OK on it then opens the
+  server for 2 minutes, nothing started within 12 seconds), the card shows why for 15
+  seconds; a start that can't begin at all (no live connection, an episode without an
+  AniDB mapping) fails at once with its reason. Each start first clears what an earlier
+  one left (a stuck "preparing", an old status message), so it can't block the new
+  start or show on its card; OK on it then opens the
   show to pick the episode or release by hand. With auto-select off, the show opens
   on its release list. Library files and online streams still open the show and start
   there. To open the show without playing, use the slide's *View details* button or
@@ -286,7 +290,8 @@ server's steps on that card at once ("Selecting best torrent...", "Loading...") 
 to cancel*. While it starts, OK on another episode only says "Episode N is already starting.
 Press Back to cancel it first."; a failure turns the card red with the reason (OK tries
 again). It is the same start as Continue watching's, with the page's own stream mode and
-auto-select toggles.
+auto-select toggles. The card shows only this start's own steps, never a message an earlier
+stream left behind.
 
 The built-in player is the TV's HTML5 video engine, not libmpv.
 

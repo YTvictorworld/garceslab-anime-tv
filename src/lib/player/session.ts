@@ -26,6 +26,7 @@ import { MPVCORE_EVENT, NATIVE_PLAYER_EVENT, type NativePlayerServerEvent, parse
 import { forgetKeptStream, type KeptDirectStream } from "./kept-direct-stream"
 import { openExternalPlayerURL } from "./external-players"
 import { getPlayerPreferences } from "./player-preferences"
+import { streamStarts } from "./stream-start"
 import type { AnimeEntryLaunchView, MobilePlaybackSource, PlayerNextEpisodeAction } from "./types"
 
 export const currentPlaybackSourceAtom = atom<MobilePlaybackSource | null>(null)
@@ -525,6 +526,8 @@ export function usePlayerEventListener() {
             }
 
             const resetTorrentStreamState = () => {
+                // A failed, aborted or stopped stream ends the start in flight.
+                streamStarts.end()
                 clearLoadingFallback()
                 clearCancelManualTrackingTimer()
                 streamSessionModeRef.current = null
@@ -579,6 +582,8 @@ export function usePlayerEventListener() {
                     continuityKind: "external_player",
                 }
 
+                // The start is over: server events after this belong to the stream that plays.
+                streamStarts.end()
                 clearLoadingFallback()
                 setIsPreparing(false)
                 setPendingInfo(null)

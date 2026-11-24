@@ -27,6 +27,7 @@ import { profileErrorMessage } from "@/lib/profile/profile-errors"
 import { streamPlaybackType } from "@/lib/player/direct-stream"
 import { endKeptStream, findKeptStream, probeKeptStream } from "@/lib/player/kept-direct-stream"
 import { useOpenKeptStream } from "@/lib/player/session"
+import { startBlockReason, streamStarts } from "@/lib/player/stream-start"
 import {
     activeStreamSessionAtom,
     debridStreamStateAtom,
@@ -64,6 +65,20 @@ export type TorrentResolution = (typeof TORRENT_RESOLUTIONS)[number] | undefined
 export type TorrentSearchMode = "smart" | "simple"
 export type TorrentSheetStage = "torrents" | "files" | "providers"
 export type StreamEpisodeLaunchMode = "manual" | "previous-batch"
+
+/**
+ * What pressing an episode (or starting a stream) did. `blocked` starts
+ * nothing and says why, so a TV start card can fail at once instead of
+ * waiting for a stream that never comes.
+ */
+export type StreamStartResult =
+    | { kind: "started" }
+    | { kind: "resuming" }
+    | { kind: "picker" }
+    | { kind: "blocked"; reason: string }
+
+const STARTED: StreamStartResult = { kind: "started" }
+const PICKER: StreamStartResult = { kind: "picker" }
 
 type PreviousBatchSelection = {
     torrent: HibikeTorrent_AnimeTorrent
@@ -130,16 +145,16 @@ export function useTorrentStreamController({ entry, mode = "stream" }: UseTorren
     const pendingStreamInfo = useAtomValue(torrentStreamPendingInfoAtom)
     const isLiveConnected = useAtomValue(websocketConnectedAtom)
     // The server says when the stream is ready over the websocket; without it the start would wait forever.
-    const ensureLiveConnection = React.useCallback(() => {
-        if (isLiveConnected || Platform.OS !== "web") return true
+    const ensureLiveConnection = React.useCallback((): string | null => {
+        if (isLiveConnected || Platform.OS !== "web") return null
         if (isWebsocketRefusedForOrigin(serverStatus)) {
             log.error("Cannot start a stream: the server refuses the websocket until it has a password")
             toast.error(WEBSOCKET_NEEDS_PASSWORD_MESSAGE)
-            return false
+            return WEBSOCKET_NEEDS_PASSWORD_MESSAGE
         }
         log.error("Cannot start a stream: the websocket is not connected")
         toast.error("No live connection to the Garceslab Anime server, so the stream can't start. Check the connection and try again.")
-        return false
+        return "No live connection to the server"
     }, [isLiveConnected, serverStatus])
     const isPreparingStream = useAtomValue(torrentStreamIsPreparingAtom)
     const loadingState = useAtomValue(torrentStreamLoadingStateAtom)
@@ -388,10 +403,20 @@ export function useTorrentStreamController({ entry, mode = "stream" }: UseTorren
     React.useEffect(() => {
         episodeSelectionLockedRef.current = isEpisodeSelectionLocked
     }, [isEpisodeSelectionLocked])
+    const lockedByAtomsRef = React.useRef(isEpisodeSelectionLocked)
+    lockedByAtomsRef.current = isEpisodeSelectionLocked
 
     const setDirectStreamLoadingMessage = useSetAtom(directStreamLoadingMessageAtom)
     const setStreamStartError = useSetAtom(streamStartErrorAtom)
+    /** The start this controller began last; in flight while it is `streamStarts.current()`. */
+    const ownStartIdRef = React.useRef<number | null>(null)
+    const beginStart = React.useCallback(() => {
+        const id = streamStarts.begin()
+        ownStartIdRef.current = id
+        return id
+    }, [])
     const clearPendingStreamState = React.useCallback(() => {
+        streamStarts.end()
         setDirectStreamLoadingMessage(null)
         setPendingInfo(null)
         setStreamSessionMode(null)
@@ -455,6 +480,8 @@ export function useTorrentStreamController({ entry, mode = "stream" }: UseTorren
 
     const openKeptStream = useOpenKeptStream()
     const resumingRef = React.useRef(false)
+    /** The TV checks the releases auto-select would pick (startPlayableAutoSelectedStream). */
+    const checkingReleaseRef = React.useRef(false)
     /** Bumped when the screen goes away or another stream starts: a pending resume check is then dropped. */
     const resumeTokenRef = React.useRef(0)
     const cancelResume = React.useCallback(() => {
@@ -463,6 +490,56 @@ export function useTorrentStreamController({ entry, mode = "stream" }: UseTorren
     }, [])
     React.useEffect(() => cancelResume, [cancelResume])
     useFocusEffect(React.useCallback(() => cancelResume, [cancelResume]))
+
+    /** A start that can't go ahead: logged with its reason (TV debug log), nothing sent. */
+    const blockedStart = React.useCallback((reason: string, context: Record<string, unknown>): StreamStartResult => {
+        log.warning(`Stream not started: ${reason}`, context)
+        return { kind: "blocked", reason }
+    }, [])
+
+    /**
+     * A start that stopped after it was reported as started (the TV's release
+     * check found the connection gone): fail it, so the card that follows it
+     * says why instead of waiting.
+     */
+    const failStartedStream = React.useCallback((result: StreamStartResult) => {
+        if (result.kind !== "blocked") return
+        setStreamStartError(result.reason)
+        clearPendingStreamState()
+    }, [clearPendingStreamState, setStreamStartError])
+
+    /** A start of this controller is running (not one another screen, or an old session, left behind). */
+    const hasOwnStartInFlight = React.useCallback(() => {
+        return ownStartIdRef.current !== null && streamStarts.isCurrent(ownStartIdRef.current)
+    }, [])
+
+    /**
+     * Before a TV card starts an episode: what an earlier session left (a
+     * cancelled or abandoned start, server events that came after the player
+     * opened) is cleared, so it can't block this start or show its status on
+     * the card. Does nothing while this controller's own start runs.
+     */
+    const clearStaleStartState = React.useCallback(() => {
+        if (hasOwnStartInFlight()) return false
+        const leftover = streamStarts.current() !== null
+            || episodeSelectionLockedRef.current
+            || resumingRef.current
+            || checkingReleaseRef.current
+        if (leftover) {
+            log.info("Clearing what an earlier stream start left", {
+                start: streamStarts.current(),
+                locked: episodeSelectionLockedRef.current,
+                resuming: resumingRef.current,
+                checkingRelease: checkingReleaseRef.current,
+            })
+        }
+        cancelResume()
+        checkingReleaseRef.current = false
+        episodeSelectionLockedRef.current = false
+        clearPendingStreamState()
+        setStreamStartError(null)
+        return true
+    }, [cancelResume, clearPendingStreamState, hasOwnStartInFlight, setStreamStartError])
 
     /**
      * webOS: the stream the player left for this episode still runs on the
@@ -474,11 +551,15 @@ export function useTorrentStreamController({ entry, mode = "stream" }: UseTorren
         const kept = findKeptStream(mediaId, episodeNumber)
         if (!kept) return false
         if (resumingRef.current) return true
+        log.info("Checking the stream the player left before resuming it", { mediaId, episodeNumber })
         resumingRef.current = true
         const token = ++resumeTokenRef.current
         void probeKeptStream(kept).then((probe) => {
             // The user left the screen or started something else meanwhile.
-            if (token !== resumeTokenRef.current) return
+            if (token !== resumeTokenRef.current) {
+                log.info("Resume check dropped: the screen went away or another start began", { mediaId, episodeNumber })
+                return
+            }
             resumingRef.current = false
             // The server ended the kept stream meanwhile: start the episode as usual.
             if (findKeptStream(kept.mediaId, kept.episodeNumber)?.playbackId !== kept.playbackId) {
@@ -496,11 +577,15 @@ export function useTorrentStreamController({ entry, mode = "stream" }: UseTorren
         return true
     }, [mediaId, openKeptStream])
 
-    const startAutoSelectedStream = React.useCallback((episode: Anime_Episode, mode: StreamMode = streamMode) => {
-        if (!episode.aniDBEpisode || !mediaId || !ensureLiveConnection()) return
+    const startAutoSelectedStream = React.useCallback((episode: Anime_Episode, mode: StreamMode = streamMode): StreamStartResult => {
+        const aniDBEpisode = episode.aniDBEpisode
+        const blocked = startBlockReason({ hasAniDBEpisode: !!aniDBEpisode, mediaId }) ?? ensureLiveConnection()
+        if (blocked || !aniDBEpisode) return blockedStart(blocked ?? "No AniDB episode", { mediaId, episodeNumber: episode.episodeNumber, step: "auto-select" })
         // A new stream replaces the one the player left (webOS); end it first.
         cancelResume()
         endKeptStream("terminate")
+        // Continues the TV's release check's start, or begins one.
+        if (ownStartIdRef.current === null || !streamStarts.isCurrent(ownStartIdRef.current)) beginStart()
         episodeSelectionLockedRef.current = true
         log.info(`Starting ${mode} stream`, {
             mediaId,
@@ -537,7 +622,7 @@ export function useTorrentStreamController({ entry, mode = "stream" }: UseTorren
                 {
                     mediaId,
                     episodeNumber: episode.episodeNumber,
-                    aniDBEpisode: episode.aniDBEpisode,
+                    aniDBEpisode,
                     autoSelect: true,
                     fileId: "",
                     playbackType: streamPlaybackType("debrid"),
@@ -559,7 +644,7 @@ export function useTorrentStreamController({ entry, mode = "stream" }: UseTorren
                     },
                 },
             )
-            return
+            return STARTED
         }
 
         setDebridStreamState(null)
@@ -569,7 +654,7 @@ export function useTorrentStreamController({ entry, mode = "stream" }: UseTorren
             {
                 mediaId,
                 episodeNumber: episode.episodeNumber,
-                aniDBEpisode: episode.aniDBEpisode,
+                aniDBEpisode,
                 autoSelect: true,
                 playbackType: streamPlaybackType(),
                 clientId: getClientIdentity().clientId,
@@ -590,9 +675,10 @@ export function useTorrentStreamController({ entry, mode = "stream" }: UseTorren
                 },
             },
         )
+        return STARTED
     },
-        [clearPendingStreamState, ensureLiveConnection, entry, mediaId, resetPicker, setActiveStreamSession, setDebridStreamState, setIsPreparing, setLoadingState,
-            setPendingInfo, setStreamSessionMode, startDebridStream, startTorrentStream, streamMode])
+        [beginStart, blockedStart, cancelResume, clearPendingStreamState, ensureLiveConnection, entry, mediaId, resetPicker, setActiveStreamSession, setDebridStreamState,
+            setIsPreparing, setLoadingState, setPendingInfo, setStreamSessionMode, startDebridStream, startTorrentStream, streamMode])
 
     const startManualStream = React.useCallback((params: {
         episode: Anime_Episode
@@ -601,10 +687,15 @@ export function useTorrentStreamController({ entry, mode = "stream" }: UseTorren
         fileIndex?: number
         batchEpisodeFiles?: HibikeTorrent_BatchEpisodeFiles
         launchMode?: StreamEpisodeLaunchMode
-    }, mode: StreamMode = streamMode) => {
-        if (!params.episode.aniDBEpisode || !mediaId || !ensureLiveConnection()) return
+    }, mode: StreamMode = streamMode): StreamStartResult => {
+        const aniDBEpisode = params.episode.aniDBEpisode
+        const blocked = startBlockReason({ hasAniDBEpisode: !!aniDBEpisode, mediaId }) ?? ensureLiveConnection()
+        if (blocked || !aniDBEpisode) {
+            return blockedStart(blocked ?? "No AniDB episode", { mediaId, episodeNumber: params.episode.episodeNumber, step: params.launchMode ?? "manual" })
+        }
         cancelResume()
         endKeptStream("terminate")
+        if (ownStartIdRef.current === null || !streamStarts.isCurrent(ownStartIdRef.current)) beginStart()
         episodeSelectionLockedRef.current = true
         log.info(`Starting ${mode} stream`, {
             mediaId,
@@ -656,7 +747,7 @@ export function useTorrentStreamController({ entry, mode = "stream" }: UseTorren
                 {
                     mediaId,
                     episodeNumber: params.episode.episodeNumber,
-                    aniDBEpisode: params.episode.aniDBEpisode,
+                    aniDBEpisode,
                     autoSelect: false,
                     torrent: params.torrent,
                     fileId: params.fileId ?? "",
@@ -684,7 +775,7 @@ export function useTorrentStreamController({ entry, mode = "stream" }: UseTorren
                     },
                 },
             )
-            return
+            return STARTED
         }
 
         setDebridStreamState(null)
@@ -694,7 +785,7 @@ export function useTorrentStreamController({ entry, mode = "stream" }: UseTorren
             {
                 mediaId,
                 episodeNumber: params.episode.episodeNumber,
-                aniDBEpisode: params.episode.aniDBEpisode,
+                aniDBEpisode,
                 autoSelect: false,
                 torrent: params.torrent,
                 fileIndex: params.fileIndex,
@@ -721,44 +812,52 @@ export function useTorrentStreamController({ entry, mode = "stream" }: UseTorren
                 },
             },
         )
+        return STARTED
     },
-        [clearPendingStreamState, ensureLiveConnection, entry, mediaId, resetPicker, setActiveStreamSession, setDebridStreamState, setIsPreparing, setLoadingState,
-            setPendingInfo, setStreamSessionMode, startDebridStream, startTorrentStream, streamMode])
+        [beginStart, blockedStart, cancelResume, clearPendingStreamState, ensureLiveConnection, entry, mediaId, resetPicker, setActiveStreamSession, setDebridStreamState,
+            setIsPreparing, setLoadingState, setPendingInfo, setStreamSessionMode, startDebridStream, startTorrentStream, streamMode])
 
     // Web TVs (LG, Samsung) don't reliably play FLAC in a video and the server can't transcode
     // a stream, so a comparable release without it is started instead.
     const choosePlayableAutoRelease = usePlayableAutoRelease({ entry, serverStatus, providerExtensions })
-    const checkingReleaseRef = React.useRef(false)
-    const isPreparingRef = React.useRef(isPreparingStream)
-    isPreparingRef.current = isPreparingStream
-    const startPlayableAutoSelectedStream = React.useCallback((episode: Anime_Episode, mode: StreamMode = streamMode) => {
-        if (Platform.OS !== "web") {
-            startAutoSelectedStream(episode, mode)
-            return
-        }
-        if (checkingReleaseRef.current || !episode.aniDBEpisode || !mediaId || !ensureLiveConnection()) return
+    const startPlayableAutoSelectedStream = React.useCallback((episode: Anime_Episode, mode: StreamMode = streamMode): StreamStartResult => {
+        if (Platform.OS !== "web") return startAutoSelectedStream(episode, mode)
+        const blocked = startBlockReason({ checkingRelease: checkingReleaseRef.current, hasAniDBEpisode: !!episode.aniDBEpisode, mediaId })
+            ?? ensureLiveConnection()
+        if (blocked) return blockedStart(blocked, { mediaId, episodeNumber: episode.episodeNumber, step: "release check" })
         checkingReleaseRef.current = true
+        // The id, not the "preparing" atom, says whether this start was cancelled meanwhile:
+        // the check can answer before React re-renders with "preparing" set (no providers
+        // loaded yet resolves at once), and a render-time copy of the atom then still says
+        // false, which dropped the start without a word while the card waited.
+        const startId = beginStart()
+        log.info("Checking the release auto-select would pick", { mediaId, episodeNumber: episode.episodeNumber, mode, startId })
         setActiveStreamSession(toActiveStreamSession(mode, entry, episode, "Selecting best torrent..."))
         setIsPreparing(true)
         void choosePlayableAutoRelease(episode.episodeNumber, mode).then((choice) => {
             checkingReleaseRef.current = false
-            // Cancelled while the releases were checked.
-            if (!isPreparingRef.current) return
+            if (!streamStarts.isCurrent(startId)) {
+                log.info("Release check finished after its start was cancelled or replaced", { mediaId, episodeNumber: episode.episodeNumber, startId })
+                return
+            }
             if (!choice) {
-                startAutoSelectedStream(episode, mode)
+                failStartedStream(startAutoSelectedStream(episode, mode))
                 return
             }
             log.info("Starting a release without audio the TV can't play", { avoided: choice.avoided.name, instead: choice.torrent.name })
             toast.info(`Picked ${choice.torrent.releaseGroup || "another release"} instead of a release with ${choice.problem} audio, which ${tvBrand()} TVs may not play.`)
-            startManualStream({ episode, torrent: choice.torrent }, mode)
+            const started = startManualStream({ episode, torrent: choice.torrent }, mode)
+            failStartedStream(started)
+            if (started.kind === "blocked") return
             // Still an auto-selected episode: the next one is auto-selected too.
             setPendingInfo(info => info && {
                 ...info,
                 nextEpisodeAction: mode === "debrid" ? "debridstream-auto-select" : "torrentstream-auto-select",
             })
         })
-    }, [choosePlayableAutoRelease, ensureLiveConnection, entry, mediaId, setActiveStreamSession, setIsPreparing, setPendingInfo, startAutoSelectedStream,
-        startManualStream, streamMode])
+        return STARTED
+    }, [beginStart, blockedStart, choosePlayableAutoRelease, ensureLiveConnection, entry, failStartedStream, mediaId, setActiveStreamSession, setIsPreparing,
+        setPendingInfo, startAutoSelectedStream, startManualStream, streamMode])
 
     const buildBatchEpisodeFiles = React.useCallback((
         previews: StreamFilePreview[] | undefined,
@@ -830,11 +929,17 @@ export function useTorrentStreamController({ entry, mode = "stream" }: UseTorren
         }
     }, [batchHistory, guessPreviousBatchFileIndex, streamMode, supportsIndexedDebridHistory, supportsPreviousBatch])
 
-    const handleEpisodePressRef = React.useRef<(episode: Anime_Episode) => void>(() => undefined)
-    const handleEpisodePress = React.useCallback((episode: Anime_Episode) => {
-        if (episodeSelectionLockedRef.current || resumingRef.current) return
+    const handleEpisodePressRef = React.useRef<(episode: Anime_Episode) => StreamStartResult>(() => PICKER)
+    const handleEpisodePress = React.useCallback((episode: Anime_Episode): StreamStartResult => {
+        // A start sets the lock before React renders it; one that ended without the
+        // atoms ever showing it (the lock then never re-syncs) no longer counts.
+        const selectionLocked = episodeSelectionLockedRef.current && (hasOwnStartInFlight() || lockedByAtomsRef.current)
+        const blocked = startBlockReason({ selectionLocked, resuming: resumingRef.current })
+        if (blocked) return blockedStart(blocked, { mediaId, episodeNumber: episode.episodeNumber, step: "episode press" })
         // Played again while the stream the player left still runs: pick it up.
-        if (mode === "stream" && resumeKeptStream(episode.episodeNumber, () => handleEpisodePressRef.current(episode))) return
+        if (mode === "stream" && resumeKeptStream(episode.episodeNumber, () => failStartedStream(handleEpisodePressRef.current(episode)))) {
+            return { kind: "resuming" }
+        }
 
         setSelectedEpisodeNumber(episode.episodeNumber)
         const sMode = streamMode
@@ -847,16 +952,15 @@ export function useTorrentStreamController({ entry, mode = "stream" }: UseTorren
                     setSheetStage("files")
                     setSelectedFileId(previousBatchSelection.fileId || null)
                     setPickerOpen(true)
-                    return
+                    return PICKER
                 }
             }
             openPickerForEpisode(episode, "torrents", sMode)
-            return
+            return PICKER
         }
 
         if (autoSelect && !episodeCollection?.hasMappingError && episode.aniDBEpisode) {
-            startPlayableAutoSelectedStream(episode, sMode)
-            return
+            return startPlayableAutoSelectedStream(episode, sMode)
         }
 
         if (usePreviousBatch && batchHistory?.torrent && episode.aniDBEpisode) {
@@ -864,11 +968,11 @@ export function useTorrentStreamController({ entry, mode = "stream" }: UseTorren
 
             if (!previousBatchSelection) {
                 openPickerForEpisode(episode, "torrents", sMode)
-                return
+                return PICKER
             }
 
             if (batchAction(autoSelectFile, previousBatchSelection.fileIndex) === "start") {
-                startManualStream({
+                return startManualStream({
                     episode,
                     torrent: previousBatchSelection.torrent,
                     fileId: previousBatchSelection.fileId,
@@ -876,20 +980,20 @@ export function useTorrentStreamController({ entry, mode = "stream" }: UseTorren
                     batchEpisodeFiles: previousBatchSelection.batchEpisodeFiles,
                     launchMode: "previous-batch",
                 }, sMode)
-                return
             }
 
             setSelectedTorrent(previousBatchSelection.torrent)
             setSheetStage("files")
             setSelectedFileId(previousBatchSelection.fileId || null)
             setPickerOpen(true)
-            return
+            return PICKER
         }
 
         openPickerForEpisode(episode, "torrents", sMode)
+        return PICKER
     },
-        [autoSelect, autoSelectFile, batchHistory?.torrent, canChooseFile, episodeCollection?.hasMappingError, getPreviousBatchSelection,
-            openPickerForEpisode, resumeKeptStream, startPlayableAutoSelectedStream, startManualStream, streamMode, usePreviousBatch, mode])
+        [autoSelect, autoSelectFile, batchHistory?.torrent, blockedStart, canChooseFile, episodeCollection?.hasMappingError, failStartedStream, getPreviousBatchSelection, hasOwnStartInFlight,
+            mediaId, openPickerForEpisode, resumeKeptStream, startPlayableAutoSelectedStream, startManualStream, streamMode, usePreviousBatch, mode])
 
     React.useEffect(() => {
         handleEpisodePressRef.current = handleEpisodePress
@@ -1020,6 +1124,8 @@ export function useTorrentStreamController({ entry, mode = "stream" }: UseTorren
     return {
         availableModes,
         clearPendingStreamState,
+        clearStaleStartState,
+        hasOwnStartInFlight,
         autoSelect,
         autoSelectFile,
         batchHistory,

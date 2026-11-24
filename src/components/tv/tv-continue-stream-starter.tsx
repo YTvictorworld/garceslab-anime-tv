@@ -12,22 +12,40 @@ import {
     torrentStreamLoadingStateAtom,
     torrentStreamLoadingTorrentNameAtom,
 } from "@/lib/player"
-import { atom, useAtomValue, useSetAtom } from "jotai"
+import { streamStarts } from "@/lib/player/stream-start"
+import { logger } from "@/lib/utils/logger"
+import { useAtomValue, useSetAtom } from "jotai"
 import * as React from "react"
-import { startOutcome, type StartOutcome, startStatusLabel } from "./tv-continue-start"
+import { ownsPreparing, startOutcome, type StartOutcome, startStatusLabel } from "./tv-continue-start"
+
+const log = logger("tv-stream-start")
 
 export type ContinueStartResult = Exclude<StartOutcome, { kind: "wait" }>
 
-/** What the stream being started is doing, from the server's own status events. */
-export const streamStartStatusAtom = atom((get) => {
-    const loadingState = get(torrentStreamLoadingStateAtom)
+/** The stream start in flight (`streamStarts`), or null. */
+export function useCurrentStreamStartId() {
+    return React.useSyncExternalStore(streamStarts.subscribe, streamStarts.current, streamStarts.current)
+}
+
+/**
+ * What the stream being started is doing, from the server's own status
+ * events, while a start is in flight; an earlier session's messages aren't shown.
+ */
+export function useStreamStartStatus() {
+    const startId = useCurrentStreamStartId()
+    const loadingState = useAtomValue(torrentStreamLoadingStateAtom)
+    const torrentName = useAtomValue(torrentStreamLoadingTorrentNameAtom)
+    const directMessage = useAtomValue(directStreamLoadingMessageAtom)
+    const debridMessage = useAtomValue(debridStreamStateAtom)?.message
+    const sessionMessage = useAtomValue(activeStreamSessionAtom)?.message
     return startStatusLabel({
-        directMessage: get(directStreamLoadingMessageAtom),
-        debridMessage: get(debridStreamStateAtom)?.message,
-        torrentLabel: loadingState ? getTorrentStreamLoadingLabel(loadingState, get(torrentStreamLoadingTorrentNameAtom)) : null,
-        sessionMessage: get(activeStreamSessionAtom)?.message,
+        startInFlight: startId !== null,
+        directMessage,
+        debridMessage,
+        torrentLabel: loadingState ? getTorrentStreamLoadingLabel(loadingState, torrentName) : null,
+        sessionMessage,
     })
-})
+}
 
 type Props = {
     mediaId: number
@@ -42,7 +60,7 @@ type Props = {
  * opening the show. It loads the show and runs the show page's own stream
  * controller, pressing the episode as its episode list would, so auto-select,
  * a stream the player left, the TV's audio checks and resume all apply. It
- * renders nothing; the card shows `streamStartStatusAtom`.
+ * renders nothing; the card shows `useStreamStartStatus()`.
  */
 export function TVContinueStreamStarter(props: Props) {
     const { data: entry, isError } = useGetAnimeEntry(props.mediaId)
@@ -76,12 +94,18 @@ type WatchProps = Omit<Props, "mediaId"> & {
  * it. Renders nothing.
  */
 export function TVStreamStartWatch({ torrentStream, episodeNumber, onResult, cancelRef }: WatchProps) {
-    const preparing = useAtomValue(torrentStreamIsPreparingAtom)
+    const anyPreparing = useAtomValue(torrentStreamIsPreparingAtom)
+    const currentStartId = useCurrentStreamStartId()
     const playerOpen = useAtomValue(playerOpenAtom)
     const error = useAtomValue(streamStartErrorAtom)
     const setError = useSetAtom(streamStartErrorAtom)
-    const status = useAtomValue(streamStartStatusAtom)
+    const status = useStreamStartStatus()
     const [now, setNow] = React.useState(() => Date.now())
+    /** Starts begun after the press have larger ids; set when pressed. */
+    const issuedBeforePressRef = React.useRef<number | null>(null)
+    const preparing = issuedBeforePressRef.current !== null
+        && ownsPreparing({ preparing: anyPreparing, currentStartId, issuedBeforePress: issuedBeforePressRef.current })
+    const [blocked, setBlocked] = React.useState<string | null>(null)
     const pressedAtRef = React.useRef<number | null>(null)
     const lastProgressAtRef = React.useRef(0)
     const sawPreparingRef = React.useRef(false)
@@ -100,17 +124,25 @@ export function TVStreamStartWatch({ torrentStream, episodeNumber, onResult, can
         setError(null)
     }, [setError])
 
+    const { clearStaleStartState } = torrentStream
     React.useEffect(() => {
         if (pressedAtRef.current !== null || torrentStream.isLoadingEpisodeCollection) return
         const episode = torrentStream.episodes.find(item => item.episodeNumber === episodeNumber)
         if (!episode) {
+            log.warning("Card start: the episode isn't in the stream episode list", { episodeNumber })
             finish({ kind: "failed", message: `Episode ${episodeNumber} isn't available to stream yet` })
             return
         }
+        // What an earlier session left (a stuck "preparing", a lock, a status message)
+        // must neither block this start nor show on its card.
+        clearStaleStartState()
+        issuedBeforePressRef.current = streamStarts.lastIssued()
         pressedAtRef.current = Date.now()
         lastProgressAtRef.current = pressedAtRef.current
-        torrentStream.handleEpisodePress(episode)
-    }, [episodeNumber, finish, torrentStream.episodes, torrentStream.handleEpisodePress, torrentStream.isLoadingEpisodeCollection])
+        const result = torrentStream.handleEpisodePress(episode)
+        log.info("Card start: episode pressed", { episodeNumber, result: result.kind, reason: result.kind === "blocked" ? result.reason : undefined })
+        if (result.kind === "blocked") setBlocked(result.reason)
+    }, [clearStaleStartState, episodeNumber, finish, torrentStream.episodes, torrentStream.handleEpisodePress, torrentStream.isLoadingEpisodeCollection])
 
     const { stopCurrentStream, clearPendingStreamState } = torrentStream
     React.useEffect(() => {
@@ -150,11 +182,15 @@ export function TVStreamStartWatch({ torrentStream, episodeNumber, onResult, can
             playerOpen,
             pickerOpen: torrentStream.pickerOpen,
             error,
+            blocked,
         })
         if (outcome.kind === "wait") return
-        if (outcome.kind === "failed" && sawPreparingRef.current) clearPendingStreamState()
+        if (outcome.kind === "failed") {
+            log.warning("Card start failed", { episodeNumber, message: outcome.message, sawPreparing: sawPreparingRef.current })
+            if (sawPreparingRef.current) clearPendingStreamState()
+        }
         finish(outcome)
-    }, [clearPendingStreamState, error, finish, now, playerOpen, preparing, torrentStream.pickerOpen])
+    }, [blocked, clearPendingStreamState, episodeNumber, error, finish, now, playerOpen, preparing, torrentStream.pickerOpen])
 
     return null
 }
