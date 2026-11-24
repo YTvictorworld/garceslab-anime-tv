@@ -14,6 +14,8 @@ type Props = {
     tag?: EpisodeTagKind
     text: string
     confirmLabel: string
+    /** The first (focused) button's label. */
+    cancelLabel?: string
     danger?: boolean
     onCancel: () => void
     onConfirm: () => void
@@ -26,6 +28,7 @@ export function TVPlayerDialog({
     tag,
     text,
     confirmLabel,
+    cancelLabel = "Cancel",
     danger,
     onCancel,
     onConfirm,
@@ -113,7 +116,7 @@ export function TVPlayerDialog({
                 >
                     <TVButton
                         ref={cancelRef}
-                        label="Cancel"
+                        label={cancelLabel}
                         preferred
                         onPress={onCancel}
                     />

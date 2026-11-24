@@ -10,7 +10,7 @@ import type {
     Onlinestream_VideoSource,
 } from "@/api/generated/types"
 import type { ServerLocalIdentity } from "@/lib/offline/server-local-store"
-import type { MpvChapter, MpvExternalSubtitle, MpvMediaEvent, MpvMediaInfoSummary, MpvSourceAudioTrack, MpvStreamedSubtitles } from "expo-mpv-player"
+import type { MpvChapter, MpvExternalSubtitle, MpvFontData, MpvMediaEvent, MpvMediaInfoSummary, MpvSourceAudioTrack, MpvStreamedSubtitles } from "expo-mpv-player"
 
 ///////////////////////////////////////////////////////////////////////////////
 // Mobile playback source
@@ -96,6 +96,12 @@ export type MobilePlaybackSource = {
     /** MKV metadata parsed by the backend (chapters, fonts, subtitle tracks). */
     mkvMetadata?: MKVParser_Metadata
 
+    /**
+     * Direct play: `url` is the debrid link itself, played by the TV
+     * without the server's direct stream; subtitles are read from the file
+     * on the TV (direct-play-session.ts).
+     */
+    directPlay?: boolean
     continuityKind: Continuity_Kind
 
     /** Seconds to resume from. Populated from continuity before playback starts. */
@@ -143,6 +149,8 @@ export type WebPlaybackPlan = {
     onMediaEvent?: (event: MpvMediaEvent) => void
     /** Fonts the file carries, for drawing its ASS subtitles with libass. */
     subtitleFonts?: string[]
+    /** Fonts the TV reads from the file itself (direct play); later ones are added to libass as they come. */
+    subtitleFontData?: MpvFontData
     /** The file's audio tracks and how the TV takes them, so the player can leave one it plays no sound for. */
     audioTracks?: MpvSourceAudioTrack[]
     onAudioTrackFallback?: (from: MpvSourceAudioTrack, to: MpvSourceAudioTrack) => void

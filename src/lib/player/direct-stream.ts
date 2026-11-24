@@ -6,6 +6,7 @@ import type { MKVParser_Metadata, NativePlayer_PlaybackInfo } from "@/api/genera
 import { logger } from "@/lib/utils/logger"
 import type { MpvChapter, MpvMediaEvent, MpvStreamedSubtitleLine, MpvStreamedSubtitles } from "expo-mpv-player"
 import { Platform } from "react-native"
+import { takeDirectPlayForDebridStart } from "./direct-play-mode"
 import { eventsOf, newLines, toLines } from "./direct-stream-format"
 import { probeStreamUrl } from "./kept-direct-stream"
 import type { MobilePlaybackSource } from "./types"
@@ -30,9 +31,16 @@ export const NATIVE_PLAYER_EVENT = "native-player"
 export const MPVCORE_EVENT = "mpvcore"
 const VIDEOCORE_EVENT = "videocore"
 
-/** The playback type to ask the server for when starting a torrent or debrid stream. */
-export function streamPlaybackType(): "nativeplayer" | "externalPlayerLink" {
-    return Platform.OS === "web" ? "nativeplayer" : "externalPlayerLink"
+/**
+ * The playback type to ask the server for when starting a torrent or debrid
+ * stream. The direct-play test build asks for the debrid link itself
+ * (direct-play-mode.ts); call this once per start, as it consumes a
+ * pending "Retry via server".
+ */
+export function streamPlaybackType(mode: "torrent" | "debrid" = "torrent"): "nativeplayer" | "externalPlayerLink" {
+    if (Platform.OS !== "web") return "externalPlayerLink"
+    if (mode === "debrid" && takeDirectPlayForDebridStart()) return "externalPlayerLink"
+    return "nativeplayer"
 }
 
 export type NativePlayerServerEvent =

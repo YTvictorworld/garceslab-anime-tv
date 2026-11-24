@@ -2216,6 +2216,23 @@ export const API_ENDPOINTS = {
             endpoint: "/api/v1/profiles/me/player-prefs",
         },
     },
+    PROFILES_VIEWERS: {
+        GetViewerSessions: {
+            key: "PROFILES-VIEWERS-get-viewer-sessions",
+            methods: ["GET"],
+            endpoint: "/api/v1/profiles/viewers",
+        },
+        /**
+         *  @description
+         *  Route ends a viewer session and frees its slot.
+         *  The device is told its session ended; a debrid link still being resolved for it is cancelled.
+         */
+        StopViewerSession: {
+            key: "PROFILES-VIEWERS-stop-viewer-session",
+            methods: ["POST"],
+            endpoint: "/api/v1/profiles/viewers/{sessionId}/stop",
+        },
+    },
     RELEASES: {
         /**
          *  @description

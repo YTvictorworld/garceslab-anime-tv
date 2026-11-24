@@ -162,6 +162,7 @@ export function useMpvPlayer() {
         if (playbackPlan.streamedSubtitles) videoSource.streamedSubtitles = playbackPlan.streamedSubtitles
         if (playbackPlan.onMediaEvent) videoSource.onMediaEvent = playbackPlan.onMediaEvent
         if (playbackPlan.subtitleFonts?.length) videoSource.subtitleFonts = playbackPlan.subtitleFonts
+        if (playbackPlan.subtitleFontData) videoSource.subtitleFontData = playbackPlan.subtitleFontData
         if (playbackPlan.audioTracks?.length) videoSource.audioTracks = playbackPlan.audioTracks
         if (playbackPlan.onAudioTrackFallback) videoSource.onAudioTrackFallback = playbackPlan.onAudioTrackFallback
         if (!prefs.assRendering) videoSource.assRendering = false

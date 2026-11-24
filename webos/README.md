@@ -464,7 +464,10 @@ The built-in player is the TV's HTML5 video engine, not libmpv.
   - For library files, embedded tracks are extracted by the server. This needs its
     media streaming module and FFmpeg on the server. PGS tracks of library files are not
     handled yet.
-  - **Torrent and debrid streams** use the server's *direct stream*, the same mode the
+  - **Debrid streams play directly** on the TV by default (see *Direct play of debrid
+    streams* below); the TV reads their subtitles itself.
+  - **Torrent streams** (and debrid streams sent through the server) use the server's
+    *direct stream*, the same mode the
     Seanime web player uses: the server serves the file with a type the TV accepts and
     reads its subtitle lines as it goes, sending them over the websocket once the player
     has loaded the file, and again from the new position after a seek. All embedded
@@ -695,6 +698,75 @@ are released, so a long seek doesn't continue when you come back.
   stream start from an episode card.
 - Whether a sideloaded app really can't show a toast or put cards on the home screen of
   the C3. That is what LG's docs and staff say (see Start screen); it was not tried.
+
+## Direct play of debrid streams (default)
+
+Debrid (TorBox) streams play **directly**: the server only resolves the link and the
+TV's `<video>` plays it, with the MKV's own subtitles read on the TV. This is what lets
+**up to three TVs watch at the same time** (the server keeps one *viewing slot* per
+device; see `docs/phase2-direct-play.md` in the server repository). Torrent streams,
+library files and online streams play as before. Build with `EXPO_PUBLIC_DIRECT_PLAY=0`
+to send every debrid stream through the server instead.
+
+The phase 1.5 test build still builds side by side, with the loud failure dialog:
+
+```bash
+WEBOS_APP_ID=app.garceslab.anime.directtest WEBOS_APP_TITLE="GA Direct Test" npm run build:webos
+# -> dist/webos/app.garceslab.anime.directtest_<version>_all.ipk
+```
+
+Any app id containing `directtest` (or `EXPO_PUBLIC_DIRECT_PLAY_TEST=1`) makes a test
+build.
+
+- **Getting the link:** the app starts the debrid stream with the `externalPlayerLink`
+  playback type: the server takes a viewing slot for the TV, resolves the TorBox link and
+  sends it, and the stream's status, to this TV only (`external-player-open-url`),
+  without starting its direct stream. When all slots are taken the episode card says
+  *"All 3 viewing slots are in use (Ana, Bob and Carl). Try again when someone stops
+  watching."*
+- **Video:** the link goes straight into the TV's `<video>`.
+- **Subtitles:** read on the TV from the MKV with HTTP Range requests
+  (`src/lib/player/mkv/`): the header (Tracks, Cues) first, then only the subtitle blocks.
+  TorBox's CDN answers **429** to a client that sends many requests while its `<video>`
+  streams from it, so the reads are few and large: the blocks the Cues point at are
+  merged into one read when less than 2 MiB lies between them (at most 6 MiB a read), one
+  request at a time and at least 1 s apart (`EXPO_PUBLIC_DIRECT_PLAY_MIN_GAP_MS` at build
+  time changes the gap). The lines from the playhead up to 90 s ahead come first; the rest
+  of the file follows in the background (2 s between reads), which stops while the video
+  buffers or seeks. A 429 or 503 waits for Retry-After (when the CDN lets the page read
+  it) or 2 s, 4 s, … up to 60 s and tries again quietly; reading only gives up, with the
+  dialog below, after several failures in a row **and** with no lines near the playhead.
+  Without Cues for the subtitle blocks, the file is read in 4 MiB chunks a minute ahead of
+  playback (a second download, paced to playback). Fonts (the Attachments element) are
+  read in a few large reads after the first subtitle reads. ASS is drawn with
+  JASSUB/libass with the file's fonts, SRT as text. Image subtitles (PGS) are not read.
+- **CORS:** the reads use `fetch` first. If the CDN doesn't allow the app's origin, the
+  ranges go through the app's JS service (`range` method), never the video (the test
+  build says so in a toast). TorBox's CDN allowed it on the C3 (`Origin: null` with Range).
+- **Audio:** the file's audio tracks are listed from the header; switching uses the
+  `<video>`'s `audioTracks`.
+- **Progress:** reported per profile as the native apps do it (manual tracking, which
+  marks the anime as watching, continuity every 15 s, the episode marked watched at
+  85 %). Leaving the player frees the TV's viewing slot.
+- **Failures fall back quietly:** if the TV can't play the link, or can't read the file's
+  header, the same release starts once through the server's direct stream (*"Playing
+  through the server instead."*). Subtitles that stop loading part way only say so; a
+  video failure later in the episode shows the error screen with **Retry via server**.
+  The test build instead opens a dialog that says what failed ("Direct play failed:
+  reading subtitles: …") with **Retry via server**.
+- **Slot ended by the server:** *Stop* in Settings → Profiles on another device, or the
+  same profile starting to watch elsewhere, closes the player with a message. A slot
+  that lapsed while the player stayed open (idle, websocket gap) is taken again quietly.
+- **Diagnostics:** turn on **Playback stats** (Info) to show the direct-play panel (for
+  support): reader
+  path and CORS, container and muxer, codecs, **CDN requests, 429/503 answers, retries,
+  bytes, the read in flight and any backoff**, subtitle tracks with lines read, strategy,
+  fonts, audio tracks and `audioTracks` support and switches, buffered
+  ranges, the last seek's latency, MediaError and errors. The same summary goes to the
+  debug log (see below) every minute and when the episode closes, prefixed
+  `[direct-play] Direct play summary`. It never contains the link.
+
+`npm test` covers the parser on generated samples (`tests/fixtures/mkv/make-fixtures.sh`).
 
 ## Debug logs
 

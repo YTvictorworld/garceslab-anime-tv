@@ -125,3 +125,47 @@ export function lunaSubscribe(uri: string, params: Record<string, unknown>, onRe
     }
     return { cancel }
 }
+
+/**
+ * Calls `uri` once and resolves with the service's answer as it is, failures
+ * included (`returnValue: false` with `errorCode`/`errorText`). Resolves
+ * null outside a TV, when the bridge throws, or after `timeoutMs`.
+ */
+export function lunaRequest(uri: string, params: Record<string, unknown>, { timeoutMs = 10_000 } = {}): Promise<LunaResponse | null> {
+    if (!hasLunaBridge()) return Promise.resolve(null)
+    const Bridge = (window as BridgeWindow).PalmServiceBridge!
+    return new Promise((resolve) => {
+        let bridge: ServiceBridge | null = null
+        let settled = false
+        const finish = (value: LunaResponse | null) => {
+            if (settled) return
+            settled = true
+            clearTimeout(timer)
+            if (bridge) {
+                inFlight.delete(bridge)
+                try {
+                    bridge.cancel?.()
+                } catch {
+                    // Already closed by the service.
+                }
+            }
+            resolve(value)
+        }
+        const timer = setTimeout(() => finish(null), timeoutMs)
+        try {
+            bridge = new Bridge()
+            inFlight.add(bridge)
+            bridge.onservicecallback = (message) => {
+                try {
+                    const response = JSON.parse(message) as unknown
+                    finish(response && typeof response === "object" ? response as LunaResponse : null)
+                } catch {
+                    finish(null)
+                }
+            }
+            bridge.call(uri, JSON.stringify(params))
+        } catch {
+            finish(null)
+        }
+    })
+}

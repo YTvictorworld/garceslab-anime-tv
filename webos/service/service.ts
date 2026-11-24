@@ -2,6 +2,7 @@
  * Tenji's webOS JS service. webos/build.mjs bundles it with `ws` 7 for Node 8 (webOS 6) and
  * packages it in the IPK as `<app id>.service`; see relay.ts for what it does.
  */
+import { createRangeHandler } from "./range.ts"
 import { createRelay } from "./relay.ts"
 
 /** Set by the build from appinfo.json. */
@@ -22,3 +23,10 @@ const relay = createRelay(WebSocket, { log: line => console.log(`[relay] ${line}
 service.register("connect", relay.connect, relay.cancel)
 service.register("send", relay.send)
 service.register("close", relay.close)
+// Direct-play spike: subtitle bytes of a debrid MKV when CORS keeps the page from reading them.
+service.register("range", createRangeHandler({
+    http: require("http"),
+    https: require("https"),
+    Buffer,
+    resolveUrl: require("url").resolve,
+}, line => console.log(`[range] ${line}`)))
