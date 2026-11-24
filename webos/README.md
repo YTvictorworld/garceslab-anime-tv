@@ -186,6 +186,15 @@ the app asks **"Who's watching?"** on every cold launch, after the server connec
   PIN opens a numeric keypad (the remote's number keys type too). A wrong PIN (403) says
   so and clears the digits; after five the server locks the profile for a few minutes
   (429), and the keypad says how long. *Add profile* creates another one.
+- **Edit profile** (the TV's stand-in for the web's hover): the focused profile shows a small
+  *Edit* button under it, reached with Down. It asks for the profile's PIN first, if it has
+  one, then lets you rename it (on-screen keyboard), pick another avatar, add, change or
+  remove the PIN, and *Delete profile*: a confirmation (Cancel focused) says it goes to the
+  server's trash and can be restored from the web for 30 days. The server only takes these
+  with a profile session, so the TV opens one for the edited profile (`POST
+  /api/v1/profiles/{id}/select`, with its PIN), sends its token with `PATCH
+  /api/v1/profiles/{id}`, `PUT .../pin` and `DELETE /api/v1/profiles/{id}`, opens a new one
+  after a PIN change (which closes the profile's sessions) and logs out when you leave.
 - A server without profiles yet shows **"Create your profile"**: a name typed on the
   on-screen keyboard, an avatar from the server's catalog (`GET /api/v1/avatars`, images
   from `/profile-avatars/<file>`), then an optional PIN and two optional imports: a public
@@ -197,8 +206,11 @@ the app asks **"Who's watching?"** on every cold launch, after the server connec
   was deleted), the app goes back to the picker.
 - Requests carry `X-Seanime-Profile`, the live connection `?profile=`. Saved responses
   (the instant start screen) are kept per profile; entering another profile clears them.
-- Settings has **Switch profile**. `PLAYBACK_BUSY` (another profile is playing) shows
-  "Another playback is in progress".
+- The nav bar ends with the **profile's avatar**: OK opens a *Switch profile* drawer with the
+  other profiles (OK enters one straight away, after its PIN on a keypad in the drawer) and
+  *Manage profiles*, which leaves for "Who's watching?". Back leaves the keypad, then closes
+  the drawer. Settings keeps its gear and its **Switch profile** too. `PLAYBACK_BUSY`
+  (another profile is playing) shows "Another playback is in progress".
 - The anime page has a **Favourite** pill next to *Add to list* / *Edit entry*: OK toggles
   the anime in the profile's favourites (the heart fills in). *Add to list* and the entry
   drawer save to the profile's local list as before.
@@ -211,8 +223,18 @@ the app asks **"Who's watching?"** on every cold launch, after the server connec
   Changes are saved about 1.5 s after the last one, only to the profile in use. Video output,
   external player, gestures, the Wyzie key, per-file delays and stats stay on the TV. Servers
   without the endpoint keep the TV's preferences as before.
-- The nav bar's **Settings** tab shows the profile's avatar. The avatar grid ends with the
-  licence line and the credits the CC BY 4.0 avatars need.
+- The avatar grid ends with the licence line and the credits the CC BY 4.0 avatars need.
+
+## Home: library search and scrolling
+
+- The Anime tab's library search is a round **search button** left of the nav bar (it used to
+  be a 480 px text field there, which ran into the centred bar on the TV, whose font is wider
+  than a desktop browser's). OK opens the library search, laid out like Discover's: Back, the
+  text field, the on-screen keyboard, then the matching titles of the profile's lists.
+- Up and Down move through the page's rows before they reach the floating nav bar or the
+  search button (a row scrolled out of sight above used to lose to the bar on screen), and
+  focusing anything on the first screen of a page scrolls it back to the very top, so the hero
+  is whole again and Up from it reaches the search button and the bar.
 
 ## Search as you type
 
