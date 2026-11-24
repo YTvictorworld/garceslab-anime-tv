@@ -5792,6 +5792,8 @@ export type ProfileSettings = {
  * @description
  *  TVPlayerPrefs are the TV app's player preferences that follow the profile.
  *  Every field is optional: nil = the app's default (or its local value).
+ *  SkipFillerEpisodes: "next episode" jumps over filler and recap episodes
+ *  when the anime's episode tags are known (Garceslab Anime).
  */
 export type TVPlayerPrefs = {
     preferredAudioLanguages?: string
@@ -5802,6 +5804,7 @@ export type TVPlayerPrefs = {
     assRendering?: boolean
     autoPlay?: boolean
     autoNextEpisode?: boolean
+    skipFillerEpisodes?: boolean
     autoSkipOpEd?: boolean
     skipDurationSec?: number
     buttonSeekSec?: number
