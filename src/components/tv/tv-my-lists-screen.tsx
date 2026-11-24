@@ -1,4 +1,6 @@
 import { requestTVFocus } from "@/components/tv/tv-native"
+import { useMyAnimeFavourites } from "@/api/hooks/profiles_library.hooks"
+import type { ProfileFavourite } from "@/api/generated/types"
 import type {
     AL_AnimeCollection_MediaListCollection_Lists,
     AL_BaseAnime,
@@ -135,6 +137,21 @@ function returnFocus(ref: React.RefObject<ButtonRef | null>) {
     })
 }
 
+const FAVOURITES = "FAVOURITES"
+
+/** Garceslab Anime: the profile's favourite anime as a shelf, filtered like the lists. */
+function makeFavouritesShelf(favourites: ProfileFavourite[] | undefined, query: string, showAdult: boolean | undefined): Shelf | null {
+    let media = (favourites ?? []).flatMap(f => f.media ? [f.media] : [])
+    if (!showAdult) media = media.filter(m => !m.isAdult)
+    if (query) {
+        const q = query.toLowerCase()
+        media = media.filter(m => [m.title?.userPreferred, m.title?.english, m.title?.romaji, ...(m.synonyms ?? [])]
+            .some(t => t?.toLowerCase().includes(q)))
+    }
+    if (media.length === 0) return null
+    return { key: FAVOURITES, title: "Favourites", media, meta: new Map() }
+}
+
 export function TVMyListsScreen() {
     const isFocused = useIsFocused()
     const { data, isLoading } = useGetRawAnimeCollection()
@@ -142,6 +159,8 @@ export function TVMyListsScreen() {
     const serverStatus = useServerStatus()
     const showAdult = serverStatus?.settings?.anilist?.enableAdultContent
     const lists = data?.MediaListCollection?.lists ?? []
+    const hasProfile = !!serverStatus?.profiles?.enabled && !!serverStatus?.currentProfile
+    const { data: favourites } = useMyAnimeFavourites(hasProfile)
 
     const [input, setInput] = React.useState("")
     const [query, setQuery] = React.useState("")
@@ -154,7 +173,13 @@ export function TVMyListsScreen() {
     const [firstList, setFirstList] = React.useState<ButtonRef | null>(null)
     const filterRef = React.useRef<ButtonRef>(null)
 
-    const choices = React.useMemo(() => getChoices(lists), [lists])
+    const choices = React.useMemo(() => {
+        const base = getChoices(lists)
+        // Favourites go right after "All lists", only when the profile has some.
+        return favourites?.some(f => f.media)
+            ? [base[0], { value: FAVOURITES, label: "Favourites" }, ...base.slice(1)]
+            : base
+    }, [lists, favourites])
     const active = countActiveCollectionFilters(params, "anime")
 
     React.useEffect(() => {
@@ -165,6 +190,12 @@ export function TVMyListsScreen() {
 
     const shelves = React.useMemo(() => {
         const items: Shelf[] = []
+
+        // Favourites ignore the list filters (status, score…): they aren't list entries.
+        if (list === "ALL" || list === FAVOURITES) {
+            const shelf = makeFavouritesShelf(favourites, query, showAdult)
+            if (shelf) items.push(shelf)
+        }
 
         for (const status of ORDER) {
             if (list !== "ALL" && list !== status) continue
@@ -199,7 +230,7 @@ export function TVMyListsScreen() {
         }
 
         return items
-    }, [list, lists, params, query, showAdult, tagMap])
+    }, [favourites, list, lists, params, query, showAdult, tagMap])
 
     const submit = React.useCallback(() => {
         setQuery(input.trim())
