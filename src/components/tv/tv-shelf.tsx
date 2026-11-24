@@ -7,6 +7,7 @@ import type {
 import { TVMediaCard } from "@/components/tv/tv-media-card"
 import { TVSectionHeader } from "@/components/tv/tv-section-header"
 import { MEDIA_ROW_LAYOUT, TV, tvSize } from "@/components/tv/tv-scale"
+import { TV_VISUAL } from "@/lib/tv/visual-flags"
 import { router } from "expo-router"
 import * as React from "react"
 import { FlatList, TVFocusGuideView, View } from "react-native"
@@ -80,7 +81,7 @@ export const TVShelf = React.memo(function TVShelf({
     if (media.length === 0) return null
 
     return (
-        <View style={{ gap: tvSize(12) }}>
+        <View style={{ gap: TV_VISUAL.typography ? tvSize(8) : tvSize(12) }}>
             <TVSectionHeader title={title} count={media.length} />
             <TVFocusGuideView trapFocusLeft trapFocusRight>
                 <FlatList
