@@ -55,3 +55,30 @@ export function pickSuggestions(sources: SuggestionSources, limit: number): { it
     }
     return { items: sources.anilist.slice(0, limit).map(suggestionFromAnilist), fromIndex: false }
 }
+
+export type CompletionInput = {
+    /** The typed search title. */
+    title: string | null | undefined
+    /** The AniList search for the typed title has finished. */
+    primaryDone: boolean
+    /** How many results that search returned. */
+    primaryCount: number
+    /** The suggestions come from the server's title index. */
+    fromIndex: boolean
+    /** The first suggestion's title. */
+    firstSuggestion: string | undefined
+}
+
+/**
+ * The title to search AniList with instead of the typed one, or null to keep it.
+ * Only when AniList found nothing for what was typed (it matches whole words only,
+ * so "blea" finds nothing) and the title index suggests a different, longer title.
+ */
+export function completedSearchTitle(input: CompletionInput): string | null {
+    const title = input.title?.trim()
+    const suggestion = input.firstSuggestion?.trim()
+    if (!title || !suggestion || !input.fromIndex) return null
+    if (!input.primaryDone || input.primaryCount > 0) return null
+    if (suggestion.toLowerCase() === title.toLowerCase()) return null
+    return suggestion
+}

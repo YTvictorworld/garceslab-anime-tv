@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { pickSuggestions, suggestionDetail, suggestionFromAnilist } from "../src/lib/search/search-suggestions.ts"
+import { completedSearchTitle, pickSuggestions, suggestionDetail, suggestionFromAnilist } from "../src/lib/search/search-suggestions.ts"
 
 const bleach = { mediaId: 269, title: "Bleach", year: 2004, format: "TV", episodes: 366 }
 const aot = { mediaId: 16498, title: "Shingeki no Kyojin", matched: "Attack on Titan", year: 2013, format: "TV" }
@@ -33,4 +33,14 @@ test("suggestions are capped", () => {
 test("the detail line shows the matched synonym, the format and the year", () => {
     assert.equal(suggestionDetail({ id: 1, title: "x", matched: "Attack on Titan", format: "TV_SHORT", year: 2013 }), "Attack on Titan · TV SHORT · 2013")
     assert.equal(suggestionDetail(suggestionFromAnilist({ id: 2, title: { romaji: "R" }, startDate: { year: 1999 } } as any)), "1999")
+})
+
+test("completedSearchTitle searches the first index suggestion when AniList found nothing", () => {
+    const base = { title: "blea", primaryDone: true, primaryCount: 0, fromIndex: true, firstSuggestion: "Bleach" }
+    assert.equal(completedSearchTitle(base), "Bleach")
+    assert.equal(completedSearchTitle({ ...base, primaryCount: 3 }), null, "AniList already has results")
+    assert.equal(completedSearchTitle({ ...base, primaryDone: false }), null, "AniList still searching")
+    assert.equal(completedSearchTitle({ ...base, fromIndex: false }), null, "suggestions are AniList's own")
+    assert.equal(completedSearchTitle({ ...base, firstSuggestion: "BLEA" }), null, "same title")
+    assert.equal(completedSearchTitle({ ...base, title: "  " }), null, "nothing typed")
 })

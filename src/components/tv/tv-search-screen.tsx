@@ -18,7 +18,7 @@ import {
     searchParamsAtom,
     type SearchParams,
 } from "@/lib/search/search.atoms"
-import { type SearchSuggestion, suggestionDetail } from "@/lib/search/search-suggestions"
+import { completedSearchTitle, type SearchSuggestion, suggestionDetail } from "@/lib/search/search-suggestions"
 import { SEARCH_DEBOUNCE_MS, searchQueryFor } from "@/lib/tv-keyboard"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { router } from "expo-router"
@@ -55,19 +55,38 @@ export function TVSearchScreen() {
     }, [input, setParams])
 
     const shouldQuery = isSearchActive(params)
-    const search = useInfiniteAnimeSearch(params, shouldQuery, { keepPrevious: true })
-    const media = React.useMemo(() => (
+    const primary = useInfiniteAnimeSearch(params, shouldQuery, { keepPrevious: true })
+    const primaryMedia = React.useMemo(() => (
         shouldQuery
-            ? search.data?.pages
+            ? primary.data?.pages
                 .flatMap(page => page?.Page?.media ?? [])
                 .filter(Boolean) as AL_BaseAnime[] ?? []
             : []
-    ), [search.data?.pages, shouldQuery])
+    ), [primary.data?.pages, shouldQuery])
     const activeFilters = getActiveFiltersCount(params)
     const typed = input.trim()
     const waitingForLetters = typed.length > 0 && !searchQueryFor(input)
     // Suggestions come from one hook: the server's title index (prefix matches), else AniList.
-    const { suggestions, isFetching: searching } = useSearchSuggestions(params.title, params)
+    const { suggestions, isFetching: searching, fromIndex } = useSearchSuggestions(params.title, params)
+
+    // AniList matches whole words only, so "blea" finds nothing there while the index
+    // already suggests Bleach. Then the results show the AniList search for the first
+    // suggestion's full title instead of an empty page.
+    const completion = completedSearchTitle({
+        title: params.title,
+        primaryDone: shouldQuery && !primary.isFetching,
+        primaryCount: primaryMedia.length,
+        fromIndex,
+        firstSuggestion: suggestions[0]?.title,
+    })
+    const completedParams = React.useMemo(() => ({ ...params, title: completion }), [params, completion])
+    const completed = useInfiniteAnimeSearch(completedParams, !!completion, { keepPrevious: false })
+    const search = completion ? completed : primary
+    const media = React.useMemo(() => (
+        completion
+            ? completed.data?.pages.flatMap(page => page?.Page?.media ?? []).filter(Boolean) as AL_BaseAnime[] ?? []
+            : primaryMedia
+    ), [completion, completed.data?.pages, primaryMedia])
 
     const loadMore = React.useCallback(() => {
         if (search.hasNextPage && !search.isFetchingNextPage) {
@@ -181,7 +200,7 @@ export function TVSearchScreen() {
                     </View>
                 ) : undefined}
                 emptyTitle={shouldQuery
-                    ? (params.title ? `No results for “${params.title}”` : "No titles match these filters")
+                    ? (params.title ? `No results for “${completion ?? params.title}”` : "No titles match these filters")
                     : "Search the AniList catalog"}
                 emptyText={shouldQuery
                     ? "Try another title or change the filters."
