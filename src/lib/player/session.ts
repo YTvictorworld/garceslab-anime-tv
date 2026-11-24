@@ -1,4 +1,4 @@
-import { DIRECT_PLAY } from "./direct-play-mode"
+import { DIRECT_PLAY, rememberResolvedDebridRelease, takeDirectRetry } from "./direct-play-mode"
 import { getServerBaseUrl } from "@/api/client/server-url"
 import { subscribeWsMessage, type WebsocketMessage } from "@/api/components/websocket-hub"
 import { API_ENDPOINTS } from "@/api/generated/endpoints"
@@ -10,6 +10,7 @@ import type {
     Anime_Episode,
     Anime_LibraryCollection,
     DebridClient_StreamState,
+    HibikeTorrent_AnimeTorrent,
     Torrentstream_TorrentStatus,
 } from "@/api/generated/types"
 import { usePlaybackCancelManualTracking } from "@/api/hooks/playback_manager.hooks"
@@ -26,6 +27,7 @@ import { MPVCORE_EVENT, NATIVE_PLAYER_EVENT, type NativePlayerServerEvent, parse
 import { forgetKeptStream, type KeptDirectStream } from "./kept-direct-stream"
 import { openExternalPlayerURL } from "./external-players"
 import { getPlayerPreferences } from "./player-preferences"
+import { streamStarts } from "./stream-start"
 import type { AnimeEntryLaunchView, MobilePlaybackSource, PlayerNextEpisodeAction } from "./types"
 
 export const currentPlaybackSourceAtom = atom<MobilePlaybackSource | null>(null)
@@ -255,6 +257,9 @@ type ExternalPlayerOpenURLPayload = {
     mediaId?: number
     episodeNumber?: number
     mediaTitle?: string
+    /** Garceslab Anime server: the release and file a direct debrid stream resolved. */
+    torrent?: HibikeTorrent_AnimeTorrent
+    fileId?: string
 }
 
 function isTorrentStreamLoadingState(value: string): value is TorrentStreamLoadingState {
@@ -525,6 +530,8 @@ export function usePlayerEventListener() {
             }
 
             const resetTorrentStreamState = () => {
+                // A failed, aborted or stopped stream ends the start in flight.
+                streamStarts.end()
                 clearLoadingFallback()
                 clearCancelManualTrackingTimer()
                 streamSessionModeRef.current = null
@@ -579,6 +586,8 @@ export function usePlayerEventListener() {
                     continuityKind: "external_player",
                 }
 
+                // The start is over: server events after this belong to the stream that plays.
+                streamStarts.end()
                 clearLoadingFallback()
                 setIsPreparing(false)
                 setPendingInfo(null)
@@ -872,8 +881,19 @@ export function usePlayerEventListener() {
                         .replace("{{SCHEME}}", base.startsWith("https") ? "https" : "http")
                         .replace("{{HOST}}", base.replace(/^https?:\/\//, ""))
 
-                    if (directPlay) log.info("Direct play: the TV plays the debrid link itself")
-                    openStreamInPlayer(resolvedUrl, { ...payload, mediaId: payload.mediaId, episodeNumber: payload.episodeNumber }, directPlay ? { directPlay } : undefined)
+                    let extra: Partial<MobilePlaybackSource> | undefined
+                    if (directPlay) {
+                        log.info("Direct play: the TV plays the debrid link itself")
+                        if (payload.torrent && typeof payload.fileId === "string") {
+                            rememberResolvedDebridRelease(payload.mediaId, payload.episodeNumber, payload.torrent, payload.fileId)
+                        }
+                        const retry = takeDirectRetry(payload.mediaId, payload.episodeNumber)
+                        if (retry) log.info("Direct play: fresh link for a retry", { attempt: retry.attempt, resumeAtSec: Math.round(retry.resumeAtSec) })
+                        extra = retry
+                            ? { directPlay, directRetryAttempt: retry.attempt, resumePositionSec: retry.resumeAtSec > 0 ? retry.resumeAtSec : undefined }
+                            : { directPlay }
+                    }
+                    openStreamInPlayer(resolvedUrl, { ...payload, mediaId: payload.mediaId, episodeNumber: payload.episodeNumber }, extra)
                     return
                 }
 

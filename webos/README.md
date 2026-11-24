@@ -116,7 +116,11 @@ before the library lists:
   the player left running, the TV's audio checks and resume positions all apply. While
   one card is starting, other cards don't start anything. Back cancels the start and
   ends the server's stream. If it fails (no release, a server error, no news from the
-  server for 2 minutes), the card shows why for 15 seconds; OK on it then opens the
+  server for 2 minutes, nothing started within 12 seconds), the card shows why for 15
+  seconds; a start that can't begin at all (no live connection, an episode without an
+  AniDB mapping) fails at once with its reason. Each start first clears what an earlier
+  one left (a stuck "preparing", an old status message), so it can't block the new
+  start or show on its card; OK on it then opens the
   show to pick the episode or release by hand. With auto-select off, the show opens
   on its release list. Library files and online streams still open the show and start
   there. To open the show without playing, use the slide's *View details* button or
@@ -286,7 +290,8 @@ server's steps on that card at once ("Selecting best torrent...", "Loading...") 
 to cancel*. While it starts, OK on another episode only says "Episode N is already starting.
 Press Back to cancel it first."; a failure turns the card red with the reason (OK tries
 again). It is the same start as Continue watching's, with the page's own stream mode and
-auto-select toggles.
+auto-select toggles. The card shows only this start's own steps, never a message an earlier
+stream left behind.
 
 The built-in player is the TV's HTML5 video engine, not libmpv.
 
@@ -748,17 +753,26 @@ build.
 - **Progress:** reported per profile as the native apps do it (manual tracking, which
   marks the anime as watching, continuity every 15 s, the episode marked watched at
   85 %). Leaving the player frees the TV's viewing slot.
-- **Failures fall back quietly:** if the TV can't play the link, or can't read the file's
-  header, the same release starts once through the server's direct stream (*"Playing
-  through the server instead."*). Subtitles that stop loading part way only say so; a
-  video failure later in the episode shows the error screen with **Retry via server**.
+- **Failures retry direct play first:** if the TV can't play the link, or can't read the
+  file's header, it asks the server for a fresh link to the same release and file (no
+  auto-select again; links expire and CDN nodes fail) and plays it directly again, up to
+  3 times, 2 s, 4 s and 8 s apart (longer while the CDN asks to back off), showing
+  *"Retrying direct play (2/3)…"*. A retry restarts the stream as the same device, so it
+  never takes another viewing slot. Only after the third failed retry does the same
+  release start once through the server's direct stream (*"Playing through the server
+  instead."*). Failures a fresh link can't fix go to the server at once: MediaError 3
+  (decode), and MediaError 4 on a link whose header the TV read or whose video codec it
+  can't play. A video failure later in the episode retries the same way at its position
+  (the count starts again after a minute of playback), then shows the error screen with
+  **Retry via server**. Subtitles that stop loading part way, or a CDN rate-limiting
+  (429) the subtitle or header reads, only say so: the video keeps playing direct.
   The test build instead opens a dialog that says what failed ("Direct play failed:
   reading subtitles: …") with **Retry via server**.
 - **Slot ended by the server:** *Stop* in Settings → Profiles on another device, or the
   same profile starting to watch elsewhere, closes the player with a message. A slot
   that lapsed while the player stayed open (idle, websocket gap) is taken again quietly.
 - **Diagnostics:** turn on **Playback stats** (Info) to show the direct-play panel (for
-  support): reader
+  support): which direct retry the link is (0/3 to 3/3) and why the last one failed, reader
   path and CORS, container and muxer, codecs, **CDN requests, 429/503 answers, retries,
   bytes, the read in flight and any backoff**, subtitle tracks with lines read, strategy,
   fonts, audio tracks and `audioTracks` support and switches, buffered

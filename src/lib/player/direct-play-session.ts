@@ -20,7 +20,7 @@ import React from "react"
 import { describeStreamCodecs, directStreamChapters } from "./direct-stream"
 import { describeRanges, directPlayDiagnostics, summarizeDiagnostics } from "./direct-play-diagnostics"
 import { DIRECT_PLAY_LOUD } from "./direct-play-mode"
-import type { DirectPlayFailureKind } from "./direct-play-policy"
+import { type DirectPlayFailureKind, mediaErrorCause, readFailureCause } from "./direct-play-policy"
 import { isFontAttachment, isTextSubtitle, type MkvIndex, MkvError, readAttachedFiles, readMkvIndex, type RangeReader, toMkvMetadata } from "./mkv/mkv-demux"
 import { chunkedReader, createFetchRangeReader, createPacedReader, isFatalRangeError, RangeFetchError, type ReaderEvent } from "./mkv/range-reader"
 import { createSubtitleExtractor, type SubtitleExtractor } from "./mkv/subtitle-extractor"
@@ -327,6 +327,7 @@ function logSummary(reason: string) {
  */
 async function startSession(source: MobilePlaybackSource, isCurrent: () => boolean): Promise<Session> {
     directPlayDiagnostics.reset(source.id)
+    if (source.directRetryAttempt) directPlayDiagnostics.update({ directRetries: source.directRetryAttempt })
     log.info("Direct play: reading the file's header", { sourceId: source.id, mediaId: source.mediaId, episodeNumber: source.episodeNumber })
 
     let disposed = false
@@ -342,7 +343,7 @@ async function startSession(source: MobilePlaybackSource, isCurrent: () => boole
         const failure = `Direct play failed: ${what}: ${describeError(error)}`
         log.error(failure)
         directPlayDiagnostics.error(failure)
-        directPlayDiagnostics.update({ failure, failureKind: kind, failurePositionSec: currentVideoTime() })
+        directPlayDiagnostics.update({ failure, failureKind: kind, failurePositionSec: currentVideoTime(), failureCause: readFailureCause(error) })
     }
 
     const dispose = () => {
@@ -509,6 +510,7 @@ export function directPlayErrorMessage(error: { message: string; code?: number; 
     directPlayDiagnostics.update({
         failure,
         failureKind: "video",
+        failureCause: mediaErrorCause(error.code),
         failurePositionSec: error.position ?? currentVideoTime(),
         mediaError: { code: error.code ?? 0, message: error.message },
     })

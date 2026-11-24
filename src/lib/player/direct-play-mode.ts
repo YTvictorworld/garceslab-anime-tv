@@ -1,4 +1,3 @@
-import type { Anime_Episode, HibikeTorrent_AnimeTorrent, HibikeTorrent_BatchEpisodeFiles } from "@/api/generated/types"
 import { Platform } from "react-native"
 import { directPlayFlags } from "./direct-play-policy"
 
@@ -29,31 +28,19 @@ export const DIRECT_PLAY = flags.enabled
 /** The side-by-side test build: loud failures with the diagnostics. */
 export const DIRECT_PLAY_LOUD = flags.loud
 
-/** How the last debrid stream was started, so "Retry via server" can start it the same way. */
-export type DebridStartRecord = {
-    mediaId: number
-    episodeNumber: number
-    episode: Anime_Episode
-    kind: "auto-select" | "manual"
-    manual?: {
-        torrent: HibikeTorrent_AnimeTorrent
-        fileId?: string
-        fileIndex?: number
-        batchEpisodeFiles?: HibikeTorrent_BatchEpisodeFiles
-    }
-}
+export {
+    clearDirectRetry,
+    type DebridStartRecord,
+    directRetrySelection,
+    type DirectRetryRequest,
+    lastDebridStartFor,
+    rememberDebridStart,
+    rememberResolvedDebridRelease,
+    requestDirectRetry,
+    takeDirectRetry,
+} from "./direct-play-starts"
 
-let lastDebridStart: DebridStartRecord | null = null
 let relayNext = false
-
-export function rememberDebridStart(record: DebridStartRecord) {
-    lastDebridStart = record
-}
-
-export function lastDebridStartFor(mediaId: number, episodeNumber: number): DebridStartRecord | null {
-    const record = lastDebridStart
-    return record && record.mediaId === mediaId && record.episodeNumber === episodeNumber ? record : null
-}
 
 /** The next debrid start goes through the server's direct stream (the normal path). */
 export function requestRelayForNextStart() {
