@@ -44,6 +44,21 @@ All for the LG webOS build:
   unchanged. While the server fetches, the app asks again every 4 s for about two minutes.
   Tests in `tests/episode-tags.test.ts`.
 
+## 2026-11 (profiles, phase 4: polish)
+
+- **Player preferences per profile** (`src/lib/player/player-prefs-sync.ts`,
+  `player-prefs-remote.ts`, a change listener in `player-preferences.ts`, started from
+  `src/lib/profile/use-profile-switch.ts`): the synced preferences are loaded from and saved to
+  the server's `GET/PATCH /api/v1/profiles/me/player-prefs` (`tv` section). Tests in
+  `tests/player-prefs-sync.test.ts`.
+- **Avatars:** the profile's avatar on the nav bar's Settings tab, and the avatar licence and
+  CC BY credits under the "Create your profile" avatar grid.
+- **Fan art removed:** `src/assets/images/luffy-01.png` is replaced by the app logo in the
+  error illustration.
+- **Branding:** user-facing texts say "Garceslab Anime" instead of "Seanime" (credits,
+  identifiers, storage keys, the app id and upstream product names unchanged).
+- **API types** regenerated from the server (`src/api/generated`).
+
 ## GPL-3.0 compliance checklist
 
 - [x] **Prominent modification notices with dates (§5a):** this file, `NOTICE`, the README's
