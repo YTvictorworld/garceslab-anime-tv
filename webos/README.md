@@ -185,6 +185,9 @@ the app asks **"Who's watching?"** on every cold launch, after the server connec
   (the instant start screen) are kept per profile; entering another profile clears them.
 - Settings has **Switch profile**. `PLAYBACK_BUSY` (another profile is playing) shows
   "Another playback is in progress".
+- The anime page has a **Favourite** pill next to *Add to list* / *Edit entry*: OK toggles
+  the anime in the profile's favourites (the heart fills in). *Add to list* and the entry
+  drawer save to the profile's local list as before.
 - A stock Seanime server doesn't advertise profiles, and nothing changes.
 - **Player preferences follow the profile** (`GET/PATCH /api/v1/profiles/me/player-prefs`,
   section `tv`; `src/lib/player/player-prefs-sync.ts`). Entering a profile replaces this TV's

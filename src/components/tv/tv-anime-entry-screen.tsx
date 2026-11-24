@@ -1,4 +1,5 @@
 import { requestTVFocus } from "@/components/tv/tv-native"
+import { TVFavouriteButton } from "@/components/tv/tv-favourite-button"
 import { TVLazyImage } from "@/components/tv/tv-lazy-image"
 import type {
     Anime_Episode,
@@ -513,6 +514,7 @@ export function TVAnimeEntryScreen({
                         )}
                         onPress={() => setEditOpen(true)}
                     />
+                    <TVFavouriteButton mediaId={entry.media?.id} />
                 </TVFocusGuideView>
 
                 <TVTabBar
