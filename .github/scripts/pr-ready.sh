@@ -9,21 +9,33 @@
 # If one of them is missing, this script fails. A "(WIP)" title always passes, and the
 # script lists what is still missing.
 #
+# Real-TV test (see CONTRIBUTING.md, "Testing on a real TV"): while the PR has the
+# "needs-tv-test" label, the script also fails, with its own message, so the PR can't be
+# merged. It does not ask for "(WIP)": such a PR can be ready for review. A ticked
+# "Not tested on a real TV" box needs the "needs-tv-test" (or, after the test, "tv-tested")
+# label.
+#
 # Inputs (environment):
 #   PR_TITLE, PR_BODY      the pull request's title and body
+#   PR_LABELS              the pull request's label names, separated by commas
 #   REQUIRED_CHECKS        required CI job names, one per line
 #   CHECK_RESULTS          optional: "<name>\t<status>\t<conclusion>" lines to use instead of
 #                          asking GitHub (used by the tests)
 #   GITHUB_REPOSITORY, HEAD_SHA, GH_TOKEN   to read the check runs with `gh` otherwise
 #   WAIT_SECONDS           how long to wait for running checks (default 0: don't wait)
+#   GITHUB_OUTPUT          optional: gets "tv_test_only=true" when the real-TV test is the
+#                          only thing missing (the workflow then doesn't label the PR "wip")
 #
-# Exit codes: 0 ready (or WIP), 1 not ready.
+# Exit codes: 0 ready (or WIP), 1 not ready (or waiting for a real-TV test).
 set -euo pipefail
 
 title="${PR_TITLE:-}"
 body="${PR_BODY:-}"
 wait_seconds="${WAIT_SECONDS:-0}"
+labels=",${PR_LABELS:-},"
 problems=()
+
+has_label() { [[ "$labels" == *",$1,"* ]]; }
 
 # 1. Linked issue.
 if ! grep -Eiq '(close[sd]?|fix(e[sd])?|resolve[sd]?)[[:space:]]+#[0-9]+' <<<"$body"; then
@@ -34,6 +46,13 @@ fi
 unchecked=$(grep -Ec '^[[:space:]]*[-*][[:space:]]+\[[[:space:]]\]' <<<"$body" || true)
 if [ "$unchecked" -gt 0 ]; then
     problems+=("$unchecked checklist item(s) not ticked (tick them, or write \"n/a\" and tick)")
+fi
+
+# The checklist says "Not tested on a real TV" (ticked, not "n/a") but the label is missing.
+not_tested=$(grep -Ei '^[[:space:]]*[-*][[:space:]]+\[[xX]\].*not tested on a real TV' <<<"$body" |
+    grep -vi 'n/a' || true)
+if [ -n "$not_tested" ] && ! has_label needs-tv-test && ! has_label tv-tested; then
+    problems+=("the checklist says \"Not tested on a real TV\": add the needs-tv-test label")
 fi
 
 # 3. Required CI jobs.
@@ -84,8 +103,23 @@ done <<<"${REQUIRED_CHECKS:-}"
 
 is_wip=0
 if [[ "$title" == "(WIP)"* ]]; then is_wip=1; fi
+needs_tv_test=0
+if has_label needs-tv-test; then needs_tv_test=1; fi
+tv_test_message="Waiting for a real-TV test: remove needs-tv-test after testing (the tester comments the result and adds tv-tested)."
 
 if [ "${#problems[@]}" -eq 0 ]; then
+    if [ "$needs_tv_test" -eq 1 ]; then
+        if [ "$is_wip" -eq 1 ]; then
+            echo "Everything else is in place: remove \"(WIP)\" from the title and mark the PR ready for review."
+            echo "$tv_test_message"
+            exit 0
+        fi
+        echo "Ready for review: linked issue, checklist ticked and every required check passed."
+        echo "$tv_test_message"
+        echo "Until then this check fails, so the PR can't be merged. No \"(WIP)\" needed."
+        if [ -n "${GITHUB_OUTPUT:-}" ]; then echo "tv_test_only=true" >>"$GITHUB_OUTPUT"; fi
+        exit 1
+    fi
     if [ "$is_wip" -eq 1 ]; then
         echo "Everything is in place: remove \"(WIP)\" from the title and mark the PR ready for review."
     else
@@ -96,6 +130,7 @@ fi
 
 echo "Not ready yet:"
 for p in "${problems[@]}"; do echo "  - $p"; done
+if [ "$needs_tv_test" -eq 1 ]; then echo "$tv_test_message"; fi
 if [ "$is_wip" -eq 1 ]; then
     echo "The title starts with \"(WIP)\", so this is fine for now (keep the PR as a draft)."
     exit 0

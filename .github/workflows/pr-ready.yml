@@ -4,11 +4,13 @@ name: PR ready
 # with "(WIP)" needs a linked issue ("Closes #N"), every checklist box ticked and every
 # required CI job green. The logic is in .github/scripts/pr-ready.sh (tested by
 # pr-ready_test.sh). It waits for the webOS build workflow's jobs on the same commit, so editing the
-# title or the description re-checks without running CI again.
+# title or the description re-checks without running CI again. Adding or removing a label
+# re-checks too: while the PR has "needs-tv-test" the check fails (it can't be merged) without
+# asking for "(WIP)"; see "Testing on a real TV" in CONTRIBUTING.md.
 
 on:
   pull_request:
-    types: [opened, edited, reopened, synchronize, ready_for_review]
+    types: [opened, edited, reopened, synchronize, ready_for_review, labeled, unlabeled]
 
 permissions:
   contents: read
@@ -35,6 +37,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PR_TITLE: ${{ github.event.pull_request.title }}
           PR_BODY: ${{ github.event.pull_request.body }}
+          PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           WAIT_SECONDS: "3600"
           # The job names of .github/workflows/webos.yml that must pass.
@@ -49,9 +52,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.number }}
           PR_TITLE: ${{ github.event.pull_request.title }}
+          # Only the real-TV test missing: the PR is ready for review, so it isn't "wip".
+          TV_TEST_ONLY: ${{ steps.check.outputs.tv_test_only }}
         run: |
           gh label create wip --color FBCA04 --description "Not ready: see the PR ready check" 2>/dev/null || true
-          if [[ "$PR_TITLE" == "(WIP)"* ]] || [ "${{ steps.check.outcome }}" != success ]; then
+          if [[ "$PR_TITLE" == "(WIP)"* ]] || { [ "${{ steps.check.outcome }}" != success ] && [ "$TV_TEST_ONLY" != true ]; }; then
             gh pr edit "$PR" --add-label wip
           else
             gh pr edit "$PR" --remove-label wip
