@@ -23,6 +23,8 @@ The server and web interface have their own repository and guide:
    [webos/README.md](webos/README.md) too when webOS behaviour changes.
 5. **A PR is "ready" only when every check below passes.** If even one is failing or missing,
    the title starts with **`(WIP)`** and the PR stays a **draft**.
+6. **A PR that changes UI behaviour is tested on a real LG TV before it is merged.** No TV?
+   Label it `needs-tv-test` and ask for a test ([Testing on a real TV](#testing-on-a-real-tv)).
 
 ## When a PR is ready
 
@@ -40,6 +42,10 @@ it and tick it.
 - [ ] **UI changes:** BEFORE and AFTER screenshots at **1920×1080** attached to the PR, and
       saved under `docs/images/` when they document a feature. Screenshots contain **no
       private data** (see below).
+- [ ] **UI behaviour changes:** tested on a real LG webOS TV (model/webOS version), **or** not
+      tested: `needs-tv-test` label added and the maintainer asked to test
+      ([Testing on a real TV](#testing-on-a-real-tv)). Tick the one that applies and write
+      "n/a" on the other.
 - [ ] **Docs** updated in `./docs`.
 - [ ] **No secrets or private data** (IP addresses, server URLs, tokens, passwords, emails,
       real names) in code, commits or images.
@@ -55,10 +61,41 @@ with `(WIP)` and any of these is true, it fails and labels the PR `wip`:
 - a checklist box is not ticked;
 - a required CI job (*Tests and webOS .ipk*, *Secrets (gitleaks)*) failed or hasn't finished.
 
+While the PR has the **`needs-tv-test`** label the check also fails, with *"Waiting for a
+real-TV test: remove needs-tv-test after testing"*, so it can't be merged; that alone doesn't
+need `(WIP)` or the `wip` label (the PR can be ready for review). Adding or removing a label
+re-runs the check.
+
 With a `(WIP)` title it passes and lists what is still missing. When everything is green,
 remove `(WIP)` and mark the PR ready for review. The rule is in
 [`.github/scripts/pr-ready.sh`](.github/scripts/pr-ready.sh), with tests in `pr-ready_test.sh`
 (`bash .github/scripts/pr-ready_test.sh`).
+
+## Testing on a real TV
+
+Desktop Chromium is not a TV. A PR that **changes UI behaviour** (anything the TV user sees or
+does: layout, focus and remote navigation, Back, the player, playback, subtitles) must be tried
+on a real **LG webOS TV** before it is merged. Screenshots alone aren't enough for focus,
+remote or player behaviour.
+
+**If you have a TV,** test it (the checklist in [docs/testing-on-tv.md](docs/testing-on-tv.md))
+and write the model and webOS version in the PR's "Tested on a real LG webOS TV" box.
+
+**If you don't have a TV:**
+
+1. Say so in the PR and add the **`needs-tv-test`** label.
+2. Tick *"Not tested on a real TV"* in the template (and "n/a" on *"Tested on a real LG webOS
+   TV"*).
+3. Mention the maintainer, **@YTvictorworld** (currently the only one who can test on a TV),
+   in the PR description and ask for a TV test, with what to check: the steps, the screens and
+   the expected result.
+
+Whoever tests on the TV comments the result on the PR (device and webOS version, what was
+checked, photos or videos if useful), then **replaces `needs-tv-test` with `tv-tested`**. A PR
+with `needs-tv-test` can be ready for review, but it **must not be merged**: the *PR ready
+(WIP rule)* check fails until the label is gone.
+
+AI agents without access to a TV always follow these steps for a UI behaviour change.
 
 ## Setting up
 
