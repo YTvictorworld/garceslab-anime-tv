@@ -8,7 +8,7 @@ const OTA_UPDATES_ENABLED = false
 export default ({ config }: ConfigContext): ExpoConfig => {
     const isTV = process.env.EXPO_TV === "1"
     const isTVDev = isTV && process.env.SEANIME_TV_DEV === "1"
-    const version = "0.4.0"
+    const version = "1.0.0"
     const otaChannel = isTV ? "stable-tv" : "stable"
     const otaUrl = isTV
         ? "https://seanime.app/api/ota/tv/manifest"

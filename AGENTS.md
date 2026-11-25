@@ -185,6 +185,7 @@ npm test                    # unit tests, incl. your regression test
 npx tsc --noEmit -p .       # only the known app/_layout.tsx TS2882 may remain
 npm run build:webos         # the .ipk must build
 bash .github/scripts/pr-ready_test.sh   # only if you changed the WIP rule
+bash .github/scripts/release-check_test.sh   # only if you changed release.yml or release-check.sh
 ```
 
 ### Before and after screenshots

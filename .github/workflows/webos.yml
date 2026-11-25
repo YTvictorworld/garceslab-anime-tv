@@ -25,9 +25,15 @@ jobs:
           cache: npm
       - run: npm ci --no-fund
       - run: npm test
+      # The rules of the release workflow (release.yml), see docs/releasing.md.
+      - name: Release rules (release-check_test.sh)
+        run: bash .github/scripts/release-check_test.sh
       # EXPO_PUBLIC_TV_TIME_ZONE is a local build option and is not set here:
       # the app uses the TV's own time zone.
       - run: npm run build:webos
+      # The release attaches exactly this file, so its name must follow package.json.
+      - name: Package named after package.json's version
+        run: test -f "dist/webos/app.seanime.tenji_$(node -p 'require("./package.json").version')_all.ipk"
       - uses: actions/upload-artifact@v7
         with:
           name: webos-ipk

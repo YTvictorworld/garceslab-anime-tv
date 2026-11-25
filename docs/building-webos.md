@@ -80,11 +80,18 @@ The app id is still `app.seanime.tenji`, so it **replaces** an installed Seanime
 
 ## Releases and versions
 
-Releases are built by GitHub Actions (`.github/workflows/release.yml`) when a version tag is
-pushed: the workflow builds the `.ipk`, computes its SHA-256 and attaches both to a GitHub
-Release, which links that tag's source (GPL-3.0 §6). Versions are `vMAJOR.MINOR.PATCH` and must
-match `version` in `package.json` (webOS reads it from there). They continue from Seanime Tenji
-0.4.0, so the TV can update an installed copy in place.
+Versions are `vMAJOR.MINOR.PATCH`, starting at **1.0.0** (the project's own versioning; the
+server is released with the same version). The version lives in `package.json` (also in
+`package-lock.json` and `app.config.ts`, kept equal by `tests/app-version.test.ts`); the build
+writes it into `appinfo.json` and the file name, e.g. `app.seanime.tenji_1.0.0_all.ipk`. 1.0.0
+is higher than Seanime Tenji's 0.4.0, so a release installs over an existing copy in place.
+
+Releases are built by GitHub Actions (`.github/workflows/release.yml`), started by the
+maintainer from `main` with *Run workflow* (`version` = `X.Y.Z`, `confirm` = `publish`) after
+the full test on a TV: it checks the version, tests, builds the `.ipk`, creates the tag and a
+GitHub Release with the `.ipk` and `SHA256SUMS.txt`, linking that tag's source (GPL-3.0 §6). A
+wrong request fails with a message instead of being skipped. Pushing a `vX.Y.Z` tag by hand
+still works. The full procedure, verification and rollback: [releasing.md](releasing.md).
 
 CI (`.github/workflows/webos.yml`) runs the tests and builds the `.ipk` on every pull request.
 

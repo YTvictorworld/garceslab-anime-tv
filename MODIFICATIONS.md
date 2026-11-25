@@ -80,6 +80,18 @@ All for the LG webOS build:
   templates, and the `PR ready (WIP rule)` workflow (`.github/workflows/pr-ready.yml`,
   `.github/scripts/pr-ready.sh` with its tests). The existing workflows are unchanged.
 
+## 2026-11 (versioning and releases)
+
+- **Own version 1.0.0** (`package.json`, `package-lock.json`, `app.config.ts`): the project
+  starts its own versioning at 1.0.0, released together with the server's version. The app id
+  `app.seanime.tenji` is unchanged.
+- **App update check** (`src/lib/app-release-updates.ts`, helpers moved to the new
+  `src/lib/app-release.ts`): it looks at this repository's releases instead of Seanime Tenji's.
+- **Release workflow** (`.github/workflows/release.yml`, `.github/scripts/release-check.sh` with
+  its tests): it can also be run from `main` with a version and `confirm = publish` (it then
+  checks the version, builds and creates the tag), with a read-only build job, and fails with a
+  message on any mismatch. See `docs/releasing.md`.
+
 ## GPL-3.0 compliance checklist
 
 - [x] **Prominent modification notices with dates (§5a):** this file, `NOTICE`, the README's
