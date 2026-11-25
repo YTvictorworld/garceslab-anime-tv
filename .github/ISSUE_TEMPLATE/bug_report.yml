@@ -6,7 +6,8 @@ body:
     attributes:
       value: |
         This is the Garceslab Anime tracker. Please don't report Garceslab Anime problems to Seanime or Seanime Tenji.
-        Don't paste passwords, API keys, tokens or your server's public address.
+        Don't paste passwords, API keys, tokens, IP addresses or your server's address, and check screenshots for private data.
+        Every fix starts from an issue like this one; the pull request will reference it with "Closes #N".
   - type: input
     id: version
     attributes:
@@ -35,6 +36,18 @@ body:
     id: steps
     attributes:
       label: Steps to reproduce
+      description: Which screen, which remote keys. The steps help us write the regression test that every fix must include.
+      placeholder: |
+        1. Open ...
+        2. Press ...
+        3. See ...
+    validations:
+      required: true
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots or photos of the TV
+      description: Optional. Remove names, addresses and tokens first.
   - type: textarea
     id: logs
     attributes:

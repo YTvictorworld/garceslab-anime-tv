@@ -2,9 +2,42 @@ name: Feature request
 description: Suggest an idea for Garceslab Anime
 labels: [enhancement]
 body:
+  - type: markdown
+    attributes:
+      value: |
+        Every change starts with an issue. Once it is agreed, the pull request references it with "Closes #N",
+        adds tests and documents the feature in ./docs (see CONTRIBUTING.md).
   - type: textarea
     id: idea
     attributes:
       label: What would you like, and why?
+      description: The problem it solves for you, not only the solution.
     validations:
       required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where?
+      options:
+        - LG webOS TV app
+        - Web interface
+        - Server / Docker
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: How could it work?
+      description: Optional. Screens, settings, endpoints, anything that helps. Mock-ups are welcome.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered
+  - type: checkboxes
+    id: help
+    attributes:
+      label: Contributing
+      options:
+        - label: I'd like to work on this myself.

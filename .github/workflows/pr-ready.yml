@@ -1,0 +1,58 @@
+name: PR ready
+
+# Enforces the "(WIP)" rule from CONTRIBUTING.md: a pull request whose title doesn't start
+# with "(WIP)" needs a linked issue ("Closes #N"), every checklist box ticked and every
+# required CI job green. The logic is in .github/scripts/pr-ready.sh (tested by
+# pr-ready_test.sh). It waits for the webOS build workflow's jobs on the same commit, so editing the
+# title or the description re-checks without running CI again.
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize, ready_for_review]
+
+permissions:
+  contents: read
+  checks: read
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: pr-ready-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  pr-ready:
+    name: PR ready (WIP rule)
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v7
+      - name: Test the rule itself
+        run: bash .github/scripts/pr-ready_test.sh
+      - name: Check the pull request
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          WAIT_SECONDS: "3600"
+          # The job names of .github/workflows/webos.yml that must pass.
+          REQUIRED_CHECKS: |
+            Tests and webOS .ipk
+            Secrets (gitleaks)
+        run: bash .github/scripts/pr-ready.sh
+      - name: Label "wip"
+        if: always()
+        continue-on-error: true # forks get a read-only token
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          gh label create wip --color FBCA04 --description "Not ready: see the PR ready check" 2>/dev/null || true
+          if [[ "$PR_TITLE" == "(WIP)"* ]] || [ "${{ steps.check.outcome }}" != success ]; then
+            gh pr edit "$PR" --add-label wip
+          else
+            gh pr edit "$PR" --remove-label wip
+          fi

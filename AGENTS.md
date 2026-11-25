@@ -1,4 +1,11 @@
-# Seanime Tenji: guide for coding agents
+# Garceslab Anime TV: guide for coding agents
+
+Garceslab Anime TV is the LG webOS app of Garceslab Anime, a self-hosted fork of Seanime. It is
+derived from **Seanime Tenji** (© AlkindiX and contributors, based on Seanime Tenji by 5rahim,
+GPL-3.0): the code is not our property, so keep every copyright and license notice and log
+meaningful changes in `MODIFICATIONS.md`. Its server is `garceslab-anime-server` (local profiles,
+viewer sessions, episode tags, title index). Human guide: [CONTRIBUTING.md](CONTRIBUTING.md);
+feature docs: [docs/README.md](docs/README.md).
 
 Seanime Tenji is the mobile and TV client for a [Seanime](https://github.com/5rahim/seanime)
 server (a self-hosted anime/manga media server). One Expo / React Native codebase builds:
@@ -115,8 +122,10 @@ script; match the surrounding style.
   (webOS Audio Guidance reads it).
 - webOS-only behaviour is gated with `Platform.OS === "web"`; don't change Android TV / tvOS
   behaviour unless asked.
-- Commits: one topic each, subject like `webOS: <what changed>`; end with the attribution
-  line the session asks for. Update `webos/README.md` when webOS behaviour changes.
+- Commits: one topic each, [Conventional Commits](https://www.conventionalcommits.org/)
+  (`feat(tv): …`, `fix(webos): …`, `docs: …`, `test: …`); end with the attribution line the
+  session asks for. Document every change in `docs/` (and `webos/README.md` when webOS
+  behaviour changes).
 - Unit-test pure modules (no react-native imports) by importing the `.ts` file directly
   from `tests/`; node runs them with `--experimental-strip-types`.
 
@@ -156,11 +165,60 @@ script; match the surrounding style.
 - Screen transitions (`tv-screen-transition.tsx`) and the nav fade (`tv-nav-scrim.tsx`)
   use the Web Animations API / static gradients: opacity and transform only.
 
+## The workflow you must follow
+
+1. **Issue first.** Every change has an issue; the PR description says `Closes #N`.
+2. **Tests in every PR, including regression tests.** A bug fix adds a test in `tests/` that
+   fails before the fix and passes after it (run it both ways). A feature adds tests that lock
+   its behaviour.
+3. **Docs in every PR**, in `./docs` (new doc → add it to `docs/README.md`).
+4. **The "(WIP)" rule.** Open the PR as a **draft** with a title starting with `(WIP)`. Only when
+   every item of `.github/pull_request_template.md` is ticked and CI is green may you remove
+   `(WIP)` and mark it ready. The `PR ready (WIP rule)` workflow (`.github/workflows/pr-ready.yml`,
+   logic in `.github/scripts/pr-ready.sh`, tests in `pr-ready_test.sh`) fails otherwise. Never
+   tick a box you didn't verify; write "n/a" next to a box that doesn't apply.
+
+### Checks to run before "ready"
+
+```bash
+npm test                    # unit tests, incl. your regression test
+npx tsc --noEmit -p .       # only the known app/_layout.tsx TS2882 may remain
+npm run build:webos         # the .ipk must build
+bash .github/scripts/pr-ready_test.sh   # only if you changed the WIP rule
+```
+
+### Before and after screenshots
+
+Every UI change needs BEFORE and AFTER screenshots at **1920×1080** in the PR (and in
+`docs/images/` when they document a feature).
+
+1. **A throwaway local server**, never the maintainer's or any production server. Build the
+   server repository's image and run it on loopback with a scratch data directory:
+   ```bash
+   docker run --rm -d --name ga-scratch -p 127.0.0.1:43299:43211 \
+     -e SEANIME_SERVER_HOST=0.0.0.0 -e SEANIME_SERVER_PORT=43211 \
+     -e SEANIME_PROFILES_ENFORCE=true garceslab-anime-server:dev
+   ```
+   Set a server password in its web settings, and create made-up profiles (Alex, Sam, Kids).
+   Don't log in to real accounts (AniList, TorBox) on it.
+2. **The app:** `npm run build:webos`, then `npm run serve:webos` (http://localhost:8090). For
+   BEFORE, build the base branch in a separate worktree the same way.
+3. **Capture** with headless Chromium at a 1920×1080 viewport (Playwright or the DevTools
+   protocol): set `localStorage["seanime-mobile\\sea-server-url"]` to the JSON-encoded
+   `"http://127.0.0.1:43299"`, reload, drive the screens with key presses (arrows, Enter,
+   Escape = Back) and take the screenshot. A one-shot page works with
+   `chromium --headless=new --window-size=1920,1080 --screenshot=after.png http://localhost:8090/`.
+4. **Privacy check every image** (open it): no real names, IP addresses, server URLs, emails,
+   tokens, time zones (the Schedule header shows one) or paths with user names. Strip metadata
+   and compress: `magick in.png -strip -resize '1600x1600>' -quality 78 docs/images/name.webp`.
+5. `docker rm -f ga-scratch` when done.
+
 ## Working with the user
 
-- **Ask before anything touches the user's real Seanime server** (192.168.68.60:43211),
-  even read-only browsing, and say what it will do. Never start playback/streams or change
-  server data without an explicit yes. A throwaway server (`seanime-server-windows.exe
-  --datadir <scratch> --port 43299`) is fine for protocol checks.
-- Don't commit or push unless asked; the user tests builds on their LG C3 (webOS 23) first.
+- **Ask before anything touches the user's real server or TV**, even read-only browsing, and
+  say what it will do. Never start playback/streams or change server data without an explicit
+  yes. A throwaway local server (above) is fine for protocol checks.
+- Never put real IP addresses, hostnames, tokens or emails in code, docs, commits or
+  screenshots; use `192.0.2.x` (documentation range) or `<server>` in examples.
+- Don't commit, push, open PRs or merge unless asked; the user tests builds on an LG C3 (webOS 23) first.
 - Explain fixes in plain words; the user is not reading diffs.
