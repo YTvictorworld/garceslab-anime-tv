@@ -96,7 +96,7 @@ credentials/
 /android/
 /ios/
 TODO.md
-docs/
+# docs/ holds the project's documentation (see docs/README.md).
 scripts/
 !tools/
 tools/*
@@ -108,6 +108,8 @@ tools/*
 !.github/workflows/
 !.github/ISSUE_TEMPLATE/
 !.github/dependabot.yml
+!.github/pull_request_template.md
+!.github/scripts/
 latest-version.txt
 
 # npm run debug:logs output

@@ -67,6 +67,19 @@ All for the LG webOS build:
   identifiers, storage keys, the app id and upstream product names unchanged).
 - **API types** regenerated from the server (`src/api/generated`).
 
+## 2026-11 (documentation and contribution rules)
+
+- **Docs:** a feature overview with screenshots in `README.md`; a new `docs/` folder as the home
+  of all documentation (`docs/README.md` index, `profiles.md`, `home-and-schedule.md`,
+  `episode-tags.md`, `direct-play.md`, `remote-and-navigation.md`, `building-webos.md`);
+  `webos/README.md` stays the full webOS reference and points to it. Screenshots in
+  `docs/images/` (WebP, made-up profiles).
+- **Contribution rules:** `CONTRIBUTING.md` rewritten for this project (issue first, tests with
+  regression tests and docs in every PR, the "(WIP)" rule), `AGENTS.md` extended (workflow,
+  checks, before/after screenshots against a throwaway server), a pull request checklist, issue
+  templates, and the `PR ready (WIP rule)` workflow (`.github/workflows/pr-ready.yml`,
+  `.github/scripts/pr-ready.sh` with its tests). The existing workflows are unchanged.
+
 ## GPL-3.0 compliance checklist
 
 - [x] **Prominent modification notices with dates (§5a):** this file, `NOTICE`, the README's
