@@ -1,45 +1,136 @@
-# Builds the webOS .ipk and attaches it, with its SHA-256, to a GitHub Release.
-# Runs only when a version tag (vX.Y.Z, matching package.json) is pushed.
+# Builds the webOS .ipk and attaches it, with its SHA-256, to a GitHub Release that links
+# the exact source (GPL-3.0 section 6). How and when: docs/releasing.md.
+#
+#   - From main (the usual way): Run workflow -> branch main, version = X.Y.Z,
+#     confirm = publish. Checks that vX.Y.Z doesn't exist and equals package.json's
+#     version, tests and builds the .ipk, then creates the tag vX.Y.Z at the built commit and
+#     the GitHub Release.
+#   - Pushing a tag vX.Y.Z by hand (it must match package.json) still works, and so does
+#     Run workflow on an existing tag with confirm = publish.
+#
+# Anything else (no "publish", another branch, a version that doesn't match package.json)
+# fails with a message in the "Check the request" job; it never skips quietly. The rules are
+# in .github/scripts/release-check.sh, tested by release-check_test.sh.
 name: Release (webOS .ipk)
 
 on:
   push:
     tags:
       - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release, e.g. 1.0.0 (required when run from main; must equal package.json)'
+        required: false
+        default: ""
+      confirm:
+        description: 'Type "publish" to create the tag and the release'
+        required: true
 
-permissions:
-  contents: write
+permissions: {}
+
+# One release at a time; a second run waits instead of racing for the same tag.
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
-  release:
+  check:
+    name: Check the request
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+      tag: ${{ steps.check.outputs.tag }}
+      create_tag: ${{ steps.check.outputs.create_tag }}
     steps:
       - uses: actions/checkout@v7
+      - name: Test the release rules
+        run: bash .github/scripts/release-check_test.sh
+      - name: Check the request
+        id: check
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          GIT_REF: ${{ github.ref }}
+          CONFIRM: ${{ inputs.confirm }}
+          VERSION_INPUT: ${{ inputs.version }}
+        run: bash .github/scripts/release-check.sh
+
+  # Builds with a read-only token: npm ci and the build never hold write access.
+  build:
+    name: Tests and webOS .ipk
+    needs: check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      VERSION: ${{ needs.check.outputs.version }}
+    steps:
+      # The commit the run was started on (main's head or the tag), never a newer main.
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
       - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
-      - name: Tag matches package.json
-        run: |
-          version="$(node -p 'require("./package.json").version')"
-          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
-            echo "Tag $GITHUB_REF_NAME doesn't match package.json version $version" >&2
-            exit 1
-          fi
       - run: npm ci --no-fund
       - run: npm test
       # EXPO_PUBLIC_TV_TIME_ZONE is a local build option and is not set here.
       - run: npm run build:webos
       - name: Checksums
         working-directory: dist/webos
-        run: sha256sum *.ipk > SHA256SUMS.txt && cat SHA256SUMS.txt
-      - name: GitHub Release
+        run: |
+          ipk="app.seanime.tenji_${VERSION}_all.ipk"
+          if [ ! -f "$ipk" ]; then
+            echo "::error title=Release refused::The build didn't produce $ipk:" >&2
+            ls -l
+            exit 1
+          fi
+          sha256sum "$ipk" > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+      - uses: actions/upload-artifact@v7
+        with:
+          name: webos-release
+          path: |
+            dist/webos/*.ipk
+            dist/webos/SHA256SUMS.txt
+          if-no-files-found: error
+
+  publish:
+    name: Tag and GitHub Release
+    needs: [check, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # create the tag and the release
+    env:
+      TAG: ${{ needs.check.outputs.tag }}
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: webos-release
+          path: release
+      - name: Verify the checksums
+        working-directory: release
+        run: sha256sum -c SHA256SUMS.txt
+      # Created only after the .ipk is built, so a failed build leaves no tag behind and the
+      # same run can simply be started again.
+      - name: Create the tag
+        if: needs.check.outputs.create_tag == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" dist/webos/*.ipk dist/webos/SHA256SUMS.txt \
-            --title "Garceslab Anime TV $GITHUB_REF_NAME" \
-            --notes "webOS package for LG TVs. Install it as described in the README (Developer Mode); verify the download with SHA256SUMS.txt.
-          Source: https://github.com/$GITHUB_REPOSITORY/tree/$GITHUB_REF_NAME (commit $GITHUB_SHA)
-          Derived from Seanime Tenji (AlkindiX) and Seanime (5rahim); GPL-3.0, see NOTICE and MODIFICATIONS.md." \
-            --verify-tag
+          gh api "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/tags/$TAG" -f sha="$GITHUB_SHA" >/dev/null
+          echo "Created tag $TAG at $GITHUB_SHA"
+      - name: GitHub Release (links the exact source, GPL-3.0 section 6)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$TAG" release/*.ipk release/SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --verify-tag \
+            --title "Garceslab Anime TV $TAG" \
+            --notes "webOS package for LG TVs. Install it as described in docs/building-webos.md (Developer Mode); verify the download with SHA256SUMS.txt.
+          Use it with the server of the same version: https://github.com/YTvictorworld/garceslab-anime-server/releases/tag/$TAG
+          Source: https://github.com/$GITHUB_REPOSITORY/tree/$TAG (commit $GITHUB_SHA)
+          Derived from Seanime Tenji (AlkindiX) and Seanime (5rahim); GPL-3.0, see NOTICE and MODIFICATIONS.md."

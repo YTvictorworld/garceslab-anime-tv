@@ -24,6 +24,7 @@ It is published only for self-hosting with LG webOS TVs: there is no hosted serv
 | Doc | What it covers |
 |---|---|
 | [building-webos.md](building-webos.md) | Building the `.ipk`, installing it on a TV, test builds, releases |
+| [releasing.md](releasing.md) | Versions (1.0.0 onwards, server and TV together), cutting a release with the workflow, verifying it, rolling back |
 | [../webos/README.md](../webos/README.md) | The full webOS reference: playback and formats, relay service, device info, debug logs, what is not yet verified on a TV |
 | [../tizen/README.md](../tizen/README.md) | Samsung Tizen build (untested on a TV) |
 | [../CONTRIBUTING.md](../CONTRIBUTING.md) | Issue first, the pull request checklist and the "(WIP)" rule, running the checks |
@@ -36,7 +37,8 @@ profiles; anime titles and art are AniList's public data.
 
 ## Roadmap
 
-- **1.0 release:** the `.ipk` and its checksum on GitHub Releases, built from a git tag.
+- **1.0 release:** the `.ipk` and its checksum on GitHub Releases, built from a git tag
+  ([how](releasing.md)).
 - **Self-hosted subtitle translation (planned):** an optional service on your own Garceslab
   Anime server that translates a release's subtitles into the profile's language when no release
   has them, so nothing is sent to a third-party translation service. The TV would show the
