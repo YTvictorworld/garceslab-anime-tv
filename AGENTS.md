@@ -183,7 +183,7 @@ script; match the surrounding style.
 You have no LG TV, so for a PR that **changes UI behaviour** (layout, focus/remote navigation,
 Back, player, playback, subtitles) always: add the **`needs-tv-test`** label, tick *"Not tested
 on a real TV"* in the template ("n/a" on *"Tested on a real LG webOS TV"*), and mention
-**@YTvictorworld** in the PR description asking for a TV test, with the steps to check (use
+**@YTvictorworld** in the PR description (a real mention, without the backticks the template uses) asking for a TV test, with the steps to check (use
 [docs/testing-on-tv.md](docs/testing-on-tv.md)). Screenshots don't replace it. The tester
 comments the result and swaps the label for **`tv-tested`**. With `needs-tv-test` the PR may be
 ready for review (no `(WIP)`), but the *PR ready* check fails, so it can't be merged; never

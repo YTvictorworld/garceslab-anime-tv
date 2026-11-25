@@ -88,7 +88,7 @@ and write the model and webOS version in the PR's "Tested on a real LG webOS TV"
    TV"*).
 3. Mention the maintainer, **@YTvictorworld** (currently the only one who can test on a TV),
    in the PR description and ask for a TV test, with what to check: the steps, the screens and
-   the expected result.
+   the expected result. The template writes the handle in backticks so that opening a PR doesn't notify anyone; remove the backticks to send the mention.
 
 Whoever tests on the TV comments the result on the PR (device and webOS version, what was
 checked, photos or videos if useful), then **replaces `needs-tv-test` with `tv-tested`**. A PR

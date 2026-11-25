@@ -21,7 +21,7 @@ aren't enough for focus, remote or player behaviour.
    webOS TV"*.
 3. Mention the maintainer, @YTvictorworld (currently the only one who can test on a TV), in the
    PR description and ask for a TV test. Under *"Real-TV test"*, list what to check: the steps,
-   the screens and the expected result, using the checklist below.
+   the screens and the expected result, using the checklist below. The template writes the handle in backticks so that opening a PR doesn't notify anyone; remove the backticks to send the mention.
 
 AI agents without access to a TV always do this for a UI behaviour change.
 

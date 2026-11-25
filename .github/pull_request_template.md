@@ -24,7 +24,8 @@ Commands you ran, and what you checked by hand (desktop Chromium at 1920×1080, 
 
 ## Real-TV test (UI behaviour changes not tested on a TV; delete this section otherwise)
 
-@YTvictorworld, could you test this on a real LG webOS TV? What to check (steps, screens, expected result):
+<!-- To notify the maintainer, replace `@YTvictorworld` below with a real mention (same text without the backticks). -->
+`@YTvictorworld`, could you test this on a real LG webOS TV? What to check (steps, screens, expected result):
 
 1.
 
@@ -38,7 +39,7 @@ Commands you ran, and what you checked by hand (desktop Chromium at 1920×1080, 
 - [ ] UI changes: BEFORE and AFTER screenshots at 1920×1080 attached, and saved in `docs/images/` if they document a feature.
 - [ ] Changes UI behaviour on the TV (layout, focus/remote navigation, player, playback); tick the one of the two boxes below that applies and write "n/a" on the other; if the PR doesn't change UI behaviour, write "n/a" on all three and tick them:
   - [ ] Tested on a real LG webOS TV (model/webOS version: …).
-  - [ ] Not tested on a real TV: `needs-tv-test` label added and @YTvictorworld asked to test (steps in "Real-TV test" above).
+  - [ ] Not tested on a real TV: `needs-tv-test` label added and `@YTvictorworld` mentioned in "Real-TV test" above to ask for a test.
 - [ ] Docs updated in `./docs` (and the index in `docs/README.md` for a new doc; `webos/README.md` if webOS behaviour changed).
 - [ ] No secrets or private data (IPs, server URLs, tokens, emails, real names) in code, commits or screenshots.
 - [ ] `MODIFICATIONS.md` updated if the change modifies code that comes from Seanime Tenji.
