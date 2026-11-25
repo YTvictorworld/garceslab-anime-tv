@@ -1,5 +1,9 @@
 # Seanime Tenji for LG webOS
 
+> This is the **full technical reference** for the webOS build. For a shorter, feature-by-feature
+> overview start with the [docs folder](../docs/README.md) (profiles, direct play, episode tags,
+> remote and search, building and installing).
+
 LG TVs can't run Android apps, so the webOS build is the TV interface rendered with
 React Native Web and packaged as a webOS web app (`.ipk`). It uses the same screens as
 Android TV and tvOS. The remote works the same way, with D-pad focus, Back, OK and the
@@ -709,7 +713,7 @@ are released, so a long seek doesn't continue when you come back.
 Debrid (TorBox) streams play **directly**: the server only resolves the link and the
 TV's `<video>` plays it, with the MKV's own subtitles read on the TV. This is what lets
 **up to three TVs watch at the same time** (the server keeps one *viewing slot* per
-device; see `docs/phase2-direct-play.md` in the server repository). Torrent streams,
+device; see `docs/phase2-direct-play.md` in the server repository, and [docs/direct-play.md](../docs/direct-play.md)). Torrent streams,
 library files and online streams play as before. Build with `EXPO_PUBLIC_DIRECT_PLAY=0`
 to send every debrid stream through the server instead.
 
@@ -794,7 +798,7 @@ and can stream them to a computer on the same network:
    It prints the addresses to use (port 8787) and writes everything it receives to
    `debug-logs/tenji-<date>.log`. Let Node through the firewall if Windows asks.
 2. On the TV, open Settings › Diagnostics and turn on **Debug Logging**.
-3. Open **Log Receiver** and enter the computer's address, e.g. `192.168.1.20` (the port
+3. Open **Log Receiver** and enter the computer's address, e.g. `192.0.2.20` (the port
    defaults to 8787). The TV sends a test request and shows whether it got through.
 4. Reproduce the problem. Lines appear in the terminal as they happen. **Send Saved Logs**
    sends everything saved on the TV so far, including what was logged before a receiver
