@@ -178,6 +178,17 @@ script; match the surrounding style.
    logic in `.github/scripts/pr-ready.sh`, tests in `pr-ready_test.sh`) fails otherwise. Never
    tick a box you didn't verify; write "n/a" next to a box that doesn't apply.
 
+### Testing on a real TV
+
+You have no LG TV, so for a PR that **changes UI behaviour** (layout, focus/remote navigation,
+Back, player, playback, subtitles) always: add the **`needs-tv-test`** label, tick *"Not tested
+on a real TV"* in the template ("n/a" on *"Tested on a real LG webOS TV"*), and mention
+**@YTvictorworld** in the PR description (a real mention, without the backticks the template uses) asking for a TV test, with the steps to check (use
+[docs/testing-on-tv.md](docs/testing-on-tv.md)). Screenshots don't replace it. The tester
+comments the result and swaps the label for **`tv-tested`**. With `needs-tv-test` the PR may be
+ready for review (no `(WIP)`), but the *PR ready* check fails, so it can't be merged; never
+remove the label yourself. Details: [CONTRIBUTING.md](CONTRIBUTING.md#testing-on-a-real-tv).
+
 ### Checks to run before "ready"
 
 ```bash

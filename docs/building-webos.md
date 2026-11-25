@@ -95,6 +95,11 @@ still works. The full procedure, verification and rollback: [releasing.md](relea
 
 CI (`.github/workflows/webos.yml`) runs the tests and builds the `.ipk` on every pull request.
 
+## Testing on the TV
+
+Pull requests that change UI behaviour are tested on a real LG TV before they are merged
+(`needs-tv-test` / `tv-tested` labels); what to check: [testing-on-tv.md](testing-on-tv.md).
+
 ## Debug logs
 
 Settings › **Diagnostics** keeps logs on the TV and can stream them to a computer on the same
