@@ -7,6 +7,7 @@ real TV" and list below what to check (see "Testing on a real TV" in CONTRIBUTIN
 -->
 
 Closes #
+<!-- Closes #N — for partial work, link a sub-issue (`Closes #<sub-issue>`, see CONTRIBUTING.md). -->
 
 ## Summary
 
