@@ -1,0 +1,161 @@
+# The nightly channel: every push to main builds the webOS .ipk and republishes it as the
+# GitHub pre-release "nightly" (tag "nightly" moved to the built commit). It is never marked
+# as the latest release and never touches the stable vX.Y.Z tags (release.yml). What it
+# publishes, and the JSON formats external updaters can rely on: docs/releasing.md,
+# "Release channels". The guard (push to main only) is .github/scripts/nightly-check.sh,
+# tested by nightly-check_test.sh; the JSON files come from nightly-release.mjs.
+name: Nightly (webOS .ipk)
+
+on:
+  push:
+    branches: [main]
+
+permissions: {}
+
+# A newer push to main cancels an older nightly run; the newest commit wins.
+concurrency:
+  group: nightly
+  cancel-in-progress: true
+
+jobs:
+  # Builds with a read-only token: npm ci and the build never hold write access.
+  build:
+    name: Tests and nightly .ipk
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      commit: ${{ steps.check.outputs.commit }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Test the nightly rules
+        run: bash .github/scripts/nightly-check_test.sh
+      - name: Only a push to main
+        id: check
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          GIT_REF: ${{ github.ref }}
+          COMMIT: ${{ github.sha }}
+        run: bash .github/scripts/nightly-check.sh
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-fund
+      - run: npm test
+      # Embeds "nightly" and the commit (Settings shows "v1.0.0 · nightly (abc1234)") and
+      # writes dist/webos/app/build.json. EXPO_PUBLIC_TV_TIME_ZONE is not set here.
+      - run: npm run build:webos
+        env:
+          GARCESLAB_BUILD_CHANNEL: nightly
+          GARCESLAB_BUILD_COMMIT: ${{ github.sha }}
+      - name: Package and build identity
+        run: |
+          version="$(node -p 'require("./package.json").version')"
+          ipk="dist/webos/app.seanime.tenji_${version}_all.ipk"
+          if [ ! -f "$ipk" ]; then
+            echo "::error title=Nightly refused::The build didn't produce $ipk" >&2
+            ls -l dist/webos
+            exit 1
+          fi
+          mkdir -p nightly
+          cp "$ipk" nightly/
+          cp dist/webos/app/build.json nightly/app-build.json
+          cat nightly/app-build.json
+      - uses: actions/upload-artifact@v7
+        with:
+          name: webos-nightly
+          path: nightly/
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Nightly pre-release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # move the nightly tag and edit the nightly pre-release
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GITHUB_TOKEN: ${{ github.token }}
+      COMMIT: ${{ needs.build.outputs.commit }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          sparse-checkout: .github
+      - name: Still main's head
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          GIT_REF: ${{ github.ref }}
+        run: |
+          MAIN_HEAD="$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)" \
+            bash .github/scripts/nightly-check.sh
+      - uses: actions/download-artifact@v8
+        with:
+          name: webos-nightly
+          path: build
+      - name: build.json, changes.json and SHA256SUMS.txt
+        run: |
+          previous="$(gh api "repos/$GITHUB_REPOSITORY/git/matching-refs/tags/nightly" \
+            --jq '.[] | select(.ref == "refs/tags/nightly") | .object.sha')"
+          echo "Previous nightly: ${previous:-none}"
+          mkdir release
+          mv build/*.ipk release/
+          node .github/scripts/nightly-release.mjs build-json --app build/app-build.json \
+            --previous "$previous" --out release/build.json
+          node .github/scripts/nightly-release.mjs changes --repo "$GITHUB_REPOSITORY" \
+            --previous "$previous" --commit "$COMMIT" --out release/changes.json
+          (cd release && sha256sum -- *.ipk build.json changes.json > SHA256SUMS.txt && cat SHA256SUMS.txt)
+      - name: Release notes (links the exact source, GPL-3.0 section 6)
+        run: |
+          short="${COMMIT:0:7}"
+          {
+            echo "**Nightly build of \`main\` at $short. It may be broken:** it is built from every push to main and not tested on a TV. For everyday use, install the [latest stable release](https://github.com/$GITHUB_REPOSITORY/releases/latest)."
+            echo
+            echo "webOS package for LG TVs; install it as described in docs/building-webos.md (Developer Mode) and verify the download with SHA256SUMS.txt. \`build.json\` and \`changes.json\` describe this build for updaters (docs/releasing.md)."
+            echo
+            changes="$(jq -r '.[] | select(.type != "internal") | "- \(.title) (#\(.pr))"' release/changes.json)"
+            if [ -n "$changes" ]; then
+              echo "Changes since the previous nightly:"
+              echo
+              echo "$changes"
+              echo
+            fi
+            echo "Source: https://github.com/$GITHUB_REPOSITORY/tree/$COMMIT (commit $COMMIT)"
+            echo "Derived from Seanime Tenji (AlkindiX) and Seanime (5rahim); GPL-3.0, see NOTICE and MODIFICATIONS.md."
+          } > notes.md
+          cat notes.md
+      # Only now, after a successful build: the nightly tag moves to the built commit.
+      - name: Move the nightly tag
+        run: |
+          if gh api "repos/$GITHUB_REPOSITORY/git/matching-refs/tags/nightly" --jq '.[].ref' | grep -Fxq refs/tags/nightly; then
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/git/refs/tags/nightly" -f sha="$COMMIT" -F force=true >/dev/null
+          else
+            gh api "repos/$GITHUB_REPOSITORY/git/refs" -f ref=refs/tags/nightly -f sha="$COMMIT" >/dev/null
+          fi
+          echo "nightly -> $COMMIT"
+      - name: Publish the nightly pre-release
+        run: |
+          title="Garceslab Anime TV nightly (${COMMIT:0:7})"
+          if old="$(gh release view nightly --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')"; then
+            gh release edit nightly --repo "$GITHUB_REPOSITORY" --prerelease --latest=false \
+              --title "$title" --notes-file notes.md >/dev/null
+            gh release upload nightly release/* --repo "$GITHUB_REPOSITORY" --clobber
+            # Assets of the previous nightly that this one doesn't replace (e.g. an .ipk of an
+            # older version).
+            for name in $old; do
+              if [ ! -f "release/$name" ]; then
+                gh release delete-asset nightly "$name" --repo "$GITHUB_REPOSITORY" --yes
+              fi
+            done
+          else
+            gh release create nightly release/* --repo "$GITHUB_REPOSITORY" --verify-tag \
+              --prerelease --latest=false --title "$title" --notes-file notes.md
+          fi
+          gh release view nightly --repo "$GITHUB_REPOSITORY" --json tagName,isPrerelease,assets \
+            --jq '"\(.tagName) prerelease=\(.isPrerelease): \([.assets[].name] | join(", "))"'

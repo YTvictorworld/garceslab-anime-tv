@@ -28,6 +28,9 @@ jobs:
       # The rules of the release workflow (release.yml), see docs/releasing.md.
       - name: Release rules (release-check_test.sh)
         run: bash .github/scripts/release-check_test.sh
+      # The rules of the nightly workflow (nightly.yml).
+      - name: Nightly rules (nightly-check_test.sh)
+        run: bash .github/scripts/nightly-check_test.sh
       # EXPO_PUBLIC_TV_TIME_ZONE is a local build option and is not set here:
       # the app uses the TV's own time zone.
       - run: npm run build:webos
