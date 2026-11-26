@@ -78,8 +78,13 @@ jobs:
           cache: npm
       - run: npm ci --no-fund
       - run: npm test
-      # EXPO_PUBLIC_TV_TIME_ZONE is a local build option and is not set here.
+      # EXPO_PUBLIC_TV_TIME_ZONE is a local build option and is not set here. The stable
+      # channel and the commit are embedded (Settings shows "v1.0.0") and written to
+      # dist/webos/app/build.json (docs/releasing.md, "Release channels").
       - run: npm run build:webos
+        env:
+          GARCESLAB_BUILD_CHANNEL: stable
+          GARCESLAB_BUILD_COMMIT: ${{ github.sha }}
       - name: Checksums
         working-directory: dist/webos
         run: |

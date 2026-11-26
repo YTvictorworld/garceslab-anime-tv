@@ -16,6 +16,7 @@ import { TVDebugLogReceiverDrawer } from "@/components/tv/tv-debug-log-receiver-
 import { usePreferredFocus, useTVFocus } from "@/components/tv/tv-focus"
 import { TVNavScrim } from "@/components/tv/tv-nav-scrim"
 import { TV, tvSize } from "@/components/tv/tv-scale"
+import { embeddedBuildIdentity, formatBuildLabel } from "@/lib/build-identity"
 import { getConnectionSnapshot, getLastConnectionChange, subscribeToConnectionState } from "@/lib/connection-state"
 import { getDebugLogReceiverLastError, getDebugLogReceiverUrl, sendToDebugLogReceiver, setDebugLogReceiverUrl } from "@/lib/debug-log-receiver"
 import { useServerConnectionState } from "@/lib/offline"
@@ -420,6 +421,11 @@ export function TVSettingsScreen() {
     const [clearing, setClearing] = React.useState(false)
     const [checkingOta, setCheckingOta] = React.useState(false)
     const version = React.useMemo(() => getOtaVersionInfo(), [])
+    // Garceslab Anime: the TV builds show their release channel and commit (build-identity.ts)
+    // instead of the OTA version, which they don't use.
+    const versionLabel = React.useMemo(() => Platform.OS === "web"
+        ? formatBuildLabel(embeddedBuildIdentity(version.appVersion))
+        : `v${version.appVersion} · ${version.otaVersion}`, [version])
     const deviceSummary = useDeviceSummary()
     const socketState = useAtomValue(websocketConnectionStateAtom)
     const socketLastClose = useAtomValue(websocketLastCloseAtom)
@@ -550,8 +556,8 @@ export function TVSettingsScreen() {
                                 </Text>
                             </View>
                         </View>
-                        <Text className="text-white/20" style={{ fontSize: tvSize(14) }}>
-                            v{version.appVersion} · {version.otaVersion}
+                        <Text className="text-white/20" style={{ fontSize: tvSize(14) }} accessibilityLabel={`Version ${versionLabel}`}>
+                            {versionLabel}
                         </Text>
                     </View>
 
