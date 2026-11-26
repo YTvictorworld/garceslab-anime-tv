@@ -25,7 +25,7 @@ It is published only for self-hosting with LG webOS TVs: there is no hosted serv
 |---|---|
 | [building-webos.md](building-webos.md) | Building the `.ipk`, installing it on a TV, test builds, releases |
 | [testing-on-tv.md](testing-on-tv.md) | The real-TV test for UI behaviour changes: the `needs-tv-test` / `tv-tested` labels, asking for a test, what to check on the TV |
-| [releasing.md](releasing.md) | Versions (1.0.0 onwards, server and TV together), cutting a release with the workflow, verifying it, rolling back |
+| [releasing.md](releasing.md) | Versions (1.0.0 onwards, server and TV together), the nightly and stable channels (nightly assets and their JSON formats for updaters), cutting a release with the workflow, verifying it, rolling back |
 | [../webos/README.md](../webos/README.md) | The full webOS reference: playback and formats, relay service, device info, debug logs, what is not yet verified on a TV |
 | [../tizen/README.md](../tizen/README.md) | Samsung Tizen build (untested on a TV) |
 | [../CONTRIBUTING.md](../CONTRIBUTING.md) | Issue first, the pull request checklist and the "(WIP)" rule, running the checks |

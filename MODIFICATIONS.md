@@ -92,6 +92,21 @@ All for the LG webOS build:
   checks the version, builds and creates the tag), with a read-only build job, and fails with a
   message on any mismatch. See `docs/releasing.md`.
 
+## 2026-11 (release channels: nightly and stable)
+
+- **Build identity** (`webos/build-identity.mjs`, `webos/build.mjs`, `src/lib/build-identity.ts`):
+  the webOS build embeds its version, release channel (`stable`, `nightly` or `dev`, the default
+  for local builds) and commit, and writes them to `build.json` in the app directory.
+- **Settings** (`src/components/tv/tv-settings-screen.tsx`): on the TV builds the version line
+  shows the channel and commit ("v1.0.0 · nightly (abc1234)"; a stable build shows "v1.0.0")
+  instead of the OTA version.
+- **App update check** (`src/lib/app-release-updates.ts`): on the TV builds only a stable build
+  checks for a newer release; nightly and dev builds never show the notice.
+- **Nightly workflow** (`.github/workflows/nightly.yml`, `.github/scripts/nightly-check.sh` and
+  `nightly-release.mjs` with tests): every push to `main` republishes the `nightly` pre-release
+  with the `.ipk`, `SHA256SUMS.txt`, `build.json` and `changes.json`. The stable release workflow
+  builds with the `stable` channel. See `docs/releasing.md`.
+
 ## GPL-3.0 compliance checklist
 
 - [x] **Prominent modification notices with dates (§5a):** this file, `NOTICE`, the README's

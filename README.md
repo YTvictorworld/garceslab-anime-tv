@@ -130,9 +130,11 @@ Bleach. More: [docs/remote-and-navigation.md](docs/remote-and-navigation.md).
 1. **Server:** run Garceslab Anime with Docker Compose, as in the server's
    [self-hosting guide](https://github.com/YTvictorworld/garceslab-anime-server/blob/main/docs/self-hosting-webos.md).
 2. **TV app:** download the `.ipk` and `SHA256SUMS.txt` from this repository's
-   [GitHub Releases](https://github.com/YTvictorworld/garceslab-anime-tv/releases)
-   (*coming with 1.0*; until then, build it yourself as in
-   [docs/building-webos.md](docs/building-webos.md)), check it with
+   [GitHub Releases](https://github.com/YTvictorworld/garceslab-anime-tv/releases): the
+   **latest** release is the tested **stable** version; the **`nightly`** pre-release is
+   rebuilt from every change to `main` and may be broken
+   ([channels](docs/releasing.md#release-channels)). Or build it yourself as in
+   [docs/building-webos.md](docs/building-webos.md). Check it with
    `sha256sum -c SHA256SUMS.txt`, and install it with the TV in **Developer Mode** using
    [webOS Dev Manager](https://github.com/webosbrew/dev-manager-desktop) or the webOS CLI
    (`ares-install --device tv garceslab-anime-tv.ipk`). Step by step, and what to do if the

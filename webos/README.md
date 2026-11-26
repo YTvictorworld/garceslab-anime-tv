@@ -537,6 +537,11 @@ its inspector.
 
 ## About this TV
 
+The version line at the top of Settings says which build is installed: `v1.0.0` for a stable
+release, `v1.0.0 · nightly (abc1234)` for a nightly (with its commit) and `v1.0.0 · dev` for a
+build made by hand. The same facts are in `build.json` next to `appinfo.json` in the installed
+app; see [docs/releasing.md](../docs/releasing.md#release-channels).
+
 On webOS, Settings shows *Live updates*, the state of the websocket to the server, with how
 the last connection closed and whether it goes through the relay service. Torrent and debrid
 streams are started and followed over it, so without it they can't start; Tenji then says so
