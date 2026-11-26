@@ -41,6 +41,8 @@ The TV app has two channels, like the server:
 
 A build made by hand (`npm run build:webos`) is a **dev** build: Settings shows `v1.0.0 · dev`.
 
+![Settings on a nightly build: the version line reads "v1.0.0 · nightly (808b9ee)"](images/tv-settings-version.webp)
+
 - The nightly is never marked as the "latest" release, and its workflow never creates, moves
   or edits a `vX.Y.Z` tag or release. `https://github.com/YTvictorworld/garceslab-anime-tv/releases/latest`
   (and the API's `/releases/latest`) is always the newest stable release.
