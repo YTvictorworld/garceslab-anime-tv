@@ -15,6 +15,12 @@ The server and web interface have their own repository and guide:
    [feature request](https://github.com/YTvictorworld/garceslab-anime-tv/issues/new?template=feature_request.yml)).
 2. **Then open a Pull Request that references it** with `Closes #N` (or `Fixes #N`,
    `Resolves #N`) in the description.
+
+   If your change covers only part of an issue, don't write `Part of #N` (the PR ready check
+   doesn't accept it, and `Closes #N` would close the whole issue too early). Use a
+   **sub-issue**: create one under the parent issue for exactly your scope (GitHub → the parent
+   issue → Sub-issues → Create sub-issue, or ask a maintainer), and write `Closes #<sub-issue>`
+   in the PR. The parent issue closes when all its sub-issues are done.
 3. **Every PR adds or updates tests** in `tests/`, including **regression tests**:
    - a **bug fix** includes a test that **fails before the fix and passes after** it;
    - a **feature** includes tests that **lock its behaviour**.
