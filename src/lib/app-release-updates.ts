@@ -1,10 +1,11 @@
 import { getStoredString, setStoredString } from "@/atoms/storage"
 import { APP_RELEASE_API_URL, APP_RELEASE_URL, compareSemverLike } from "@/lib/app-release"
+import { appUpdateNoticeAllowed, embeddedBuildIdentity } from "@/lib/build-identity"
 import { isManualOfflineModeEnabled } from "@/lib/connection-state"
 import { toast } from "@/lib/utils/toast"
 import Constants from "expo-constants"
 import * as React from "react"
-import { Alert, Linking } from "react-native"
+import { Alert, Linking, Platform } from "react-native"
 
 type AppRelease = {
     tagName: string
@@ -15,11 +16,18 @@ type AppRelease = {
 const APP_RELEASE_CHECK_DELAY_MS = 10000
 const DISMISSED_APP_RELEASE_VERSION_KEY = "sea-app-release-dismissed-version"
 
+// Garceslab Anime: on the TV builds only the stable channel checks GitHub's latest release;
+// nightly and dev builds never show the notice (docs/releasing.md, "Release channels").
+function updateNoticeAllowed(): boolean {
+    const identity = embeddedBuildIdentity(Constants.expoConfig?.version ?? "0.0.0")
+    return appUpdateNoticeAllowed(identity, Platform.OS === "web")
+}
+
 export function AppReleaseUpdatePrompt() {
     const promptShownRef = React.useRef(false)
 
     React.useEffect(() => {
-        if (__DEV__ || isManualOfflineModeEnabled()) {
+        if (__DEV__ || isManualOfflineModeEnabled() || !updateNoticeAllowed()) {
             return
         }
 
@@ -55,6 +63,11 @@ export function AppReleaseUpdatePrompt() {
 }
 
 export async function checkForAppReleaseUpdateManually(): Promise<void> {
+    if (!updateNoticeAllowed()) {
+        toast.info("Update checks are for stable builds")
+        return
+    }
+
     if (isManualOfflineModeEnabled()) {
         toast.info("Disable offline mode to check app updates")
         return

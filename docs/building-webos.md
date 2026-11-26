@@ -42,9 +42,13 @@ ares-install --device tv --remove app.garceslab.anime.visualtest   # when done
 
 ## Installing on the TV
 
-Prebuilt `.ipk` files will be on the
+Prebuilt `.ipk` files are on the
 [GitHub Releases](https://github.com/YTvictorworld/garceslab-anime-tv/releases) page with a
-`SHA256SUMS.txt` (*coming with 1.0*); check a download with `sha256sum -c SHA256SUMS.txt`.
+`SHA256SUMS.txt`; check a download with `sha256sum -c SHA256SUMS.txt`. Pick a channel:
+
+- **stable** (`vX.Y.Z`, the "latest" release): tested on a real TV. Use this one.
+- **nightly** (the `nightly` pre-release): the newest `main`, rebuilt on every change. It may
+  be broken; for trying new things.
 
 1. Install LG's **Developer Mode** app on the TV (LG Content Store), sign in with an LG
    developer account and turn Developer Mode on. The TV restarts. Developer Mode expires after
@@ -92,6 +96,24 @@ the full test on a TV: it checks the version, tests, builds the `.ipk`, creates 
 GitHub Release with the `.ipk` and `SHA256SUMS.txt`, linking that tag's source (GPL-3.0 §6). A
 wrong request fails with a message instead of being skipped. Pushing a `vX.Y.Z` tag by hand
 still works. The full procedure, verification and rollback: [releasing.md](releasing.md).
+
+Every push to `main` also publishes the **nightly** pre-release (`.github/workflows/nightly.yml`):
+the `.ipk`, `SHA256SUMS.txt`, `build.json` (which commit) and `changes.json` (the pull requests
+merged since the previous nightly). It may be broken, is never the "latest" release, and the
+app's update notice ignores it. Its files and their JSON formats, for a tool that installs
+nightlies on a TV: [releasing.md](releasing.md#release-channels).
+
+**Build identity.** Every build writes `dist/webos/app/build.json` (installed next to
+`appinfo.json`) with its version, channel and commit, and Settings shows them:
+`v1.0.0` (stable), `v1.0.0 · nightly (abc1234)` or `v1.0.0 · dev`. A build on your computer is
+`dev` (the commit comes from `git`). CI sets the channel; to reproduce a CI build:
+
+```sh
+GARCESLAB_BUILD_CHANNEL=nightly GARCESLAB_BUILD_COMMIT=$(git rev-parse HEAD) npm run build:webos
+```
+
+`--skip-export` reuses the earlier export, so the app keeps the identity embedded then (only
+`build.json` is rewritten).
 
 CI (`.github/workflows/webos.yml`) runs the tests and builds the `.ipk` on every pull request.
 

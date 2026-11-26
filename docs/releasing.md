@@ -1,6 +1,7 @@
 # Releasing
 
-How Garceslab Anime TV is versioned and how a release is cut. The server's side, including the
+How Garceslab Anime TV is versioned, its two release channels (nightly and stable) and how a
+stable release is cut. The server's side, including the
 shared rules, is in the server repository's
 [docs/releasing.md](https://github.com/YTvictorworld/garceslab-anime-server/blob/main/docs/releasing.md);
 both are released together.
@@ -28,6 +29,117 @@ both are released together.
   reporting Seanime's version there and its own version in `garceslabVersion`.
 - `CHANGELOG.md` is Seanime Tenji's changelog up to 0.4.0; Garceslab Anime TV's release notes
   are on [GitHub Releases](https://github.com/YTvictorworld/garceslab-anime-tv/releases).
+
+## Release channels
+
+The TV app has two channels, like the server:
+
+| Channel | What | Where | Settings shows |
+|---|---|---|---|
+| **nightly** | every push to `main`, built automatically. **It may be broken**: nobody tested it on a TV | the GitHub **pre-release `nightly`** (tag `nightly`, moved to each new build) | `v1.0.0 · nightly (abc1234)` |
+| **stable** | a version `vX.Y.Z`, released by the maintainer after the full test on a real TV (below) | the GitHub release `vX.Y.Z`, the repository's **latest** release | `v1.0.0` |
+
+A build made by hand (`npm run build:webos`) is a **dev** build: Settings shows `v1.0.0 · dev`.
+
+![Settings on a nightly build: the version line reads "v1.0.0 · nightly (808b9ee)"](images/tv-settings-version.webp)
+
+- The nightly is never marked as the "latest" release, and its workflow never creates, moves
+  or edits a `vX.Y.Z` tag or release. `https://github.com/YTvictorworld/garceslab-anime-tv/releases/latest`
+  (and the API's `/releases/latest`) is always the newest stable release.
+- The in-app "App update available" notice (`src/lib/app-release-updates.ts`) runs only in a
+  **stable** build and offers only the latest stable release. Nightly and dev builds never show
+  it (`appUpdateNoticeAllowed` in `src/lib/build-identity.ts`).
+- The version stays the numeric `package.json` version in every channel (webOS only accepts
+  `x.y.z` in `appinfo.json`), so a nightly and the stable release of the same version have the
+  same `.ipk` version; the commit tells them apart.
+
+### Build identity
+
+`webos/build.mjs` reads `GARCESLAB_BUILD_CHANNEL` (`stable`, `nightly` or `dev`; default `dev`)
+and `GARCESLAB_BUILD_COMMIT` (the full commit SHA; required for `stable` and `nightly`, taken
+from `git` for a dev build), embeds them in the app (Settings, update notice) and writes them to
+**`build.json` in the app directory**, next to `appinfo.json`. On the TV it is
+`/media/developer/apps/usr/palm/applications/app.seanime.tenji/build.json` (Developer Mode
+install), so a tool can read which build is installed:
+
+```json
+{
+  "version": "1.0.0",
+  "channel": "nightly",
+  "commit": "<full 40-character SHA>",
+  "shortCommit": "abc1234",
+  "builtAt": "2026-11-25T12:00:00.000Z"
+}
+```
+
+`commit` and `shortCommit` are `null` in a dev build made without git. A build older than this
+file has no `build.json`: treat it as unknown. `release.yml` builds with `stable`,
+`nightly.yml` with `nightly`.
+
+### Nightly assets
+
+The `nightly` pre-release always holds exactly these files of the newest build:
+
+| Asset | Contents |
+|---|---|
+| `app.seanime.tenji_<version>_all.ipk` | the webOS package |
+| `SHA256SUMS.txt` | SHA-256 of the `.ipk`, `build.json` and `changes.json` (`sha256sum -c SHA256SUMS.txt`) |
+| `build.json` | the build identity above, plus `previousCommit` |
+| `changes.json` | the pull requests merged into `main` since the previous nightly |
+
+`build.json` of the pre-release:
+
+```json
+{
+  "version": "1.0.0",
+  "channel": "nightly",
+  "commit": "<full SHA of this build>",
+  "shortCommit": "abc1234",
+  "builtAt": "2026-11-25T12:00:00.000Z",
+  "previousCommit": "<full SHA of the nightly it replaced, or null>"
+}
+```
+
+`changes.json`, oldest merge first:
+
+```json
+[
+  { "type": "feat", "title": "Seasons tabs on the anime page", "pr": 21, "url": "https://github.com/YTvictorworld/garceslab-anime-tv/pull/21" },
+  { "type": "fix", "title": "Spanish subtitles selected at start", "pr": 22, "url": "https://github.com/YTvictorworld/garceslab-anime-tv/pull/22" },
+  { "type": "internal", "title": "nightly pre-release on every push to main", "pr": 23, "url": "https://github.com/YTvictorworld/garceslab-anime-tv/pull/23" }
+]
+```
+
+- `type` comes from the Conventional Commit prefix of the **pull request title**: `feat` →
+  `"feat"`, `fix` → `"fix"`; `docs`, `ci`, `test`, `chore`, `build`, `refactor` and `style` →
+  `"internal"` (listed so nothing is lost, but meant to be hidden from TV users); anything
+  else (`perf`, `revert`, no prefix) → `"other"`.
+- `title` is the PR title without the prefix (`feat(tv): Seasons tabs` → `Seasons tabs`).
+- Only pull requests are listed; commits pushed to `main` directly have no entry. The first
+  nightly (no previous one), a re-run on the same commit, or a previous commit that no longer
+  exists give `[]`.
+- Each `changes.json` covers one nightly. When a TV skipped some nightlies, an updater that wants
+  all changes since the **installed** commit keeps the `changes.json` files it has seen (following
+  `previousCommit` back to the installed commit), or asks GitHub for the PRs itself.
+
+The release notes repeat the non-internal changes and link the exact source commit
+(GPL-3.0 §6).
+
+### Following a channel from your own tool
+
+Installing updates automatically is not part of this repository: a self-hoster's own tool does
+it, over webOS Developer Mode (as in [building-webos.md](building-webos.md#installing-on-the-tv)).
+Such a tool can:
+
+- **Follow nightly:** poll
+  `https://github.com/YTvictorworld/garceslab-anime-tv/releases/download/nightly/build.json`;
+  when its `commit` differs from the installed one (the TV's `build.json`), download the
+  `.ipk` and `SHA256SUMS.txt` from the same `releases/download/nightly/` path and check them.
+  If the checksum doesn't match, the nightly is being replaced right now: try again a few
+  minutes later.
+- **Follow stable:** poll `https://api.github.com/repos/YTvictorworld/garceslab-anime-tv/releases/latest`
+  (never a pre-release); a newer `tag_name` `vX.Y.Z` has the `.ipk` and `SHA256SUMS.txt` as
+  assets.
 
 ## Who and when
 
@@ -98,7 +210,7 @@ git ls-remote --tags https://github.com/YTvictorworld/garceslab-anime-tv v1.0.0
 ```
 
 - Install the downloaded `.ipk` on the TV ([building-webos.md](building-webos.md#installing-on-the-tv)):
-  Settings shows **v1.0.0**, and the app connects to the server of the same version.
+  Settings shows **v1.0.0** (no channel: it is a stable build), and the app connects to the server of the same version.
 - The release page lists the `.ipk`, `SHA256SUMS.txt`, the source link and the commit.
 
 ## Rolling back
@@ -116,8 +228,37 @@ Tags and releases stay; roll back by installing the previous version and fixing 
 - **A tag created by mistake with no release:** `git push --delete garceslab vX.Y.Z`, then run
   the workflow from `main` again.
 
+## The nightly workflow
+
+[`.github/workflows/nightly.yml`](../.github/workflows/nightly.yml) runs on **every push to
+`main`** only (not on pull requests, tags or by hand). A newer push cancels an older run that is
+still going.
+
+1. **Tests and nightly .ipk** (read-only token): runs the tests of the nightly rules, then
+   [`.github/scripts/nightly-check.sh`](../.github/scripts/nightly-check.sh), which **fails with
+   a message** for anything but a push to `main`; then `npm ci`, `npm test` and
+   `npm run build:webos` with `GARCESLAB_BUILD_CHANNEL=nightly` and the commit.
+2. **Nightly pre-release** (`contents: write`): checks that the built commit is still `main`'s
+   head (so re-running an old run never moves the nightly back), writes `build.json`,
+   `changes.json` (from the GitHub API, by
+   [`.github/scripts/nightly-release.mjs`](../.github/scripts/nightly-release.mjs)) and
+   `SHA256SUMS.txt`, moves the `nightly` tag to the built commit (only now, after a successful
+   build), then updates the `nightly` pre-release: new assets replace the old ones, assets the
+   new build doesn't have are deleted, and it stays a pre-release that is not "latest".
+
+Nothing needs configuring: it uses the workflow's own token. A failed build leaves the previous
+nightly as it was.
+
 ## Tests
 
+- `bash .github/scripts/nightly-check_test.sh`: the nightly rules (a push to `main` publishes; a
+  pull request, a tag, a manual run or another branch is refused with a message; an old run
+  can't move the nightly back) and checks on `nightly.yml` (triggers, pre-release, never
+  "latest", no `vX.Y.Z`). CI runs it in the *Tests and webOS .ipk* job.
+- `tests/nightly-release.test.ts`: how PR titles are classified and aggregated into
+  `changes.json`, and the pre-release's `build.json`.
+- `tests/build-identity.test.ts`: the version line in Settings per channel, the update-notice
+  rule per channel, and how the build resolves and embeds the identity.
 - `bash .github/scripts/release-check_test.sh`: the release rules (pass and fail cases, including
   the regression "run from main without *confirm* fails with a message"). CI runs it in the
   *Tests and webOS .ipk* job; the release workflow runs it before every release.

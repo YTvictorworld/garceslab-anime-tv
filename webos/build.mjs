@@ -21,10 +21,17 @@
  * The relay service is renamed with it (`<id>.service`) and the app is told
  * its id at export time (EXPO_PUBLIC_WEBOS_APP_ID), so don't combine a custom
  * id with --skip-export of a default build. Without them the build is unchanged.
+ *
+ * Build identity (webos/build-identity.mjs): GARCESLAB_BUILD_CHANNEL = stable | nightly |
+ * dev (default dev) and GARCESLAB_BUILD_COMMIT (full SHA; from git for dev builds) are
+ * embedded in the app (Settings shows "v1.0.0 · nightly (abc1234)") and written to
+ * dist/webos/app/build.json. CI sets them: release.yml stable, nightly.yml nightly.
+ * With --skip-export the embedded identity is the one of the earlier export.
  */
 import fs from "node:fs"
 import path from "node:path"
 import zlib from "node:zlib"
+import { buildIdentityEnv, gitHeadCommit, resolveBuildIdentity } from "./build-identity.mjs"
 import { buildService, SERVICE_NODE } from "./service-build.mjs"
 import { buildWebApp, pngSize, root, walk } from "./web-app.mjs"
 
@@ -217,6 +224,11 @@ async function main() {
     } else {
         delete process.env.EXPO_PUBLIC_WEBOS_APP_ID
     }
+    // Embedded by the export and written next to appinfo.json for external tools. webOS
+    // only takes a numeric appinfo.json version, so the channel and commit live here.
+    const identity = resolveBuildIdentity({ version: pkg.version, env: process.env, gitCommit: () => gitHeadCommit(root) })
+    Object.assign(process.env, buildIdentityEnv(identity))
+    log(`Build: v${identity.version} · ${identity.channel}${identity.shortCommit ? ` (${identity.shortCommit})` : ""}`)
     // Checked first so a bad image fails the build before the slow export.
     const images = Object.entries(APPINFO_IMAGES).filter(([field]) => appinfo[field])
     for (const [field, size] of images) checkPng(path.join(webosDir, appinfo[field]), field, size)
@@ -224,6 +236,7 @@ async function main() {
     await buildWebApp({ exportDir, appDir, skipExport: args.has("--skip-export"), log })
 
     fs.writeFileSync(path.join(appDir, "appinfo.json"), JSON.stringify(appinfo, null, 4) + "\n")
+    fs.writeFileSync(path.join(appDir, "build.json"), JSON.stringify(identity, null, 2) + "\n")
     for (const [field] of images) {
         fs.copyFileSync(path.join(webosDir, appinfo[field]), path.join(appDir, appinfo[field]))
     }
