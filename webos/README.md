@@ -542,6 +542,10 @@ release, `v1.0.0 · nightly (abc1234)` for a nightly (with its commit) and `v1.0
 build made by hand. The same facts are in `build.json` next to `appinfo.json` in the installed
 app; see [docs/releasing.md](../docs/releasing.md#release-channels).
 
+When the Garceslab server has a TV updater configured, Settings also has an *Updates* section,
+and a "New version" card asks before a new build is installed; see
+[docs/tv-updates.md](../docs/tv-updates.md).
+
 On webOS, Settings shows *Live updates*, the state of the websocket to the server, with how
 the last connection closed and whether it goes through the relay service. Torrent and debrid
 streams are started and followed over it, so without it they can't start; Tenji then says so
