@@ -3,11 +3,30 @@
  * Kept free of React Native so the tests can load it.
  */
 import type { MKVParser_Metadata, MKVParser_SubtitleEvent, MKVParser_TrackInfo, NativePlayer_SubtitleEventsPayload } from "@/api/generated/types"
-import type { MpvStreamedSubtitleLine, MpvSubtitleImage } from "expo-mpv-player"
+import type { MpvStreamedSubtitleLine, MpvStreamedSubtitleTrack, MpvSubtitleImage } from "expo-mpv-player"
 import { streamedLineKey } from "../../../modules/expo-mpv-player/src/web/subtitles.ts"
 import { h264ProfileProblem } from "../webos/playback-capabilities.ts"
 import { tvBrand } from "../webos/tizen-platform.ts"
 import { describeTVAudioTrack, mkvAudioCodec, type TVAudioTrack } from "../webos/tv-audio.ts"
+
+/**
+ * Garceslab Anime: the subtitle tracks of the server's MKV metadata as the web
+ * player lists them (relayed play), with the same fields as direct play so the
+ * subtitle choice (track-matching.ts) sees the same tracks either way: the IETF
+ * tag first (the server already prefers it, older servers may not) and the
+ * forced flag (issue #11).
+ */
+export function streamedSubtitleTracks(metadata: MKVParser_Metadata | undefined): MpvStreamedSubtitleTrack[] {
+    return (metadata?.subtitleTracks ?? []).map(track => ({
+        number: track.number,
+        title: track.name || undefined,
+        lang: track.languageIETF || track.language || undefined,
+        codec: track.codecID,
+        forced: track.forced || undefined,
+        // CodecPrivate is the script header; Matroska muxers often end it with a NUL.
+        header: track.codecPrivate?.replace(/\u0000+$/, "") || undefined,
+    }))
+}
 
 /** How long an image subtitle stays up when the server sends no duration. */
 const IMAGE_FALLBACK_DURATION_MS = 5000

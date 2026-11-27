@@ -152,61 +152,6 @@ export function usePlayerPreferences() {
 // Track matching
 ///////////////////////////////////////////////////////////////////////////////
 
-/**
- * e.g. "jpn, jp, ja, japanese" -> ["jpn", "jp", "ja", "japanese"]
- */
-function parseLanguageTags(pref: string): string[] {
-    return pref
-        .split(",")
-        .map(t => t.trim().toLowerCase())
-        .filter(Boolean)
-}
-
-/**
- * The first track whose language and title match none of the ignored labels
- * (e.g. "signs & songs"), for when no track is in a preferred language.
- */
-export function findFallbackTrack(
-    tracks: Array<{ id: number; language?: string; title?: string }>,
-    ignoredString?: string,
-): number | null {
-    const ignoredTags = ignoredString ? parseLanguageTags(ignoredString) : []
-    const track = tracks.find(track => {
-        const lang = (track.language ?? "").toLowerCase()
-        const title = (track.title ?? "").toLowerCase()
-        return !ignoredTags.some(tag => lang.includes(tag) || title.includes(tag))
-    })
-    return track?.id ?? null
-}
-
-/**
- * for each preferred tag (in order), check each track's
- * `language` and `title` fields (case-insensitive, substring match).
- */
-export function findPreferredTrack(
-    tracks: Array<{ id: number; language?: string; title?: string }>,
-    preferenceString: string,
-    ignoredString?: string,
-): number | null {
-    if (!tracks.length || !preferenceString.trim()) return null
-
-    const tags = parseLanguageTags(preferenceString)
-    const ignoredTags = ignoredString ? parseLanguageTags(ignoredString) : []
-
-    for (const tag of tags) {
-        for (const track of tracks) {
-            const lang = (track.language ?? "").toLowerCase()
-            const title = (track.title ?? "").toLowerCase()
-
-            const isIgnored = ignoredTags.some(iTag => {
-                return lang.includes(iTag) || title.includes(iTag)
-            })
-            if (isIgnored) continue
-
-            if (lang.includes(tag) || title.includes(tag)) {
-                return track.id
-            }
-        }
-    }
-    return null
-}
+// Garceslab Anime: the matching lives in a pure module (unit tested); it compares
+// canonical language codes instead of substrings (issue #11).
+export { findFallbackTrack, findPreferredTrack } from "./track-matching"
