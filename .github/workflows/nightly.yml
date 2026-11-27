@@ -139,23 +139,37 @@ jobs:
             gh api "repos/$GITHUB_REPOSITORY/git/refs" -f ref=refs/tags/nightly -f sha="$COMMIT" >/dev/null
           fi
           echo "nightly -> $COMMIT"
+      # The order matters: GitHub sends the "release" webhook (action "edited", or "published"
+      # for the first nightly) when the release itself changes, and an updater may check the
+      # release as soon as it arrives. So every asset is uploaded and every stale one deleted
+      # first, and the title, notes and flags are edited LAST: that event means "this nightly
+      # is complete". Within the assets, SHA256SUMS.txt comes after the files it lists and
+      # build.json (the commit pollers compare) comes last. Order tested by
+      # nightly-check_test.sh; docs/releasing.md, "When a nightly is complete".
       - name: Publish the nightly pre-release
         run: |
           title="Garceslab Anime TV nightly (${COMMIT:0:7})"
           if old="$(gh release view nightly --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')"; then
-            gh release edit nightly --repo "$GITHUB_REPOSITORY" --prerelease --latest=false \
-              --title "$title" --notes-file notes.md >/dev/null
-            gh release upload nightly release/* --repo "$GITHUB_REPOSITORY" --clobber
-            # Assets of the previous nightly that this one doesn't replace (e.g. an .ipk of an
-            # older version).
-            for name in $old; do
-              if [ ! -f "release/$name" ]; then
-                gh release delete-asset nightly "$name" --repo "$GITHUB_REPOSITORY" --yes
-              fi
-            done
+            echo "Updating the nightly pre-release"
           else
-            gh release create nightly release/* --repo "$GITHUB_REPOSITORY" --verify-tag \
-              --prerelease --latest=false --title "$title" --notes-file notes.md
+            # First nightly: a draft (invisible to updaters) that is published by the final
+            # edit below, once its assets are in place.
+            old=""
+            gh release create nightly --repo "$GITHUB_REPOSITORY" --verify-tag --draft \
+              --prerelease --latest=false --title "$title" --notes-file notes.md >/dev/null
           fi
+          gh release upload nightly release/*.ipk release/changes.json --repo "$GITHUB_REPOSITORY" --clobber
+          gh release upload nightly release/SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --clobber
+          gh release upload nightly release/build.json --repo "$GITHUB_REPOSITORY" --clobber
+          # Assets of the previous nightly that this one doesn't replace (e.g. an .ipk of an
+          # older version).
+          for name in $old; do
+            if [ ! -f "release/$name" ]; then
+              gh release delete-asset nightly "$name" --repo "$GITHUB_REPOSITORY" --yes
+            fi
+          done
+          # Last: the metadata edit, whose webhook tells updaters the nightly is complete.
+          gh release edit nightly --repo "$GITHUB_REPOSITORY" --draft=false --prerelease --latest=false \
+            --title "$title" --notes-file notes.md >/dev/null
           gh release view nightly --repo "$GITHUB_REPOSITORY" --json tagName,isPrerelease,assets \
             --jq '"\(.tagName) prerelease=\(.isPrerelease): \([.assets[].name] | join(", "))"'
