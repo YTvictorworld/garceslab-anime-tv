@@ -44,17 +44,41 @@ Spanish when the release has it, else any Spanish track. The region of a track c
 tag or its name ("Latin America", "Latino" → 419; "Spain", "España", "Castellano" → ES). A
 plain `es`/`spa`/`spanish` takes the first Spanish track in the file.
 
-## Setting Spanish first
+## The default: Spanish first
+
+The default **Preferred Subtitle Languages** are `es-419, spa, es, spanish, eng, en, english`:
+Latin American Spanish first, then any Spanish, then English when the release has no Spanish
+(Seanime Tenji's default was English only). Episodes start in Spanish without setting anything.
 
 Player preferences follow the profile (see [profiles.md](profiles.md#what-follows-the-profile)).
-A new profile starts with this TV's values, which are English (`eng, en, english`) on a new
-TV. To start episodes in Spanish:
+A new profile takes this TV's values, so it starts with this default too.
+
+### Profiles and TVs that had the old default
+
+Until this change the default was `eng, en, english`, and every profile was saved with it the
+first time it was used on a TV. The app can't tell that value from one typed in by hand, so a
+saved value **equal to the old default** (same list, ignoring case and spaces) is treated as
+never customised and moved to the new default **once**:
+
+- **This TV's own preferences:** when the app first reads them after the update. A marker
+  (`subtitleDefaultVersion: 2`, kept on the TV) makes sure it never happens again.
+- **Each profile:** when the profile is entered on this TV. The new value is written back to
+  the profile on the server through the normal sync (only `preferredSubtitleLanguages` is
+  sent, nothing else changes), and the TV remembers that it checked that profile (per server
+  and profile). If the save fails it is tried again the next time.
+- Any other value (`eng, en`, `jpn`, `spa, es`...) is never touched, and the profile is
+  marked checked anyway. Choosing `eng, en, english` again by hand later is kept: the profile
+  was already checked.
+
+The marker lives on the TV, so a second TV that never saw a profile before this update could
+move a hand-set `eng, en, english` once more; set it again there if that happens.
+
+## Changing the languages
 
 1. Start any episode with the profile.
 2. Open the player settings → **Audio & Subtitles** → **Default Language** (under Subtitles).
 3. Set **Preferred Subtitle Languages** to, for example:
-   - `es-419, spa, es, spanish, eng, en, english`: Latin American Spanish first, then any
-     Spanish, then English;
+   - `eng, en, english`: English only;
    - `spa, es, spanish, eng`: the first Spanish track, then English.
 4. Save. The change applies to the episode that is playing (unless you picked a track by hand)
    and is saved to the profile on the server, so every TV uses it.
@@ -72,6 +96,9 @@ choose the TV's subtitle track.
   these same rules. The language table matches the server's
   (`internal/torrents/trackprobe/language.go`).
 - `src/lib/player/use-mpv-player.ts`: applies it to the player.
+- `src/lib/player/subtitle-defaults.ts`: the default and the old-default migration (device in
+  `player-preferences.ts`, profiles in `player-prefs-sync.ts`); tests in
+  `tests/subtitle-defaults.test.ts`.
 - The forced flag comes from the MKV (`src/lib/player/direct-play-session.ts`, direct play) or the
   server's MKV metadata (`streamedSubtitleTracks` in `src/lib/player/direct-stream-format.ts`,
   relayed play).

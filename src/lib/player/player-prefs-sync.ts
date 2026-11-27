@@ -7,6 +7,7 @@
  * Free of React Native so it can be unit tested; player-prefs-remote.ts wires it.
  */
 import type { TVPlayerPrefs } from "@/api/generated/types"
+import { DEFAULT_SUBTITLE_LANGUAGES, isPreviousSubtitleDefault } from "./subtitle-defaults.ts"
 
 /** The synced keys and the type each one must have. */
 export const SYNCED_PLAYER_PREF_TYPES = {
@@ -84,6 +85,12 @@ export type PlayerPrefsSyncDeps = {
     /** setTimeout-like; returns a cancel function. */
     schedule?: (fn: () => void, ms: number) => () => void
     saveDelayMs?: number
+    /**
+     * Garceslab Anime: the one-time move of this profile from the previous
+     * subtitle default to the new one. `isChecked` is true once this TV has
+     * loaded the profile's saved values after the change.
+     */
+    subtitleDefault?: { isChecked: () => boolean; markChecked: () => void }
 }
 
 /**
@@ -113,13 +120,24 @@ export function createPlayerPrefsSync(deps: PlayerPrefsSyncDeps) {
         }
         if (stopped) return false
         const local = deps.getLocal()
+        const migration = deps.subtitleDefault
+        const markChecked = () => migration?.markChecked()
         if (hasAny(server?.tv)) {
-            const merged = mergeServerPlayerPrefs(local, server!.tv)
+            const merged: Record<string, unknown> = mergeServerPlayerPrefs(local, server!.tv)
+            // Saved before Spanish became the default and never changed: move it, once.
+            const migrate = !!migration && !migration.isChecked() && isPreviousSubtitleDefault(server!.tv!.preferredSubtitleLanguages)
+            if (migrate) merged.preferredSubtitleLanguages = DEFAULT_SUBTITLE_LANGUAGES
             synced = pickSyncedPlayerPrefs(merged)
             deps.setLocal(merged)
+            if (migrate) {
+                // Checked only once the server has it, so a failed save is tried again next time.
+                void deps.savePrefs({ preferredSubtitleLanguages: DEFAULT_SUBTITLE_LANGUAGES }).then(markChecked, () => undefined)
+            } else {
+                markChecked()
+            }
         } else {
             synced = pickSyncedPlayerPrefs(local)
-            void deps.savePrefs(synced).catch(() => undefined)
+            void deps.savePrefs(synced).then(markChecked, () => undefined)
         }
         return true
     }

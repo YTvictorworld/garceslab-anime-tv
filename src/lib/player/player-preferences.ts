@@ -1,6 +1,7 @@
 import type { MpvVideoOutput } from "expo-mpv-player"
 import React from "react"
 import { createMMKV } from "react-native-mmkv"
+import { DEFAULT_SUBTITLE_LANGUAGES, migrateDeviceSubtitleDefault, SUBTITLE_DEFAULT_VERSION } from "./subtitle-defaults"
 
 const storage = createMMKV({ id: "seanime-player-prefs" })
 
@@ -30,8 +31,11 @@ export type PlayerPreferences = {
     /**
      * Comma-separated language tags to prefer for the default subtitle track.
      * e.g. "eng, en, english". First match wins.
+     * Garceslab Anime: Spanish first by default (subtitle-defaults.ts).
      */
     preferredSubtitleLanguages: string
+    /** Garceslab Anime: this device's preferences went through the subtitle default migration (not synced). */
+    subtitleDefaultVersion: number
     ignoredSubtitleLabels: string
     /** Seek amount in seconds for double-tap gestures. Default 3. */
     doubleTapSeekSec: number
@@ -79,7 +83,8 @@ const DEFAULTS: PlayerPreferences = {
     skipDurationSec: 85,
     showSubtitles: true,
     preferredAudioLanguages: "jpn, jp, ja, japanese",
-    preferredSubtitleLanguages: "eng, en, english",
+    preferredSubtitleLanguages: DEFAULT_SUBTITLE_LANGUAGES,
+    subtitleDefaultVersion: SUBTITLE_DEFAULT_VERSION,
     ignoredSubtitleLabels: "signs & songs, signs, songs, sign, song",
     doubleTapSeekSec: 3,
     buttonSeekSec: 3,
@@ -107,6 +112,12 @@ export function getPlayerPreferences(): PlayerPreferences {
     if (!raw) return { ...DEFAULTS }
     try {
         const parsed = JSON.parse(raw) as Partial<PlayerPreferences>
+        // Garceslab Anime: the previous English-only default becomes the new one, once.
+        const migrated = migrateDeviceSubtitleDefault(parsed as Record<string, unknown>) as Partial<PlayerPreferences> | null
+        if (migrated) {
+            storage.set(STORAGE_KEY, JSON.stringify(migrated))
+            return { ...DEFAULTS, ...migrated }
+        }
         return { ...DEFAULTS, ...parsed }
     }
     catch {
@@ -126,6 +137,33 @@ export function setPlayerPreferences(update: Partial<PlayerPreferences>) {
 
 // Garceslab Anime: the profile sync (player-prefs-remote.ts) saves changes to the server.
 const changeListeners = new Set<() => void>()
+
+/**
+ * Garceslab Anime: which profiles (per server) this TV has checked for the
+ * previous subtitle default (player-prefs-sync.ts), so a value set later by
+ * hand is never migrated.
+ */
+const PROFILE_MIGRATION_KEY = "subtitle-default-migrated-profiles"
+
+function migratedProfiles(): string[] {
+    try {
+        const list = JSON.parse(storage.getString(PROFILE_MIGRATION_KEY) ?? "[]")
+        return Array.isArray(list) ? list.filter(item => typeof item === "string") : []
+    }
+    catch {
+        return []
+    }
+}
+
+export function isProfileSubtitleDefaultChecked(profileKey: string): boolean {
+    return migratedProfiles().includes(profileKey)
+}
+
+export function markProfileSubtitleDefaultChecked(profileKey: string) {
+    const list = migratedProfiles()
+    if (list.includes(profileKey)) return
+    storage.set(PROFILE_MIGRATION_KEY, JSON.stringify([...list, profileKey]))
+}
 
 export function subscribePlayerPreferences(listener: () => void): () => void {
     changeListeners.add(listener)

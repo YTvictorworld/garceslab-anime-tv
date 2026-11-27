@@ -134,7 +134,14 @@ All for the LG webOS build:
   `web/web-video-player.ts`, `src/lib/player/direct-play-session.ts`), and relayed play lists the
   server's tracks with their IETF tag (`streamedSubtitleTracks` in
   `src/lib/player/direct-stream-format.ts`).
-- Tests in `tests/track-matching.test.ts`; doc in `docs/subtitles.md`.
+- **Default subtitle languages** (`src/lib/player/subtitle-defaults.ts`, `player-preferences.ts`):
+  `es-419, spa, es, spanish, eng, en, english` instead of Seanime Tenji's `eng, en, english`. A
+  device or profile whose saved value is exactly the old default is moved to the new one once
+  (`player-preferences.ts` for the device, `player-prefs-sync.ts` / `player-prefs-remote.ts` for
+  profiles, written back through the profile sync). The subtitle search opens on the first
+  preferred language's ISO 639-1 code (`player-panel.tsx`).
+- Tests in `tests/track-matching.test.ts` and `tests/subtitle-defaults.test.ts`; doc in
+  `docs/subtitles.md`.
 
 ## GPL-3.0 compliance checklist
 
