@@ -32,7 +32,9 @@ const { atom, createStore, Provider, useAtomValue, useSetAtom } = await import("
 
 type Check = "at-once" | "after-a-request"
 
-function runStart(check: Check, cancelledBy: "render-copy" | "start-id"): Promise<{ outcome: string; preparing: boolean }> {
+// stallMs: the event loop is busy that long right after the check is sent, as on a loaded CI
+// runner that takes the CPU away from node for a few milliseconds.
+function runStart(check: Check, cancelledBy: "render-copy" | "start-id", stallMs = 0): Promise<{ outcome: string; preparing: boolean }> {
     const preparingAtom = atom(false)
     const store = createStore()
     const starts = createStreamStartRegistry()
@@ -48,6 +50,8 @@ function runStart(check: Check, cancelledBy: "render-copy" | "start-id"): Promis
                 const answer = check === "at-once"
                     ? Promise.resolve(null)
                     : new Promise(done => setTimeout(done, 5))
+                const until = performance.now() + stallMs
+                while (performance.now() < until) { /* busy */ }
                 void answer.then(() => {
                     const cancelled = cancelledBy === "render-copy" ? !preparingRef.current : !starts.isCurrent(startId)
                     resolve({ outcome: cancelled ? "dropped" : "request sent", preparing: store.get(preparingAtom) })
@@ -69,4 +73,13 @@ test("reproduction: a render-time copy of 'preparing' drops a start whose check 
 test("the start id goes on in both cases", async () => {
     assert.equal((await runStart("at-once", "start-id")).outcome, "request sent")
     assert.equal((await runStart("after-a-request", "start-id")).outcome, "request sent")
+})
+
+// The CI failure of run 46060054829: a few milliseconds without the CPU must not change what
+// the reproduction shows.
+test("the reproduction holds when the event loop stalls after the check is sent", async () => {
+    assert.deepEqual(await runStart("at-once", "render-copy", 20), { outcome: "dropped", preparing: true })
+    assert.deepEqual(await runStart("after-a-request", "render-copy", 20), { outcome: "request sent", preparing: true })
+    assert.equal((await runStart("at-once", "start-id", 20)).outcome, "request sent")
+    assert.equal((await runStart("after-a-request", "start-id", 20)).outcome, "request sent")
 })
