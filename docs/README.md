@@ -16,6 +16,7 @@ It is published only for self-hosting with LG webOS TVs: there is no hosted serv
 | [profiles.md](profiles.md) | "Who's watching?", PINs, creating and editing profiles on the TV, the avatar switcher, per-profile player preferences, favourites |
 | [home-and-schedule.md](home-and-schedule.md) | Home screen, Continue watching and Upcoming cards, the anime page, episode cards that start in place, the Schedule calendar, the visual refresh |
 | [episode-tags.md](episode-tags.md) | CANON / FILLER / RECAP / MIX pills, Skip filler and recaps, the Up next card |
+| [subtitles.md](subtitles.md) | Which subtitle track starts: preferred languages per profile, how tracks are matched (codes, regions, names, forced and signs & songs), setting Spanish first |
 | [direct-play.md](direct-play.md) | Direct play of debrid streams, subtitles read from the MKV, retries, up to three viewers |
 | [tv-updates.md](tv-updates.md) | The update banner: installing a new build only after confirming on the TV, See what's new, Settings → Updates, the server API it uses |
 | [remote-and-navigation.md](remote-and-navigation.md) | Remote keys, Magic Remote, the on-screen keyboard and search suggestions |

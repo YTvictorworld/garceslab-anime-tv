@@ -120,6 +120,22 @@ All for the LG webOS build:
   and pending build, install, skip, last result, "updater unreachable"; only rows with data),
   only when the server has an updater configured; `SettingsRow` gets a lilac `accent`. See `docs/tv-updates.md`.
 
+## 2026-11 (subtitle track at start)
+
+- **Subtitle and audio track choice** (`src/lib/player/track-matching.ts`, new; re-exported by
+  `src/lib/player/player-preferences.ts`): languages are compared by canonical code (ISO 639-1
+  from 639-2 codes, IETF tags and names, whole words only) instead of substrings, so `es` no
+  longer matches "Portuguese" or "Japanese"; a regional tag (`es-419`) prefers that region;
+  forced tracks (flag or name) are skipped like signs & songs, in the fallback too.
+- **When it runs** (`src/lib/player/use-mpv-player.ts`): again when the profile's preferences
+  change during playback (the profile sync may finish late) and after the source URL changes
+  (direct play -> transcode), never after a track was picked by hand.
+- **Forced flag** passed from the MKV to the web player (`modules/expo-mpv-player/src/MpvPlayer.types.ts`,
+  `web/web-video-player.ts`, `src/lib/player/direct-play-session.ts`), and relayed play lists the
+  server's tracks with their IETF tag (`streamedSubtitleTracks` in
+  `src/lib/player/direct-stream-format.ts`).
+- Tests in `tests/track-matching.test.ts`; doc in `docs/subtitles.md`.
+
 ## GPL-3.0 compliance checklist
 
 - [x] **Prominent modification notices with dates (§5a):** this file, `NOTICE`, the README's
