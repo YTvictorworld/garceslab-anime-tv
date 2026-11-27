@@ -177,6 +177,8 @@ export type PlayerTrack = {
     title?: string
     language?: string
     codec?: string
+    /** Subtitles: flagged forced in the file (web player only). */
+    forced?: boolean
     selected: boolean
     /** Web player: the TV is known to play no (or partial) sound for this audio track. */
     unplayable?: boolean

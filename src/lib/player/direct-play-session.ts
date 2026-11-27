@@ -419,6 +419,7 @@ async function startSession(source: MobilePlaybackSource, isCurrent: () => boole
         title: track.name || undefined,
         lang: track.languageIETF || track.language || undefined,
         codec: track.codecId,
+        forced: track.forced || undefined,
         // CodecPrivate is the script header; muxers often end it with a NUL.
         header: metadata.subtitleTracks?.find(item => item.number === track.number)?.codecPrivate?.replace(/\u0000+$/, "") || undefined,
     })))
