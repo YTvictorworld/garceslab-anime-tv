@@ -1,6 +1,7 @@
 import { buildSeaQuery, type SeaError } from "@/api/client/requests"
 import { useServerUrl } from "@/atoms/server.atoms"
 import {
+    type InstallRequest,
     installErrorMessage,
     parseActionResponse,
     parseTVUpdatesResponse,
@@ -29,18 +30,9 @@ const STALE_MS = 5 * 60 * 1000
 /** The updater installs over webOS Developer Mode: only the LG build shows update UI. */
 export const TV_UPDATES_SUPPORTED = Platform.OS === "web" && !isTizenDevice()
 
-export type InstallRequest =
-    | { phase: "idle" }
-    /** The confirmation drawer is open. */
-    | { phase: "confirm" }
-    | { phase: "sending" }
-    /** The updater accepted; the app will close and restart. */
-    | { phase: "installing"; requestedAt: number }
-    | { phase: "failed"; error: string }
-    /** Installed, but the updater didn't relaunch this app. */
-    | { phase: "installed" }
+export type { InstallRequest }
 
-/** Shared by the card, "See changes" and Settings → Updates. */
+/** Shared by the banner, "See what's new" and Settings → Updates. */
 export const tvUpdateInstallAtom = atom<InstallRequest>({ phase: "idle" })
 
 const installRequested = (request: InstallRequest) => request.phase === "sending" || request.phase === "installing"

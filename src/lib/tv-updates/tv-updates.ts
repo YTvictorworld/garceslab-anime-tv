@@ -224,7 +224,60 @@ export function buildDescription(build: TVUpdateBuild, channel?: string | null):
     ].filter(Boolean).join(" · ") || "Unknown build"
 }
 
-export const BANNER_TITLE = "A new version of Garceslab Anime is available"
+export const BANNER_TITLE = "Garceslab Anime has a new version"
+
+/** Where an install asked from this TV is (the shared state of the banner, See what's new and Settings). */
+export type InstallRequest =
+    | { phase: "idle" }
+    /** The confirmation drawer is open. */
+    | { phase: "confirm" }
+    | { phase: "sending" }
+    /** The updater accepted; the app will close and restart. */
+    | { phase: "installing"; requestedAt: number }
+    | { phase: "failed"; error: string }
+    /** Installed, but the updater didn't relaunch this app. */
+    | { phase: "installed" }
+
+export type BannerAction = "install" | "see-changes" | "later" | "hide" | "retry" | "close" | "ok"
+
+export type BannerContent = {
+    title: string
+    /** Only when there is something to say; the banner shrinks without it. */
+    detail: string | null
+    busy: boolean
+    /** In order; the first one is where focus lands when the D-pad enters the banner. */
+    actions: BannerAction[]
+}
+
+/**
+ * What the banner says: the install progress after Install, otherwise the offer of a pending
+ * build (Install, See what's new, Later), otherwise nothing. The confirmation stage keeps the
+ * offer on screen so Cancel goes back to it.
+ */
+export function bannerContent(offer: TVUpdatePending | null, request: InstallRequest): BannerContent | null {
+    switch (request.phase) {
+        case "sending":
+        case "installing":
+            return {
+                title: "Installing the update…",
+                detail: "Garceslab Anime will close and open again by itself in about a minute.",
+                busy: true,
+                actions: ["hide"],
+            }
+        case "failed":
+            return { title: "The update wasn't installed", detail: request.error, busy: false, actions: ["retry", "close"] }
+        case "installed":
+            return {
+                title: "The update is installed",
+                detail: "Close Garceslab Anime and open it again to use the new version.",
+                busy: false,
+                actions: ["ok"],
+            }
+        default:
+            if (!offer) return null
+            return { title: BANNER_TITLE, detail: pendingSummary(offer), busy: false, actions: ["install", "see-changes", "later"] }
+    }
+}
 
 function ago(at: string | null, now: number): string | null {
     if (!at) return null
@@ -269,6 +322,19 @@ export function settingsUpdateRows(status: TVUpdaterStatus, installRequested: bo
     }
     if (status.lastResult) rows.push("last-result")
     return rows
+}
+
+/**
+ * The screens where the banner may show: the top of Anime and Discover, where it floats over
+ * the hero's artwork on the right, and Settings, whose column ends before it. Schedule, My
+ * Lists and the search pages have their own controls at the top right, so it waits there (and
+ * on pages opened over the tabs) until the user is back on one of these.
+ */
+const BANNER_SCREENS = new Set(["(library)", "discover", "(profile)"])
+
+export function bannerAllowedOn(segments: readonly string[]): boolean {
+    if (segments[1] !== "(tabs)" || !BANNER_SCREENS.has(segments[2] ?? "")) return false
+    return segments.slice(3).every(segment => segment === "index")
 }
 
 export type BannerInput = {

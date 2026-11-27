@@ -3,6 +3,9 @@ import test from "node:test"
 import {
     BANNER_FIRST_DELAY_MS,
     BANNER_IDLE_MS,
+    BANNER_TITLE,
+    bannerAllowedOn,
+    bannerContent,
     bannerMayAppear,
     buildDescription,
     changeCountsLabel,
@@ -146,6 +149,47 @@ test("banner summary: no change list gives a short date line, never 0 new · 0 f
 test("banner summary: no change list and no date gives no line at all", () => {
     assert.equal(pendingSummary(pendingWith([], null)), null)
     assert.equal(pendingSummary(pendingWith([], "not a date")), null)
+})
+
+test("banner offer: Install first, then See what's new and Later; the counts under the title", () => {
+    const content = bannerContent(pendingWith(changes("feat", "fix")), { phase: "idle" })
+    assert.deepEqual(content, { title: BANNER_TITLE, detail: "1 new · 1 fix", busy: false, actions: ["install", "see-changes", "later"] })
+})
+
+test("banner offer without a change list: only the date, still with Install", () => {
+    assert.deepEqual(bannerContent(pendingWith([]), { phase: "idle" })?.detail, "Built Nov 27")
+    const noDate = bannerContent(pendingWith([], null), { phase: "idle" })
+    assert.equal(noDate?.detail, null)
+    assert.deepEqual(noDate?.actions, ["install", "see-changes", "later"])
+})
+
+test("banner: nothing without an offer; the offer stays while the confirmation is open", () => {
+    assert.equal(bannerContent(null, { phase: "idle" }), null)
+    assert.equal(bannerContent(null, { phase: "confirm" }), null)
+    assert.deepEqual(bannerContent(pendingWith([]), { phase: "confirm" })?.actions, ["install", "see-changes", "later"])
+})
+
+test("banner after Install: installing, failed (Try again first), installed", () => {
+    const installing = bannerContent(null, { phase: "installing", requestedAt: 1 })
+    assert.equal(installing?.busy, true)
+    assert.deepEqual(installing?.actions, ["hide"])
+    assert.deepEqual(bannerContent(pendingWith([]), { phase: "sending" })?.actions, ["hide"])
+    const failed = bannerContent(null, { phase: "failed", error: "ares-install failed" })
+    assert.equal(failed?.detail, "ares-install failed")
+    assert.deepEqual(failed?.actions, ["retry", "close"])
+    assert.deepEqual(bannerContent(null, { phase: "installed" })?.actions, ["ok"])
+})
+
+test("banner screens: Anime, Discover and Settings, not Schedule, My Lists, search pages or pages over the tabs", () => {
+    assert.equal(bannerAllowedOn(["(app)", "(tabs)", "(library)"]), true)
+    assert.equal(bannerAllowedOn(["(app)", "(tabs)", "(library)", "index"]), true)
+    assert.equal(bannerAllowedOn(["(app)", "(tabs)", "discover"]), true)
+    assert.equal(bannerAllowedOn(["(app)", "(tabs)", "(profile)"]), true)
+    assert.equal(bannerAllowedOn(["(app)", "(tabs)", "schedule"]), false)
+    assert.equal(bannerAllowedOn(["(app)", "(tabs)", "(profile)", "my-lists"]), false)
+    assert.equal(bannerAllowedOn(["(app)", "(tabs)", "(library)", "search"]), false)
+    assert.equal(bannerAllowedOn(["(app)", "entry", "anime", "[id]"]), false)
+    assert.equal(bannerAllowedOn(["(app)", "(media)", "player"]), false)
 })
 
 test("build dates and descriptions are human, without the commit", () => {
