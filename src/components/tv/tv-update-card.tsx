@@ -87,7 +87,8 @@ function CardFrame({ children, label }: { children: React.ReactNode; label: stri
                 borderRadius: tvSize(20),
                 borderWidth: tvSize(2),
                 borderColor: "rgba(255,255,255,0.12)",
-                backgroundColor: "rgba(14,14,16,0.95)",
+                // Opaque: text of the cards behind showed through on the home screen.
+                backgroundColor: "#121214",
                 padding: tvSize(24),
             }}
         >
@@ -96,11 +97,11 @@ function CardFrame({ children, label }: { children: React.ReactNode; label: stri
     )
 }
 
-function Kicker({ icon, text }: { icon: React.ComponentProps<typeof Ionicons>["name"]; text: string }) {
+function Kicker({ icon, text }: { icon?: React.ComponentProps<typeof Ionicons>["name"]; text: string }) {
     return (
         <View style={{ flexDirection: "row", alignItems: "center" }}>
-            <Ionicons name={icon} size={tvSize(22)} color="#c084fc" />
-            <Text className="font-bold text-white" style={{ fontSize: tvSize(23), marginLeft: tvSize(10), flexShrink: 1 }} numberOfLines={1}>
+            {icon ? <Ionicons name={icon} size={tvSize(22)} color="#c084fc" style={{ marginRight: tvSize(10) }} /> : null}
+            <Text className="font-bold text-white" style={{ fontSize: tvSize(23), flexShrink: 1 }} numberOfLines={1}>
                 {text}
             </Text>
         </View>
@@ -195,7 +196,7 @@ export function TVUpdateProgressCard({ request, target, waitingForTV, onRetry, o
             <View style={{ flexDirection: "row", alignItems: "center" }}>
                 {failed || installed ? null : <ActivityIndicator size="small" color="#c084fc" style={{ marginRight: tvSize(12) }} />}
                 <View style={{ flex: 1 }}>
-                    <Kicker icon={failed ? "alert-circle" : "arrow-up-circle"} text={title} />
+                    <Kicker icon={failed ? "alert-circle" : installed ? "checkmark-circle" : undefined} text={title} />
                 </View>
             </View>
             {target ? (
