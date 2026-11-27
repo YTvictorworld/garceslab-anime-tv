@@ -107,6 +107,19 @@ All for the LG webOS build:
   with the `.ipk`, `SHA256SUMS.txt`, `build.json` and `changes.json`. The stable release workflow
   builds with the `stable` channel. See `docs/releasing.md`.
 
+## 2026-11 (TV updates: confirm before installing)
+
+- **Update banner** (`src/components/tv/tv-update-banner.tsx`, `src/lib/tv-updates/tv-updates.ts`,
+  `src/api/hooks/tv-updates.hooks.ts`): on webOS, when the Garceslab server reports a pending
+  build from the self-hoster's updater, a compact banner at the top right under the navigation
+  bar (rendered by `app/(app)/(tabs)/_layout.tsx`) offers it once per build with Install, See
+  what's new and Later (never during playback); "See what's new"
+  (`app/(app)/tv-update-changes.tsx`) lists the changes; installs go through a confirmation
+  (`app/(app)/_layout.tsx`).
+- **Settings** (`src/components/tv/tv-settings-screen.tsx`): an "Updates" section (installed
+  and pending build, install, skip, last result, "updater unreachable"; only rows with data),
+  only when the server has an updater configured; `SettingsRow` gets a lilac `accent`. See `docs/tv-updates.md`.
+
 ## GPL-3.0 compliance checklist
 
 - [x] **Prominent modification notices with dates (§5a):** this file, `NOTICE`, the README's
