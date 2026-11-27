@@ -137,9 +137,37 @@ Such a tool can:
   `.ipk` and `SHA256SUMS.txt` from the same `releases/download/nightly/` path and check them.
   If the checksum doesn't match, the nightly is being replaced right now: try again a few
   minutes later.
+- **React to the webhook instead of waiting for the next poll:** subscribe to the repository's
+  `release` webhook and treat a `release` event for the tag `nightly` with action **`edited`**
+  (an existing nightly was replaced) or **`published`** (the first nightly) as "**the nightly is
+  complete**": check it right away, as above. Ignore `created` (the first nightly's draft, with
+  no assets yet). See [When a nightly is complete](#when-a-nightly-is-complete).
 - **Follow stable:** poll `https://api.github.com/repos/YTvictorworld/garceslab-anime-tv/releases/latest`
   (never a pre-release); a newer `tag_name` `vX.Y.Z` has the `.ipk` and `SHA256SUMS.txt` as
   assets.
+
+### When a nightly is complete
+
+GitHub sends the `release` webhook when the release itself changes (its title, notes or flags),
+not when an asset is uploaded. So the nightly workflow changes the pre-release in this order,
+and the release is edited **last**:
+
+1. Upload the `.ipk` and `changes.json` (`--clobber` replaces the old ones; while that runs, an
+   asset can be missing for a moment).
+2. Upload `SHA256SUMS.txt`, after the files it lists.
+3. Upload `build.json`, last: a poller that sees a new `commit` there finds the matching `.ipk`
+   and `SHA256SUMS.txt` already in place.
+4. Delete the previous nightly's assets the new build doesn't have (e.g. an `.ipk` of an older
+   version).
+5. **Edit the release**: title, notes, pre-release and not "latest". This sends the `edited`
+   event. The first nightly is created as a **draft** before step 1 (drafts are invisible to
+   updaters) and this edit publishes it, which sends `published`.
+
+When `edited` (or `published`) arrives, the release holds exactly the newest build's assets
+and its notes describe that build. Between the first upload and that event the assets may be a
+mix of the old and the new build: a poller that lands there gets a checksum mismatch and tries
+again later. `bash .github/scripts/nightly-check_test.sh` runs the workflow's publish script
+against a fake `gh` and fails if this order changes.
 
 ## Who and when
 
@@ -244,7 +272,10 @@ still going.
    [`.github/scripts/nightly-release.mjs`](../.github/scripts/nightly-release.mjs)) and
    `SHA256SUMS.txt`, moves the `nightly` tag to the built commit (only now, after a successful
    build), then updates the `nightly` pre-release: new assets replace the old ones, assets the
-   new build doesn't have are deleted, and it stays a pre-release that is not "latest".
+   new build doesn't have are deleted, and only then are its title and notes edited (so the
+   `edited` webhook means the nightly is complete, see
+   [When a nightly is complete](#when-a-nightly-is-complete)); it stays a pre-release that is
+   not "latest".
 
 Nothing needs configuring: it uses the workflow's own token. A failed build leaves the previous
 nightly as it was.
@@ -254,7 +285,8 @@ nightly as it was.
 - `bash .github/scripts/nightly-check_test.sh`: the nightly rules (a push to `main` publishes; a
   pull request, a tag, a manual run or another branch is refused with a message; an old run
   can't move the nightly back) and checks on `nightly.yml` (triggers, pre-release, never
-  "latest", no `vX.Y.Z`). CI runs it in the *Tests and webOS .ipk* job.
+  "latest", no `vX.Y.Z`, and the publish order: assets first, the release edit last, for an
+  existing and a first nightly). CI runs it in the *Tests and webOS .ipk* job.
 - `tests/nightly-release.test.ts`: how PR titles are classified and aggregated into
   `changes.json`, and the pre-release's `build.json`.
 - `tests/build-identity.test.ts`: the version line in Settings per channel, the update-notice
