@@ -40,12 +40,16 @@ the Samsung Tizen build and the native apps don't.
   where it was. Untouched for about 12 seconds, it goes away by itself.
 - **Later** only hides the card on this TV; the build is still in Settings → Updates.
 
+![The "New version" card on the home screen](images/tv-update-card.webp)
+
 ### See changes
 
 A full-screen list of the pending build's changes grouped **New**, **Fixes** and **Other**
 (newest first), with **Install** and **Back** at the top. The D-pad moves line by line and
 the page scrolls with it. If the updater couldn't follow every build back to the installed
 one, a line says some changes may be missing.
+
+![See changes](images/tv-update-see-changes.webp)
 
 ### Install
 
@@ -62,6 +66,10 @@ server during this state is not treated as an error.
 - The server refuses to install while something is playing on this TV (`409
   PLAYBACK_ACTIVE`); the card says so.
 
+| Confirm | Installing |
+|---|---|
+| ![Install the update now?](images/tv-update-confirm.webp) | ![Installing update…](images/tv-update-installing.webp) |
+
 ### Settings → Updates
 
 Shown only when the server has an updater configured:
@@ -76,6 +84,13 @@ Shown only when the server has an updater configured:
 
 When the server can't reach the updater, the section shows **"Updater unreachable"** with the
 server's error and a **Check again** row; no card is shown.
+
+| Updates | Updater unreachable |
+|---|---|
+| ![Settings → Updates](images/tv-settings-updates.webp) | ![Updater unreachable](images/tv-settings-updates-unreachable.webp) |
+
+The screenshots were taken in headless Chromium at 1920×1080 against a throwaway local server
+with made-up profiles and a faked updater status.
 
 ## How often the TV asks
 
