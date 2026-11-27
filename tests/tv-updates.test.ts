@@ -1,26 +1,28 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import {
-    buildLabel,
-    CARD_AUTO_HIDE_MS,
-    CARD_FIRST_DELAY_MS,
-    CARD_IDLE_MS,
-    cardHighlights,
-    cardMayAppear,
-    cardTitle,
+    BANNER_FIRST_DELAY_MS,
+    BANNER_IDLE_MS,
+    bannerMayAppear,
+    buildDescription,
     changeCountsLabel,
+    formatBuildDate,
     groupChanges,
     INSTALLING_POLL_MS,
     installErrorMessage,
     lastResultLabel,
+    nonEmptyGroups,
     parseActionResponse,
     parseTVUpdatesResponse,
     pendingBuildKey,
+    pendingSummary,
+    settingsUpdateRows,
     STATUS_POLL_MS,
     statusPollInterval,
     type TVUpdateChange,
+    type TVUpdatePending,
     type TVUpdatesState,
-    updateCardDecision,
+    updateBannerDecision,
     watchInstall,
 } from "../src/lib/tv-updates/tv-updates.ts"
 
@@ -116,31 +118,83 @@ test("changes are grouped New / Fixes / Other, newest first", () => {
     assert.deepEqual(grouped.other.map(c => c.title), ["other 4"])
 })
 
-test("counts line: N new · M fixes, singular forms, other-only builds and builds without a list", () => {
+test("counts line: N new · M fixes, singular forms, other-only builds; empty without a list", () => {
     assert.equal(changeCountsLabel(changes("feat", "feat", "feat", "fix", "fix")), "3 new · 2 fixes")
     assert.equal(changeCountsLabel(changes("fix")), "1 fix")
     assert.equal(changeCountsLabel(changes("feat", "other")), "1 new · 1 other")
     assert.equal(changeCountsLabel(changes("other", "other")), "2 changes")
-    assert.equal(changeCountsLabel([]), "New build")
+    assert.equal(changeCountsLabel([]), "")
 })
 
-test("the card highlights at most three lines, features first, then a counter", () => {
-    const many = changes("fix", "fix", "feat", "fix", "feat", "other")
-    assert.deepEqual(cardHighlights(many), ["feat 5", "feat 3", "… and 4 more changes"])
-    assert.deepEqual(cardHighlights(changes("fix", "feat")), ["feat 2", "fix 1"])
-    assert.deepEqual(cardHighlights(changes("fix", "feat", "fix")), ["feat 2", "fix 3", "fix 1"])
-    assert.deepEqual(cardHighlights(changes("fix", "feat", "fix", "fix")), ["feat 2", "fix 4", "… and 2 more changes"])
-    assert.deepEqual(cardHighlights([]), [])
+function pendingWith(changes: TVUpdateChange[], builtAt: string | null = "2026-11-27T12:00:00.000Z"): TVUpdatePending {
+    return { version: "1.0.0", commit: PENDING_SHA, shortCommit: "0eff776", channel: "nightly", builtAt, changes, changesComplete: null }
+}
+
+test("banner summary: the counts when there is a change list", () => {
+    assert.equal(pendingSummary(pendingWith(changes("feat", "fix", "fix"))), "1 new · 2 fixes")
 })
 
-test("labels for the card and Settings", () => {
+test("banner summary: only fixes, only new", () => {
+    assert.equal(pendingSummary(pendingWith(changes("fix", "fix"))), "2 fixes")
+    assert.equal(pendingSummary(pendingWith(changes("feat"))), "1 new")
+})
+
+test("banner summary: no change list gives a short date line, never 0 new · 0 fixes", () => {
+    assert.equal(pendingSummary(pendingWith([])), "Built Nov 27")
+})
+
+test("banner summary: no change list and no date gives no line at all", () => {
+    assert.equal(pendingSummary(pendingWith([], null)), null)
+    assert.equal(pendingSummary(pendingWith([], "not a date")), null)
+})
+
+test("build dates and descriptions are human, without the commit", () => {
+    assert.equal(formatBuildDate("2026-11-27T12:00:00.000Z"), "Nov 27")
+    assert.equal(formatBuildDate(null), null)
+    assert.equal(buildDescription(pendingWith([])), "Version 1.0.0 · nightly · built Nov 27")
+    assert.equal(buildDescription({ version: "1.2.0", commit: null, shortCommit: null, channel: "stable", builtAt: null }), "Version 1.2.0 · stable")
+    assert.equal(buildDescription({ version: "?", commit: "abc", shortCommit: "abc", channel: null, builtAt: null }), "Unknown build")
+})
+
+test("See changes renders only the groups that have changes", () => {
+    assert.deepEqual(nonEmptyGroups([]), [])
+    assert.deepEqual(nonEmptyGroups(changes("fix", "fix")).map(g => g.title), ["Fixes"])
+    assert.deepEqual(nonEmptyGroups(changes("feat")).map(g => g.title), ["New"])
+    assert.deepEqual(nonEmptyGroups(changes("other", "feat", "fix")).map(g => [g.title, g.changes.length]), [["New", 1], ["Fixes", 1], ["Other", 1]])
+})
+
+test("Settings → Updates: every row, when there is data for it", () => {
     const state = ready()
-    if (state.kind !== "ready" || !state.status.pending) throw new Error("expected pending")
-    assert.equal(cardTitle(state.status.pending), "New version · nightly 0eff776")
-    assert.equal(cardTitle({ ...state.status.pending, channel: "stable", version: "1.2.0" }), "New version · v1.2.0")
-    assert.equal(buildLabel(state.status.installed), "v1.0.0 · nightly (808b9ee)")
-    assert.equal(buildLabel({ version: "1.2.0", commit: null, shortCommit: null, channel: "stable", builtAt: null }), "v1.2.0")
-    assert.equal(buildLabel(null), "Unknown")
+    if (state.kind !== "ready") throw new Error("expected ready")
+    assert.deepEqual(settingsUpdateRows(state.status, false), ["installed", "pending", "install", "skip", "last-result"])
+})
+
+test("Settings → Updates: unknown installed version and no install yet leave no empty rows", () => {
+    const state = ready({ installed: null, lastResult: null })
+    if (state.kind !== "ready") throw new Error("expected ready")
+    assert.deepEqual(settingsUpdateRows(state.status, false), ["pending", "install", "skip"])
+})
+
+test("Settings → Updates: up to date has no install or skip row", () => {
+    const state = ready({ pending: null })
+    if (state.kind !== "ready") throw new Error("expected ready")
+    assert.deepEqual(settingsUpdateRows(state.status, false), ["installed", "up-to-date", "last-result"])
+})
+
+test("Settings → Updates: while installing there is no skip row", () => {
+    const state = ready({ installing: true })
+    if (state.kind !== "ready") throw new Error("expected ready")
+    assert.deepEqual(settingsUpdateRows(state.status, false), ["installed", "pending", "install", "last-result"])
+    const idle = ready()
+    if (idle.kind !== "ready") throw new Error("expected ready")
+    assert.deepEqual(settingsUpdateRows(idle.status, true), ["installed", "pending", "install", "last-result"])
+})
+
+test("unknown installed version: the description still reads well", () => {
+    const state = ready({ installed: { version: "1.0.0", commit: null } })
+    if (state.kind !== "ready" || !state.status.installed) throw new Error("expected installed")
+    assert.equal(state.status.installed.shortCommit, null)
+    assert.equal(buildDescription(state.status.installed, state.status.channel), "Version 1.0.0 · nightly")
 })
 
 test("last install result: success with age, failure with the error", () => {
@@ -156,51 +210,50 @@ test("last install result: success with age, failure with the error", () => {
     assert.equal(lastResultLabel(null, now), "No install yet")
 })
 
-// ---- card visibility rules ----
+// ---- banner visibility rules ----
 
 const base = { seenKey: null, playing: false, installRequested: false }
 
-test("card: hidden when the updater isn't configured or the status isn't known yet", () => {
-    assert.deepEqual(updateCardDecision({ ...base, state: { kind: "not-configured" } }), { show: false, reason: "not-configured" })
-    assert.deepEqual(updateCardDecision({ ...base, state: undefined }), { show: false, reason: "not-configured" })
+test("banner: hidden when the updater isn't configured or the status isn't known yet", () => {
+    assert.deepEqual(updateBannerDecision({ ...base, state: { kind: "not-configured" } }), { show: false, reason: "not-configured" })
+    assert.deepEqual(updateBannerDecision({ ...base, state: undefined }), { show: false, reason: "not-configured" })
 })
 
-test("card: hidden when the updater is unreachable", () => {
-    assert.deepEqual(updateCardDecision({ ...base, state: { kind: "unreachable", error: "x" } }), { show: false, reason: "unreachable" })
+test("banner: hidden when the updater is unreachable", () => {
+    assert.deepEqual(updateBannerDecision({ ...base, state: { kind: "unreachable", error: "x" } }), { show: false, reason: "unreachable" })
 })
 
-test("card: hidden without a pending build", () => {
-    assert.deepEqual(updateCardDecision({ ...base, state: ready({ pending: null }) }), { show: false, reason: "no-pending" })
+test("banner: hidden without a pending build", () => {
+    assert.deepEqual(updateBannerDecision({ ...base, state: ready({ pending: null }) }), { show: false, reason: "no-pending" })
 })
 
-test("card: shown for a pending build", () => {
-    const decision = updateCardDecision({ ...base, state: ready() })
+test("banner: shown for a pending build", () => {
+    const decision = updateBannerDecision({ ...base, state: ready() })
     assert.equal(decision.show, true)
     if (decision.show) assert.equal(decision.key, PENDING_SHA)
 })
 
-test("card: shown once per build; a newer build shows it again", () => {
-    assert.deepEqual(updateCardDecision({ ...base, seenKey: PENDING_SHA, state: ready() }), { show: false, reason: "seen" })
-    assert.equal(updateCardDecision({ ...base, seenKey: INSTALLED_SHA, state: ready() }).show, true)
+test("banner: shown once per build; a newer build shows it again", () => {
+    assert.deepEqual(updateBannerDecision({ ...base, seenKey: PENDING_SHA, state: ready() }), { show: false, reason: "seen" })
+    assert.equal(updateBannerDecision({ ...base, seenKey: INSTALLED_SHA, state: ready() }).show, true)
 })
 
-test("card: never during playback", () => {
-    assert.deepEqual(updateCardDecision({ ...base, playing: true, state: ready() }), { show: false, reason: "playing" })
+test("banner: never during playback", () => {
+    assert.deepEqual(updateBannerDecision({ ...base, playing: true, state: ready() }), { show: false, reason: "playing" })
 })
 
-test("card: hidden while installing (on the updater or asked from this TV)", () => {
-    assert.deepEqual(updateCardDecision({ ...base, state: ready({ installing: true, installPhase: "installing" }) }), { show: false, reason: "installing" })
-    assert.deepEqual(updateCardDecision({ ...base, installRequested: true, state: ready() }), { show: false, reason: "installing" })
+test("banner: hidden while installing (on the updater or asked from this TV)", () => {
+    assert.deepEqual(updateBannerDecision({ ...base, state: ready({ installing: true, installPhase: "installing" }) }), { show: false, reason: "installing" })
+    assert.deepEqual(updateBannerDecision({ ...base, installRequested: true, state: ready() }), { show: false, reason: "installing" })
 })
 
-test("card timing: waits for the app to settle and for the remote to be idle", () => {
+test("banner timing: waits for the app to settle and for the remote to be idle", () => {
     const eligible = 1_000_000
-    assert.equal(cardMayAppear(eligible + CARD_FIRST_DELAY_MS - 1, eligible, 0), false)
-    assert.equal(cardMayAppear(eligible + CARD_FIRST_DELAY_MS, eligible, 0), true)
-    const now = eligible + CARD_FIRST_DELAY_MS + 5000
-    assert.equal(cardMayAppear(now, eligible, now - CARD_IDLE_MS + 1), false)
-    assert.equal(cardMayAppear(now, eligible, now - CARD_IDLE_MS), true)
-    assert.ok(CARD_AUTO_HIDE_MS >= 10_000)
+    assert.equal(bannerMayAppear(eligible + BANNER_FIRST_DELAY_MS - 1, eligible, 0), false)
+    assert.equal(bannerMayAppear(eligible + BANNER_FIRST_DELAY_MS, eligible, 0), true)
+    const now = eligible + BANNER_FIRST_DELAY_MS + 5000
+    assert.equal(bannerMayAppear(now, eligible, now - BANNER_IDLE_MS + 1), false)
+    assert.equal(bannerMayAppear(now, eligible, now - BANNER_IDLE_MS), true)
 })
 
 // ---- polling and installing ----

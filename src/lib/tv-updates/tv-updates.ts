@@ -1,7 +1,7 @@
 // Garceslab Anime: TV app updates installed only after the user confirms (docs/tv-updates.md).
 // The self-hoster's updater downloads and checks new builds; the Garceslab server proxies its
 // status at /api/v1/tv-updates/* and the TV asks the user before installing. This module reads
-// the server's answers and decides what the update card shows. Pure (no react-native imports)
+// the server's answers and decides when the update banner shows. Pure (no react-native imports)
 // so tests/tv-updates.test.ts can import it.
 
 export type TVUpdateChangeType = "feat" | "fix" | "other"
@@ -146,7 +146,7 @@ export function parseTVUpdatesResponse(raw: unknown): TVUpdatesState {
     return { kind: "ready", status: parseUpdaterStatus(raw.status) }
 }
 
-/** The key that identifies a pending build, for "show the card once per build". */
+/** The key that identifies a pending build, for "show the banner once per build". */
 export function pendingBuildKey(pending: TVUpdateBuild | null | undefined): string | null {
     if (!pending) return null
     return pending.commit ?? `${pending.version}@${pending.builtAt ?? ""}`
@@ -168,7 +168,17 @@ export function groupChanges(changes: readonly TVUpdateChange[]): GroupedChanges
     }
 }
 
-/** "3 new · 8 fixes", "1 fix", "2 changes"; "New build" when the updater listed none. */
+/** The groups of See changes that have something in them, in order New, Fixes, Other. */
+export function nonEmptyGroups(changes: readonly TVUpdateChange[]): Array<{ title: "New" | "Fixes" | "Other"; changes: TVUpdateChange[] }> {
+    const { features, fixes, other } = groupChanges(changes)
+    return ([
+        { title: "New", changes: features },
+        { title: "Fixes", changes: fixes },
+        { title: "Other", changes: other },
+    ] as const).filter(group => group.changes.length > 0).map(group => ({ ...group, changes: [...group.changes] }))
+}
+
+/** "3 new · 8 fixes", "1 fix", "2 changes"; "" when the updater listed none (callers then show no line). */
 export function changeCountsLabel(changes: readonly TVUpdateChange[]): string {
     const { features, fixes, other } = groupChanges(changes)
     const parts: string[] = []
@@ -179,40 +189,42 @@ export function changeCountsLabel(changes: readonly TVUpdateChange[]): string {
             ? `${other.length} other`
             : `${other.length} ${other.length === 1 ? "change" : "changes"}`)
     }
-    return parts.length ? parts.join(" · ") : "New build"
+    return parts.join(" · ")
 }
 
-export const CARD_HIGHLIGHT_LINES = 3
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+/** "Nov 27" (local time), or null for a missing or broken date. */
+export function formatBuildDate(at: string | null | undefined): string | null {
+    if (!at) return null
+    const date = new Date(at)
+    if (!Number.isFinite(date.getTime())) return null
+    return `${MONTHS[date.getMonth()]} ${date.getDate()}`
+}
 
 /**
- * The card's highlighted lines: features first, then fixes, then the rest, newest first
- * within each. At most CARD_HIGHLIGHT_LINES lines; when there are more changes the last
- * line is "… and N more changes".
+ * The banner's second line, in plain words: "3 new · 8 fixes" when the updater listed the
+ * changes, otherwise the short date line "Built Nov 27", otherwise null (no line at all).
+ * Never "0 new · 0 fixes": the first nightly an updater sees comes without a change list.
  */
-export function cardHighlights(changes: readonly TVUpdateChange[], maxLines = CARD_HIGHLIGHT_LINES): string[] {
-    const { features, fixes, other } = groupChanges(changes)
-    const ordered = [...features, ...fixes, ...other].map(c => c.title)
-    if (ordered.length <= maxLines) return ordered
-    const shown = ordered.slice(0, Math.max(0, maxLines - 1))
-    const more = ordered.length - shown.length
-    return [...shown, `… and ${more} more ${more === 1 ? "change" : "changes"}`]
+export function pendingSummary(pending: TVUpdatePending): string | null {
+    if (pending.changes.length > 0) return changeCountsLabel(pending.changes)
+    const built = formatBuildDate(pending.builtAt)
+    return built ? `Built ${built}` : null
 }
 
-/** "v1.0.0 · nightly (abc1234)", "v1.2.0" (stable). */
-export function buildLabel(build: TVUpdateBuild | null | undefined, channel?: string | null): string {
-    if (!build) return "Unknown"
+/** "Version 1.0.0 · nightly · built Nov 27": the human line of See changes and Settings. */
+export function buildDescription(build: TVUpdateBuild, channel?: string | null): string {
     const ch = build.channel ?? channel ?? null
-    const version = build.version === "?" ? "" : `v${build.version}`
-    if (ch === "stable" || !ch) return [version, build.shortCommit ? `(${build.shortCommit})` : ""].filter(Boolean).join(" ") || "Unknown"
-    return [version, `· ${ch}`, build.shortCommit ? `(${build.shortCommit})` : ""].filter(Boolean).join(" ")
+    const built = formatBuildDate(build.builtAt)
+    return [
+        build.version !== "?" ? `Version ${build.version}` : null,
+        ch,
+        built ? `built ${built}` : null,
+    ].filter(Boolean).join(" · ") || "Unknown build"
 }
 
-/** The card's first line: "New version · nightly abc1234", "New version · v1.2.0". */
-export function cardTitle(pending: TVUpdatePending, channel?: string | null): string {
-    const ch = pending.channel ?? channel ?? null
-    if (ch === "nightly") return `New version · nightly ${pending.shortCommit ?? `v${pending.version}`}`
-    return `New version · v${pending.version}`
-}
+export const BANNER_TITLE = "A new version of Garceslab Anime is available"
 
 function ago(at: string | null, now: number): string | null {
     if (!at) return null
@@ -236,9 +248,32 @@ export function lastResultLabel(result: TVUpdateResult | null, now: number): str
     return when ? `${what} · ${when}` : what
 }
 
-export type CardInput = {
+export type UpdatesRow = "installed" | "pending" | "up-to-date" | "install" | "skip" | "last-result"
+
+/**
+ * The rows of Settings → Updates that have data: no "Installed" row while the updater
+ * doesn't know what the TV has, no install or skip row without a pending build (except while
+ * an install runs), no "Last install" before the first one.
+ */
+export function settingsUpdateRows(status: TVUpdaterStatus, installRequested: boolean): UpdatesRow[] {
+    const installing = status.installing || installRequested
+    const rows: UpdatesRow[] = []
+    if (status.installed) rows.push("installed")
+    if (status.pending) {
+        rows.push("pending", "install")
+        if (!installing) rows.push("skip")
+    } else if (installing) {
+        rows.push("install")
+    } else {
+        rows.push("up-to-date")
+    }
+    if (status.lastResult) rows.push("last-result")
+    return rows
+}
+
+export type BannerInput = {
     state: TVUpdatesState | null | undefined
-    /** The build whose card was already shown on this TV (stored locally). */
+    /** The build whose banner was already shown on this TV (stored locally). */
     seenKey: string | null
     /** A video is playing, or the player is open. */
     playing: boolean
@@ -246,12 +281,12 @@ export type CardInput = {
     installRequested: boolean
 }
 
-export type CardDecision =
+export type BannerDecision =
     | { show: true; key: string; pending: TVUpdatePending }
     | { show: false; reason: "not-configured" | "unreachable" | "no-pending" | "installing" | "seen" | "playing" }
 
-/** Whether the update card may come up (once per pending build, never during playback). */
-export function updateCardDecision({ state, seenKey, playing, installRequested }: CardInput): CardDecision {
+/** Whether the update banner may come up (once per pending build, never during playback). */
+export function updateBannerDecision({ state, seenKey, playing, installRequested }: BannerInput): BannerDecision {
     if (!state || state.kind === "not-configured") return { show: false, reason: "not-configured" }
     if (state.kind === "unreachable") return { show: false, reason: "unreachable" }
     const { pending, installing } = state.status
@@ -321,12 +356,13 @@ export function watchInstall(state: TVUpdatesState | null | undefined, requested
     return { phase: "installed" }
 }
 
-/** Card timing: wait for the remote to be idle before showing, and hide when untouched. */
-export const CARD_FIRST_DELAY_MS = 6000
-export const CARD_IDLE_MS = 2500
-export const CARD_AUTO_HIDE_MS = 12000
+/**
+ * Banner timing: it pushes the screen down, so it comes in only after the app settled and the
+ * remote was idle for a moment, never while the user is moving through a row.
+ */
+export const BANNER_FIRST_DELAY_MS = 6000
+export const BANNER_IDLE_MS = 2500
 
-/** The card comes up only after the app settled and the user stopped pressing keys for a moment. */
-export function cardMayAppear(now: number, eligibleSince: number, lastKeyAt: number): boolean {
-    return now - eligibleSince >= CARD_FIRST_DELAY_MS && now - lastKeyAt >= CARD_IDLE_MS
+export function bannerMayAppear(now: number, eligibleSince: number, lastKeyAt: number): boolean {
+    return now - eligibleSince >= BANNER_FIRST_DELAY_MS && now - lastKeyAt >= BANNER_IDLE_MS
 }
