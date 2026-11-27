@@ -56,3 +56,9 @@ restores the earlier look). None of them uses blur or shadows on cards.
 `tv-schedule-screen.tsx`. Tests: `tests/tv-home-feed.test.ts`, `tests/tv-upcoming-episodes.test.ts`,
 `tests/tv-continue-start.test.ts`, `tests/card-start-race.test.ts`, `tests/tv-schedule-days.test.ts`,
 `tests/tv-visual-flags.test.ts`.
+
+`tests/card-start-race.test.ts` renders the old card-start pattern with react-dom's real
+scheduler. Its cases don't depend on timing: a check that "waits for a request" answers only
+after React has committed the re-render with "preparing" set (a fixed timer raced that render
+and lost on a loaded CI runner), and every case also runs with the event loop stalled for 20 ms
+after the check is sent.

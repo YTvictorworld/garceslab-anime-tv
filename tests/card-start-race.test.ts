@@ -19,11 +19,12 @@ g.window ??= globalThis
 g.document ??= { activeElement: null }
 g.HTMLIFrameElement ??= class {}
 g.dispatchEvent ??= () => true
-const container = {
+// A new container for every run: a root is unmounted before the next one is created.
+const newContainer = () => ({
     nodeType: 1, nodeName: "DIV", tagName: "DIV", textContent: "",
     ownerDocument: { nodeType: 9, defaultView: globalThis, addEventListener() {}, removeEventListener() {} },
     addEventListener() {}, removeEventListener() {}, appendChild() {}, removeChild() {}, insertBefore() {},
-}
+})
 
 const React = (await import("react")).default
 // @ts-expect-error: react-dom has no type declarations in this project
@@ -32,13 +33,19 @@ const { atom, createStore, Provider, useAtomValue, useSetAtom } = await import("
 
 type Check = "at-once" | "after-a-request"
 
+// "after-a-request": the check answers after a request, which always takes longer than
+// React's re-render with "preparing" set. The answer waits for that commit, not for a fixed
+// time: a 5 ms timer raced the re-render and lost whenever node was off the CPU for 5 ms.
 // stallMs: the event loop is busy that long right after the check is sent, as on a loaded CI
 // runner that takes the CPU away from node for a few milliseconds.
-function runStart(check: Check, cancelledBy: "render-copy" | "start-id", stallMs = 0): Promise<{ outcome: string; preparing: boolean }> {
+async function runStart(check: Check, cancelledBy: "render-copy" | "start-id", stallMs = 0): Promise<{ outcome: string; preparing: boolean }> {
     const preparingAtom = atom(false)
     const store = createStore()
     const starts = createStreamStartRegistry()
-    return new Promise((resolve) => {
+    let rerendered!: () => void
+    const preparingCommitted = new Promise<void>(done => { rerendered = done })
+    const root = createRoot(newContainer() as never)
+    const result = await new Promise<{ outcome: string; preparing: boolean }>((resolve) => {
         function Controller() {
             const preparing = useAtomValue(preparingAtom)
             const setPreparing = useSetAtom(preparingAtom)
@@ -49,7 +56,7 @@ function runStart(check: Check, cancelledBy: "render-copy" | "start-id", stallMs
                 setPreparing(true)
                 const answer = check === "at-once"
                     ? Promise.resolve(null)
-                    : new Promise(done => setTimeout(done, 5))
+                    : preparingCommitted.then(() => new Promise(done => setTimeout(done, 5)))
                 const until = performance.now() + stallMs
                 while (performance.now() < until) { /* busy */ }
                 void answer.then(() => {
@@ -57,11 +64,15 @@ function runStart(check: Check, cancelledBy: "render-copy" | "start-id", stallMs
                     resolve({ outcome: cancelled ? "dropped" : "request sent", preparing: store.get(preparingAtom) })
                 })
             }, [setPreparing])
+            React.useEffect(() => {
+                if (preparing) rerendered()
+            }, [preparing])
             return null
         }
-        const root = createRoot(container as never)
         root.render(React.createElement(Provider, { store }, React.createElement(Controller)))
     })
+    root.unmount()
+    return result
 }
 
 test("reproduction: a render-time copy of 'preparing' drops a start whose check answers at once", async () => {
