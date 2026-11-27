@@ -18,7 +18,7 @@ export default function TabLayout() {
     // The tab on screen (e.g. "discover"), while one is: pages opened on top leave (tabs).
     const segments = useSegments() as string[]
     const tvTabsRef = useTVTabTransition(segments[1] === "(tabs)" ? segments[2] : undefined)
-    // Garceslab Anime: the TV update banner under the navigation bar pushes the tab down (webOS).
+    // Garceslab Anime: the TV update banner, top right under the navigation bar (webOS).
     const updateBanner = useTVUpdateBanner()
 
     const tabs: AppTabConfig[] = [
@@ -63,7 +63,7 @@ export default function TabLayout() {
     if (Platform.isTV) {
         return (
             <View className="flex-1 bg-background">
-                <View ref={tvTabsRef} style={{ flex: 1, marginTop: updateBanner.offset }}>
+                <View ref={tvTabsRef} style={{ flex: 1 }}>
                     <Tabs
                         detachInactiveScreens
                         screenOptions={{
@@ -84,7 +84,7 @@ export default function TabLayout() {
                         ))}
                     </Tabs>
                 </View>
-                {updateBanner.banner}
+                {updateBanner}
                 <TVNavBar />
             </View>
         )

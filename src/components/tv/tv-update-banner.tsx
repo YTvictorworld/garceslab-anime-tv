@@ -1,5 +1,4 @@
 import {
-    type InstallRequest,
     TV_UPDATES_SUPPORTED,
     tvUpdateInstallAtom,
     useTVUpdateActions,
@@ -12,9 +11,11 @@ import { TVButton } from "@/components/tv/tv-focus"
 import { TV, tvSize } from "@/components/tv/tv-scale"
 import { IMAGES } from "@/constants/images"
 import {
-    BANNER_TITLE,
+    type BannerAction,
+    type BannerContent,
+    bannerAllowedOn,
+    bannerContent,
     bannerMayAppear,
-    pendingSummary,
     type TVUpdatePending,
     updateBannerDecision,
 } from "@/lib/tv-updates/tv-updates"
@@ -25,14 +26,16 @@ import { useAtomValue } from "jotai"
 import * as React from "react"
 import { ActivityIndicator, BackHandler, Platform, Pressable, Text, TVFocusGuideView, useTVEventHandler, View } from "react-native"
 
-// Garceslab Anime: the TV update notice (docs/tv-updates.md). A slim banner under the navigation
-// bar, in the app's lilac, that pushes the tab's content down instead of covering it.
+// Garceslab Anime: the TV update notice (docs/tv-updates.md). A compact lilac panel at the top
+// right, under the navigation bar, over the hero's artwork; it covers no text and moves nothing.
 
 const SEEN_BUILD_KEY = "garceslab-tv-update-seen-build"
 export const BRAND = "#a443cf"
 const BRAND_SOFT = "#e6b0fd"
-/** Space between the navigation bar, the banner and the content. */
+/** Space between the navigation bar and the banner. */
 const GAP = 14
+/** About 27 % of a 1920 px screen: the hero's title and description end well before it. */
+const WIDTH = 520
 
 /** The GA mark in a lilac tile, shared with See changes. */
 export function TVUpdateMark({ size = 52 }: { size?: number }) {
@@ -55,112 +58,86 @@ export function TVUpdateMark({ size = 52 }: { size?: number }) {
     )
 }
 
-type BannerView = {
-    title: string
-    /** Only when there is something to say; the banner shrinks without it. */
-    detail: string | null
-    busy?: boolean
-    actions: Array<{ label: string; primary?: boolean; onPress: () => void }>
+const ACTION_LABELS: Record<BannerAction, string> = {
+    "install": "Install",
+    "see-changes": "See what's new",
+    "later": "Later",
+    "hide": "Hide",
+    "retry": "Try again",
+    "close": "Close",
+    "ok": "OK",
 }
 
-function bannerView(
-    offer: TVUpdatePending | null,
-    request: InstallRequest,
-    handlers: { seeChanges: () => void; later: () => void; retry: () => void; hideProgress: () => void },
-): BannerView | null {
-    switch (request.phase) {
-        case "sending":
-        case "installing":
-            return {
-                title: "Installing the update…",
-                detail: "Garceslab Anime will close and open again by itself in about a minute.",
-                busy: true,
-                actions: [{ label: "Hide", onPress: handlers.hideProgress }],
-            }
-        case "failed":
-            return {
-                title: "The update wasn't installed",
-                detail: request.error,
-                actions: [{ label: "Try again", primary: true, onPress: handlers.retry }, { label: "Close", onPress: handlers.hideProgress }],
-            }
-        case "installed":
-            return {
-                title: "The update is installed",
-                detail: "Close Garceslab Anime and open it again to use the new version.",
-                actions: [{ label: "OK", onPress: handlers.hideProgress }],
-            }
-        default:
-            if (!offer) return null
-            return {
-                title: BANNER_TITLE,
-                detail: pendingSummary(offer),
-                actions: [{ label: "See what's new", primary: true, onPress: handlers.seeChanges }, { label: "Later", onPress: handlers.later }],
-            }
-    }
+const PRIMARY_ACTIONS = new Set<BannerAction>(["install", "retry"])
+
+type BannerProps = {
+    content: BannerContent
+    onAction: (action: BannerAction) => void
+    nodeRef: React.RefObject<React.ComponentRef<typeof View> | null>
 }
 
-function Banner({ view, onLayout, nodeRef }: { view: BannerView; onLayout: (height: number) => void; nodeRef: React.RefObject<React.ComponentRef<typeof View> | null> }) {
-    // The whole banner is a focus region leading to its first button: Down from the navigation
-    // bar or Up from the screen reaches it wherever the focused control is (spatial-navigation.ts).
+/**
+ * A compact panel at the top right, under the navigation bar, over the hero's artwork (the
+ * hero's text and buttons are on the left, the rows start lower). Fixed width, height from its
+ * content; it floats and moves nothing.
+ */
+function Banner({ content, onAction, nodeRef }: BannerProps) {
+    // The whole panel is a focus region leading to its first button (Install): the D-pad enters
+    // it from any side (spatial-navigation.ts).
     const [firstButton, setFirstButton] = React.useState<React.ElementRef<typeof Pressable> | null>(null)
     return (
         <View
             ref={nodeRef}
-            onLayout={event => onLayout(event.nativeEvent.layout.height)}
-            accessibilityLabel={view.detail ? `${view.title}. ${view.detail}` : view.title}
+            accessibilityLabel={content.detail ? `${content.title}. ${content.detail}` : content.title}
             style={{
                 position: "absolute",
                 top: TV.navTop + TV.navHeight + tvSize(GAP),
-                left: TV.gutter,
                 right: TV.gutter,
+                width: tvSize(WIDTH),
                 // Under the navigation bar (200) and its drawers.
                 zIndex: 150,
                 borderRadius: tvSize(18),
                 borderWidth: tvSize(1),
                 borderColor: "rgba(164,67,207,0.55)",
-                borderLeftWidth: tvSize(6),
-                borderLeftColor: BRAND,
-                // Opaque: no text of the screen shows through. No blur or shadow (Chromium 79).
+                borderTopWidth: tvSize(5),
+                borderTopColor: BRAND,
+                // Opaque: no artwork shows through the text. No blur or shadow (Chromium 79).
                 backgroundColor: "#1d1224",
             }}
         >
             <TVFocusGuideView
                 destinations={firstButton ? [firstButton] : undefined}
-                style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    paddingVertical: tvSize(14),
-                    paddingLeft: tvSize(16),
-                    paddingRight: tvSize(14),
-                }}
+                style={{ padding: tvSize(18) }}
             >
-                {view.busy ? (
-                    <View style={{ width: tvSize(52), height: tvSize(52), alignItems: "center", justifyContent: "center" }}>
-                        <ActivityIndicator size="small" color={BRAND_SOFT} />
-                    </View>
-                ) : (
-                    <TVUpdateMark />
-                )}
-                <View style={{ flex: 1, minWidth: 0, marginLeft: tvSize(18), marginRight: tvSize(18) }}>
-                    <Text className="font-bold text-white" style={{ fontSize: tvSize(23), lineHeight: tvSize(30) }} numberOfLines={1}>
-                        {view.title}
-                    </Text>
-                    {view.detail ? (
-                        <Text style={{ fontSize: tvSize(18), lineHeight: tvSize(25), color: BRAND_SOFT, marginTop: tvSize(2) }} numberOfLines={2}>
-                            {view.detail}
+                <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
+                    {content.busy ? (
+                        <View style={{ width: tvSize(44), height: tvSize(44), alignItems: "center", justifyContent: "center" }}>
+                            <ActivityIndicator size="small" color={BRAND_SOFT} />
+                        </View>
+                    ) : (
+                        <TVUpdateMark size={44} />
+                    )}
+                    <View style={{ flex: 1, minWidth: 0, marginLeft: tvSize(14) }}>
+                        <Text className="font-bold text-white" style={{ fontSize: tvSize(21), lineHeight: tvSize(27) }} numberOfLines={2}>
+                            {content.title}
                         </Text>
-                    ) : null}
+                        {content.detail ? (
+                            <Text style={{ fontSize: tvSize(17), lineHeight: tvSize(23), color: BRAND_SOFT, marginTop: tvSize(3) }} numberOfLines={2}>
+                                {content.detail}
+                            </Text>
+                        ) : null}
+                    </View>
                 </View>
                 {/* Margins, not gap: webOS 6 (Chromium 79) has no flexbox gap. */}
-                <TVFocusGuideView trapFocusLeft trapFocusRight style={{ flexDirection: "row", alignItems: "center", flexShrink: 0 }}>
-                    {view.actions.map((action, index) => (
-                        <View key={action.label} style={{ marginLeft: index ? tvSize(12) : 0 }}>
+                <TVFocusGuideView trapFocusLeft trapFocusRight style={{ flexDirection: "row", alignItems: "center", marginTop: tvSize(14) }}>
+                    {content.actions.map((action, index) => (
+                        <View key={action} style={{ marginLeft: index ? tvSize(10) : 0 }}>
                             <TVButton
                                 ref={index === 0 ? setFirstButton : undefined}
-                                label={action.label}
-                                variant={action.primary ? "primary" : "secondary"}
+                                label={ACTION_LABELS[action]}
+                                variant={PRIMARY_ACTIONS.has(action) ? "primary" : "secondary"}
                                 size="compact"
-                                onPress={action.onPress}
+                                onPress={() => onAction(action)}
                             />
                         </View>
                     ))}
@@ -171,26 +148,26 @@ function Banner({ view, onLayout, nodeRef }: { view: BannerView; onLayout: (heig
 }
 
 /**
- * The update banner of the tab screens (rendered by the TV tabs layout). Returns how far the
- * content has to move down (0 when there is no banner) and the banner itself. Rules:
- * - once per pending build (remembered on the TV as soon as it is shown), only on a tab screen,
- *   never in the player, and only after the app settled and the remote was idle for a moment;
- * - it doesn't take focus: Down from the navigation bar or Up from the content reaches it;
- *   Back while it has focus, or Later, hides it on this TV (Settings → Updates keeps the build);
- * - after Install (from See changes or Settings) it shows the progress instead.
+ * The update banner of the tab screens (rendered by the TV tabs layout). Rules:
+ * - once per pending build (remembered on the TV as soon as it is shown), only on Anime, Discover
+ *   and Settings (bannerAllowedOn; elsewhere it waits), never in the player, and only after the
+ *   app settled and the remote was idle for a moment;
+ * - it doesn't take focus; the D-pad reaches it (Install first). Back while it has focus, or
+ *   Later, hides it on this TV (Settings → Updates keeps the build);
+ * - Install asks to confirm (Cancel leaves the banner as it was); after Install, from here,
+ *   See what's new or Settings, it shows the progress instead.
  */
-export function useTVUpdateBanner(): { offset: number; banner: React.ReactNode } {
+export function useTVUpdateBanner(): React.ReactNode {
     const enabled = TV_UPDATES_SUPPORTED
     const { data: state } = useTVUpdates()
     const request = useAtomValue(tvUpdateInstallAtom)
     const actions = useTVUpdateActions()
     const segments = useSegments() as string[]
     const playing = segments.includes("player")
-    const onTab = segments[1] === "(tabs)"
+    const onTab = bannerAllowedOn(segments)
     const [seenKey, setSeenKey] = React.useState(() => (enabled ? getStoredString(SEEN_BUILD_KEY) ?? null : null))
     const [offer, setOffer] = React.useState<TVUpdatePending | null>(null)
     const [progressHidden, setProgressHidden] = React.useState(false)
-    const [height, setHeight] = React.useState(0)
     const lastKeyAt = React.useRef(0)
     const nodeRef = React.useRef<React.ComponentRef<typeof View>>(null)
 
@@ -202,7 +179,7 @@ export function useTVUpdateBanner(): { offset: number; banner: React.ReactNode }
         lastKeyAt.current = Date.now()
     })
 
-    // The banner pushes the screen down: it waits for a calm moment on a tab screen.
+    // It comes in at a calm moment on a screen with room for it, not while the user goes through a row.
     const onTabRef = React.useRef(onTab)
     onTabRef.current = onTab
     React.useEffect(() => {
@@ -250,21 +227,29 @@ export function useTVUpdateBanner(): { offset: number; banner: React.ReactNode }
         if (request.phase === "failed" || request.phase === "installed") actions.cancel()
     }, [actions, moveFocusOut, request.phase])
 
-    const showProgress = !progressHidden && request.phase !== "idle" && request.phase !== "confirm"
-    const view = !enabled || playing
-        ? null
-        : bannerView(offer, showProgress ? request : { phase: "idle" }, {
-            seeChanges: () => {
+    const onAction = React.useCallback((action: BannerAction) => {
+        switch (action) {
+            case "install":
+            case "retry":
+                actions.askToInstall()
+                return
+            case "see-changes":
                 setOffer(null)
                 router.push("/(app)/tv-update-changes" as never)
-            },
-            later: closeOffer,
-            retry: actions.askToInstall,
-            hideProgress,
-        })
+                return
+            case "later":
+                closeOffer()
+                return
+            default:
+                hideProgress()
+        }
+    }, [actions, closeOffer, hideProgress])
+
+    const showProgress = !progressHidden && request.phase !== "idle" && request.phase !== "confirm"
+    const content = !enabled || playing || !onTab ? null : bannerContent(offer, showProgress ? request : { phase: "idle" })
 
     React.useEffect(() => {
-        if (!view) return
+        if (!content) return
         const sub = BackHandler.addEventListener("hardwareBackPress", () => {
             if (!focusInBanner()) return false
             if (offer) closeOffer()
@@ -272,16 +257,9 @@ export function useTVUpdateBanner(): { offset: number; banner: React.ReactNode }
             return true
         })
         return () => sub.remove()
-    }, [closeOffer, focusInBanner, hideProgress, offer, view])
+    }, [closeOffer, content, focusInBanner, hideProgress, offer])
 
-    React.useEffect(() => {
-        if (!view) setHeight(0)
-    }, [view])
-
-    return {
-        offset: view && height ? height + tvSize(GAP) : 0,
-        banner: view ? <Banner view={view} onLayout={setHeight} nodeRef={nodeRef} /> : null,
-    }
+    return content ? <Banner content={content} onAction={onAction} nodeRef={nodeRef} /> : null
 }
 
 /**
