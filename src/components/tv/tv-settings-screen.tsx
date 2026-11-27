@@ -29,7 +29,7 @@ import {
     setOfflineLoggingEnabled,
 } from "@/lib/offline-logger"
 import { checkForOtaUpdateManually, getOtaVersionInfo } from "@/lib/ota/updates"
-import { buildLabel, changeCountsLabel, lastResultLabel } from "@/lib/tv-updates/tv-updates"
+import { buildDescription, lastResultLabel, pendingSummary, settingsUpdateRows, type UpdatesRow } from "@/lib/tv-updates/tv-updates"
 import { logger } from "@/lib/utils/logger"
 import { toast } from "@/lib/utils/toast"
 import { useDeviceSummary } from "@/lib/webos/use-device-summary"
@@ -86,6 +86,8 @@ type SettingsRowProps = {
     preferred?: boolean
     disabled?: boolean
     danger?: boolean
+    /** Garceslab Anime: the app's lilac icon tile (Settings → Updates). */
+    accent?: boolean
     trailing?: React.ReactNode
     showChevron?: boolean
 }
@@ -100,6 +102,7 @@ const SettingsRow = React.memo(React.forwardRef<RowRef, SettingsRowProps>(functi
     preferred,
     disabled,
     danger,
+    accent,
     trailing,
     showChevron = true,
 }, ref) {
@@ -141,7 +144,7 @@ const SettingsRow = React.memo(React.forwardRef<RowRef, SettingsRowProps>(functi
                         borderRadius: tvSize(10),
                         backgroundColor: danger
                             ? "rgba(239,68,68,0.15)"
-                            : "rgba(255,255,255,0.06)",
+                            : accent ? "rgba(164,67,207,0.28)" : "rgba(255,255,255,0.06)",
                         alignItems: "center",
                         justifyContent: "center",
                     }}
@@ -149,7 +152,7 @@ const SettingsRow = React.memo(React.forwardRef<RowRef, SettingsRowProps>(functi
                     <Ionicons
                         name={icon}
                         size={tvSize(20)}
-                        color={danger ? "#f87171" : "rgba(255,255,255,0.7)"}
+                        color={danger ? "#f87171" : accent ? "#e6b0fd" : "rgba(255,255,255,0.7)"}
                     />
                 </View>
                 <View style={{ flex: 1, gap: tvSize(2) }}>
@@ -456,59 +459,93 @@ function UpdatesSection() {
 
     const { status } = state
     const pending = status.pending
-    const installing = status.installing || request.phase === "sending" || request.phase === "installing"
-    const installDetail = installing
-        ? status.installPhase === "waiting-tv"
-            ? "Waiting for the updater to reach this TV"
-            : "The app will close and restart by itself"
-        : pending ? "Garceslab Anime closes and opens again by itself" : "Nothing to install"
+    const installRequested = request.phase === "sending" || request.phase === "installing"
+    const installing = status.installing || installRequested
+    // Only the rows that have something to show (settingsUpdateRows).
+    const rows = settingsUpdateRows(status, installRequested)
+    const summary = pending && pending.changes.length ? pendingSummary(pending) : null
+
+    const render = (row: UpdatesRow) => {
+        switch (row) {
+            case "installed":
+                return status.installed ? (
+                    <SettingsRow
+                        label="On this TV"
+                        detail={[buildDescription(status.installed, status.channel), status.installed.shortCommit].filter(Boolean).join(" · ")}
+                        icon="tv-outline"
+                        onPress={noop}
+                        showChevron={false}
+                    />
+                ) : null
+            case "pending":
+                return pending ? (
+                    <SettingsRow
+                        label="A new version is available"
+                        detail={[buildDescription(pending, status.channel), summary].filter(Boolean).join(" · ")}
+                        icon="sparkles-outline"
+                        accent
+                        onPress={() => router.push("/(app)/tv-update-changes" as never)}
+                    />
+                ) : null
+            case "up-to-date":
+                return (
+                    <SettingsRow
+                        label="Up to date"
+                        detail={status.channel ? `Following the ${status.channel} channel` : "No newer version waiting"}
+                        icon="checkmark-circle-outline"
+                        onPress={noop}
+                        showChevron={false}
+                    />
+                )
+            case "install":
+                return (
+                    <SettingsRow
+                        label={installing ? "Installing…" : "Install update"}
+                        detail={installing
+                            ? status.installPhase === "waiting-tv"
+                                ? "Waiting for the updater to reach this TV"
+                                : "Garceslab Anime will close and open again by itself"
+                            : "Garceslab Anime closes and opens again by itself"}
+                        icon="download-outline"
+                        accent={!installing}
+                        disabled={installing}
+                        onPress={actions.askToInstall}
+                        trailing={installing ? <ActivityIndicator size="small" color="white" /> : undefined}
+                        showChevron={false}
+                    />
+                )
+            case "skip":
+                return (
+                    <SettingsRow
+                        label={actions.skipping ? "Skipping…" : "Skip this build"}
+                        detail="Not offered again until a newer build arrives"
+                        icon="close-circle-outline"
+                        disabled={actions.skipping}
+                        onPress={actions.skipBuild}
+                        showChevron={false}
+                    />
+                )
+            case "last-result":
+                return (
+                    <SettingsRow
+                        label="Last install"
+                        detail={lastResultLabel(status.lastResult, now)}
+                        icon="time-outline"
+                        onPress={noop}
+                        showChevron={false}
+                    />
+                )
+        }
+    }
 
     return (
         <SectionCard title="Updates">
-            <SettingsRow
-                label="Installed"
-                detail={`${buildLabel(status.installed, status.channel)}${status.channel ? ` · following ${status.channel}` : ""}`}
-                icon="tv-outline"
-                onPress={noop}
-                showChevron={false}
-            />
-            <Divider />
-            <SettingsRow
-                label={pending ? "Update available" : "Up to date"}
-                detail={pending
-                    ? `${buildLabel(pending, status.channel)} · ${changeCountsLabel(pending.changes)} · See changes`
-                    : "No newer build waiting"}
-                icon="sparkles-outline"
-                disabled={!pending}
-                onPress={() => router.push("/(app)/tv-update-changes" as never)}
-            />
-            <Divider />
-            <SettingsRow
-                label={installing ? "Installing…" : "Install update"}
-                detail={installDetail}
-                icon="download-outline"
-                disabled={!pending || installing}
-                onPress={actions.askToInstall}
-                trailing={installing ? <ActivityIndicator size="small" color="white" /> : undefined}
-                showChevron={false}
-            />
-            <Divider />
-            <SettingsRow
-                label={actions.skipping ? "Skipping…" : "Skip this build"}
-                detail="Not offered again until a newer build arrives"
-                icon="close-circle-outline"
-                disabled={!pending || installing || actions.skipping}
-                onPress={actions.skipBuild}
-                showChevron={false}
-            />
-            <Divider />
-            <SettingsRow
-                label="Last install"
-                detail={lastResultLabel(status.lastResult, now)}
-                icon="time-outline"
-                onPress={noop}
-                showChevron={false}
-            />
+            {rows.map((row, index) => (
+                <React.Fragment key={row}>
+                    {index > 0 ? <Divider /> : null}
+                    {render(row)}
+                </React.Fragment>
+            ))}
         </SectionCard>
     )
 }
