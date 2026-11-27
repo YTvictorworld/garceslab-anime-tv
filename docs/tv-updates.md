@@ -3,7 +3,8 @@
 A new build of the TV app is installed only after someone on the TV says yes. The
 self-hoster's own **updater** (outside this repository, over webOS Developer Mode) follows a
 release channel, downloads and checks new builds, and waits. The Garceslab Anime server
-proxies the updater's status, and the TV shows a small card asking whether to install.
+proxies the updater's status, and the TV shows a banner; nothing is installed until someone
+confirms Install.
 
 The TV never talks to the updater: it only calls the Garceslab server
 ([garceslab-anime-server#18](https://github.com/YTvictorworld/garceslab-anime-server/issues/18)).
@@ -14,80 +15,93 @@ the Samsung Tizen build and the native apps don't.
 
 ## What you see
 
-### The "New version" card
+Everything sizes to its content: a line, row or group with no data is left out, never shown
+empty. The first nightly an updater sees comes without a change list, so that case is part of
+the design, not an error.
+
+### The update banner
+
+A slim banner directly under the navigation bar, across the content width, in the app's lilac
+with the GA mark. It **pushes the screen down** instead of covering the hero or a row of
+posters.
 
 ```
-⬆ New version · nightly 0eff776
-3 new · 8 fixes
-• Seasons tabs on the anime page
-• Spanish subtitles selected at start
-• … and 9 more changes
-[ Install ]  [ See changes ]  [ Later ]
+[GA]  A new version of Garceslab Anime is available        [ See what's new ]  [ Later ]
+      3 new · 8 fixes
 ```
 
-- Bottom-right, fixed size, like the player's "Up next" card. At most three change lines,
-  features first, then a counter. The changes are pull request titles from the nightly's
-  `changes.json` ([releasing.md](releasing.md#release-channels)); internal ones (docs, CI,
-  tests…) are never shown.
-- **Once per pending build:** the card comes up a few seconds after the app opens (or after
-  the server reports a new build), and this TV remembers the build so it isn't shown again.
-  When several builds are waiting the updater offers only the newest, with the changes since
-  the installed one.
-- **Never during playback**, never over a drawer, a dialog or the on-screen keyboard.
-- **Doesn't take focus while you're using the remote:** it waits until no key was pressed for
-  about 2.5 seconds, then focuses **Install**. Left/Right move between its buttons; focus
-  stays in the card until you choose. **Back** or **Later** closes it, and focus goes back to
-  where it was. Untouched for about 12 seconds, it goes away by itself.
-- **Later** only hides the card on this TV; the build is still in Settings → Updates.
+| With a change list | Without a change list |
+|---|---|
+| ![The update banner on the home screen](images/tv-update-banner.webp) | ![The banner of a build without a change list](images/tv-update-banner-empty.webp) |
 
-![The "New version" card on the home screen](images/tv-update-card.webp)
+- **Second line:** the counts ("3 new · 8 fixes") when the updater listed the changes; without a
+  list, just the build date ("Built Nov 27"); without a date either, no second line at all.
+  The commit hash isn't shown here (it is in See what's new and Settings).
+- **Once per pending build:** it comes in a few seconds after the app opens (or after the
+  server reports a new build), only on a tab screen (Anime, Schedule, Discover, My Lists,
+  Settings) and only after the remote was idle for about 2.5 seconds, so the screen doesn't
+  move while you're going through a row. This TV then remembers the build; the banner stays
+  until you close it or leave the app, and doesn't come back for that build.
+- **Never during playback** and never on a page opened over the tabs (the player, an anime).
+- **Doesn't take focus.** Down from the navigation bar or Up from the top of the screen lands
+  on **See what's new** (the whole banner is one focus region); Left/Right move between its
+  buttons. **Later**, or **Back** while it has focus, hides it on this TV and moves focus down
+  to the screen; the build is still in Settings → Updates.
+- **See what's new** opens the list of changes, which has the Install button. The banner has no
+  Install button of its own.
 
-### See changes
+### See what's new
 
-A full-screen list of the pending build's changes grouped **New**, **Fixes** and **Other**
-(newest first), with **Install** and **Back** at the top. The D-pad moves line by line and
-the page scrolls with it. If the updater couldn't follow every build back to the installed
-one, a line says some changes may be missing.
+A full-screen page with the GA mark, "What's new", the version, channel and build date, the
+counts, and the commit in small print ("Build 0eff776, replaces 808b9ee"). **Install** and
+**Back** come next, then the changes grouped **New**, **Fixes** and **Other** (newest first);
+only the groups that have changes are shown. The D-pad moves line by line and the page scrolls
+with it. A build without a change list shows just "No change list for this build." under the
+buttons. If the updater couldn't follow every build back to the installed one, a line says some
+changes may be missing.
 
-![See changes](images/tv-update-see-changes.webp)
+| With a change list | Without a change list |
+|---|---|
+| ![See what's new](images/tv-update-see-changes.webp) | ![See what's new without a change list](images/tv-update-see-changes-empty.webp) |
 
 ### Install
 
-**Install** (on the card, in See changes or in Settings) first asks to confirm: the app closes
-while the update installs and opens again by itself. After **Install** the card says
-**"Installing update… Garceslab Anime will close and restart by itself"**. The updater then
-reinstalls the app and relaunches it, so the app disappearing mid-way is expected: losing the
-server during this state is not treated as an error.
+**Install** (in See what's new or Settings) first asks to confirm: the app closes while the
+update installs and opens again by itself. Then the banner (on the tab screens) and See what's
+new say **"Installing the update… Garceslab Anime will close and open again by itself"**. The
+updater reinstalls the app and relaunches it, so the app disappearing mid-way is expected:
+losing the server during this state is not treated as an error.
 
-- If the updater reports a failure, the card says **"Update not installed"** with its error and
-  offers **Try again**.
-- If the install finished but the app wasn't relaunched, the card asks you to close and open
+- If the updater reports a failure, the banner says **"The update wasn't installed"** with its
+  error and offers **Try again**.
+- If the install finished but the app wasn't relaunched, the banner asks you to close and open
   the app again.
 - The server refuses to install while something is playing on this TV (`409
-  PLAYBACK_ACTIVE`); the card says so.
+  PLAYBACK_ACTIVE`); the app says so.
 
 | Confirm | Installing |
 |---|---|
-| ![Install the update now?](images/tv-update-confirm.webp) | ![Installing update…](images/tv-update-installing.webp) |
+| ![Install the update now?](images/tv-update-confirm.webp) | ![Installing the update…](images/tv-update-banner-installing.webp) |
 
 ### Settings → Updates
 
-Shown only when the server has an updater configured:
+Shown only when the server has an updater configured, and only with the rows that have data:
 
-| Row | What it shows |
-|---|---|
-| Installed | Version, channel and commit installed on the TV, and the channel the updater follows |
-| Update available / Up to date | The pending build and its counts; opens See changes |
-| Install update | Asks to confirm, then installs (shows "Installing…" while it runs) |
-| Skip this build | Tells the updater to drop this build (`POST /later`); it isn't offered again until a newer one arrives |
-| Last install | The updater's last result: "Installed v1.0.0 (abc1234) · 2 h ago" or "Failed: …" |
+| Row | When | What it shows |
+|---|---|---|
+| On this TV | the updater knows the installed build | Version, channel, build date and commit |
+| A new version is available | a build is pending | Version, channel, date and the counts (when listed); opens See what's new |
+| Up to date | nothing pending | The channel the updater follows |
+| Install update | a build is pending, or an install runs | Asks to confirm, then installs ("Installing…" while it runs) |
+| Skip this build | a build is pending, no install running | Tells the updater to drop this build (`POST /later`); it isn't offered again until a newer one arrives |
+| Last install | after the first install | "Installed v1.0.0 (abc1234) · 2 h ago" or "Failed: …" |
 
 When the server can't reach the updater, the section shows **"Updater unreachable"** with the
-server's error and a **Check again** row; no card is shown.
+server's error and a **Check again** row; no banner is shown.
 
-| Updates | Updater unreachable |
-|---|---|
-| ![Settings → Updates](images/tv-settings-updates.webp) | ![Updater unreachable](images/tv-settings-updates-unreachable.webp) |
+| Update available | Unknown installed build, no install yet | Updater unreachable |
+|---|---|---|
+| ![Settings → Updates](images/tv-settings-updates.webp) | ![Settings → Updates without data rows](images/tv-settings-updates-empty.webp) | ![Updater unreachable](images/tv-settings-updates-unreachable.webp) |
 
 The screenshots were taken in headless Chromium at 1920×1080 against a throwaway local server
 with made-up profiles and a faked updater status.
@@ -132,29 +146,32 @@ A server without these routes (`404`) counts as "not configured".
 
 The TV reads it defensively: `installed`, `pending` and `lastResult` may be `null`, unknown
 change types count as "other", `internal` changes are dropped, and anything unexpected hides
-the update UI instead of showing an error. The card's "seen" build is the pending `commit`
+the update UI instead of showing an error. The banner's "seen" build is the pending `commit`
 (or version and build time for a stable build without one), stored on the TV only.
 
 ## Code
 
 | File | What |
 |---|---|
-| `src/lib/tv-updates/tv-updates.ts` | Pure logic: parsing the answers, grouping and counting changes, card lines, labels, the card's visibility rules and timing, polling intervals, the install watch |
+| `src/lib/tv-updates/tv-updates.ts` | Pure logic: parsing the answers, grouping and counting changes, the banner's summary line, human build descriptions, the rows Settings shows, the banner's visibility rules and timing, polling intervals, the install watch |
 | `src/api/hooks/tv-updates.hooks.ts` | The status query, install / skip requests, the shared install state |
-| `src/components/tv/tv-update-card.tsx` | The card, the install progress card, the confirmation, and the host mounted in `app/(app)/_layout.tsx` |
-| `src/components/tv/tv-update-changes-screen.tsx` | "See changes" (`app/(app)/tv-update-changes.tsx`) |
+| `src/components/tv/tv-update-banner.tsx` | The banner (`useTVUpdateBanner`, rendered by the TV tabs layout `app/(app)/(tabs)/_layout.tsx`, which moves the tab down by its height) and the host with the install confirmation (`app/(app)/_layout.tsx`) |
+| `src/components/tv/tv-update-changes-screen.tsx` | See what's new (`app/(app)/tv-update-changes.tsx`) |
 | `src/components/tv/tv-settings-screen.tsx` | Settings → Updates |
-| `tests/tv-updates.test.ts` | Parsing, grouping/counting/truncation, card rules (not configured, unreachable, no pending, pending, seen, during playback, installing), polling and install outcomes |
+| `tests/tv-updates.test.ts` | Parsing, grouping and counting, the summary line with and without a change list or date, only-new / only-fixes builds, non-empty groups, Settings rows (unknown installed build, no install yet, up to date, installing), banner rules (not configured, unreachable, no pending, pending, seen, during playback, installing), timing, polling and install outcomes |
 
 ## Check on a real TV
 
-The card's focus, Back and the restart after installing can only be checked on a TV with an
+The banner's focus, Back and the restart after installing can only be checked on a TV with an
 updater set up; see [testing-on-tv.md](testing-on-tv.md). Things to check:
 
-1. With a pending build, open the app: the card comes up after a few seconds, Install focused;
-   Left/Right move between buttons, Back closes it and focus returns to the home screen.
-2. Close and reopen the app: the card doesn't come back for the same build.
-3. Start a video: no card over the player.
-4. Install → confirm: "Installing…", the app closes, reinstalls and opens again on the new
-   build (Settings shows the new commit, no card).
-5. Settings → Updates with the updater stopped: "Updater unreachable".
+1. With a pending build, open the app: after a few seconds the banner comes in under the
+   navigation bar and pushes the home screen down; focus stays where it was.
+2. Down from the navigation bar and Up from the hero land on **See what's new**; Left/Right
+   reach **Later**. Back (or Later) hides it and focus moves to the screen below.
+3. Close and reopen the app: the banner doesn't come back for the same build.
+4. Start a video: no banner in the player.
+5. See what's new: the list scrolls with the D-pad (or the short "No change list" line);
+   Install → confirm: "Installing…", the app closes, reinstalls and opens again on the new
+   build (Settings shows the new commit, no banner).
+6. Settings → Updates shows only rows with data; with the updater stopped: "Updater unreachable".

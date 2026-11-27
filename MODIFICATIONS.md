@@ -109,14 +109,15 @@ All for the LG webOS build:
 
 ## 2026-11 (TV updates: confirm before installing)
 
-- **Update card** (`src/components/tv/tv-update-card.tsx`, `src/lib/tv-updates/tv-updates.ts`,
+- **Update banner** (`src/components/tv/tv-update-banner.tsx`, `src/lib/tv-updates/tv-updates.ts`,
   `src/api/hooks/tv-updates.hooks.ts`): on webOS, when the Garceslab server reports a pending
-  build from the self-hoster's updater, a "New version" card asks once per build whether to
-  install it (never during playback); "See changes" (`app/(app)/tv-update-changes.tsx`) lists
-  the changes. Mounted in `app/(app)/_layout.tsx`.
+  build from the self-hoster's updater, a banner under the navigation bar (rendered by
+  `app/(app)/(tabs)/_layout.tsx`, which moves the tab down) offers it once per build (never
+  during playback); "See what's new" (`app/(app)/tv-update-changes.tsx`) lists the changes and
+  installs after a confirmation (`app/(app)/_layout.tsx`).
 - **Settings** (`src/components/tv/tv-settings-screen.tsx`): an "Updates" section (installed
-  and pending build, install, skip, last result, "updater unreachable"), only when the server
-  has an updater configured. See `docs/tv-updates.md`.
+  and pending build, install, skip, last result, "updater unreachable"; only rows with data),
+  only when the server has an updater configured; `SettingsRow` gets a lilac `accent`. See `docs/tv-updates.md`.
 
 ## GPL-3.0 compliance checklist
 
