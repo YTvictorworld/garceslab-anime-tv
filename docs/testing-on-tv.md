@@ -65,6 +65,37 @@ Check that the artifact's `<sha7>` is the PR's latest commit; Settings in GA Tes
 same short commit (`dev (<sha7>)`). To build it yourself instead:
 `WEBOS_APP_ID=app.garceslab.anime.test WEBOS_APP_TITLE="GA Test" npm run build:webos`.
 
+### The TEST ENVIRONMENT tag
+
+GA Test shows an amber **TEST ENVIRONMENT** tag in the **top right corner** of every screen:
+the tabs, anime pages, Settings, the player, "Who's watching", the server setup, error screens,
+drawers and dialogs. If you don't see it, you are in the main app. The main app (nightly and
+stable), other side-by-side builds, the Tizen build and `npm run dev:webos` never show it.
+
+![GA Test's TEST ENVIRONMENT tag at the top right of the home screen](images/tv-ga-test-tag-home.webp)
+
+| In the player | Over a drawer |
+|---|---|
+| ![The tag over the player](images/tv-ga-test-tag-player.webp) | ![The tag over a drawer, clear of its Close button](images/tv-ga-test-tag-drawer.webp) |
+
+- **Decided at build time** from the app id: `webos/build.mjs` (via `webos/app-id.mjs`) tells
+  the app its id only for a side-by-side build (`EXPO_PUBLIC_WEBOS_APP_ID`), and only the GA
+  Test id shows the tag (`src/lib/test-environment.ts`). Nothing at runtime turns it on or
+  off. To see it in the dev server, start it with
+  `EXPO_PUBLIC_WEBOS_APP_ID=app.garceslab.anime.test npm run dev:webos`.
+- **Out of the way:** it sits in the top 36 px of the screen at the right edge, right of the
+  centred nav bar and its profile picture, away from the search button and the player's Leave
+  button (top left), and above the update banner (top right, under the nav bar), the player's
+  title and the drawers' content. It is drawn over everything, video and dialogs
+  included, takes no D-pad focus, lets the Magic Remote pointer and wheel through, moves no
+  layout, and is a single static element (no animation or timer).
+- **Room for more badges:** it lives in a small container (`#ga-environment-badges`);
+  `addEnvironmentBadge()` adds GA Test-only badges to its left, such as the "DEBUG" badge
+  planned for debug mode (#30).
+
+On the TV, check that the tag is there and readable from the sofa on a few screens, including
+the player while a video plays and with a drawer open, and that it never takes focus.
+
 Good to know:
 
 - **GA Test keeps its own local data.** It has its own saved server URL, password and profile

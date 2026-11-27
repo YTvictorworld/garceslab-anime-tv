@@ -78,7 +78,9 @@ ares-install --device tv --remove app.garceslab.anime.test   # when done
 ```
 
 Without `WEBOS_APP_ID` the build is the usual `app.seanime.tenji`. Don't reuse a default
-export with `--skip-export` for a custom id (the app learns its id at export time).
+export with `--skip-export` for a custom id (the app learns its id at export time). GA Test
+shows a **TEST ENVIRONMENT** tag at the top right of every screen; no other id does
+(`docs/testing-on-tv.md`, "The TEST ENVIRONMENT tag").
 
 `dist/webos/app` is the unpacked app and `dist/webos/service` its JS service, if you'd rather
 package them with `ares-package dist/webos/app dist/webos/service`. Every way of installing
