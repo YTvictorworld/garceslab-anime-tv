@@ -545,7 +545,7 @@ build made by hand. The same facts are in `build.json` next to `appinfo.json` in
 app; see [docs/releasing.md](../docs/releasing.md#release-channels).
 
 When the Garceslab server has a TV updater configured, Settings also has an *Updates* section,
-and a banner under the navigation bar offers a new build, installed only after you confirm; see
+and a small banner at the top right offers a new build, installed only after you confirm; see
 [docs/tv-updates.md](../docs/tv-updates.md).
 
 On webOS, Settings shows *Live updates*, the state of the websocket to the server, with how

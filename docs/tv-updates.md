@@ -21,13 +21,15 @@ the design, not an error.
 
 ### The update banner
 
-A slim banner directly under the navigation bar, across the content width, in the app's lilac
-with the GA mark. It **pushes the screen down** instead of covering the hero or a row of
-posters.
+A compact panel at the top right, just under the navigation bar, about a quarter of the screen
+wide (520 px at 1920×1080), in the app's lilac with the GA mark. Its height follows its content.
+It floats over the hero's artwork on the right and **moves nothing**: the hero's title,
+description and buttons end well before it, and the rows start below it.
 
 ```
-[GA]  A new version of Garceslab Anime is available        [ See what's new ]  [ Later ]
+[GA]  Garceslab Anime has a new version
       3 new · 8 fixes
+[ Install ]  [ See what's new ]  [ Later ]
 ```
 
 | With a change list | Without a change list |
@@ -37,18 +39,24 @@ posters.
 - **Second line:** the counts ("3 new · 8 fixes") when the updater listed the changes; without a
   list, just the build date ("Built Nov 27"); without a date either, no second line at all.
   The commit hash isn't shown here (it is in See what's new and Settings).
+- **Install** asks to confirm and installs (see below); Cancel leaves the banner as it was, with
+  focus back on Install. **See what's new** opens the list of changes, which has Install too.
+- **Where:** on Anime, Discover and Settings, where the top right is artwork or empty. Schedule,
+  My Lists and the search pages have their own controls up there, so the banner waits (and
+  hides again while you are on one of them); it never shows on a page opened over the tabs
+  (an anime, the player).
 - **Once per pending build:** it comes in a few seconds after the app opens (or after the
-  server reports a new build), only on a tab screen (Anime, Schedule, Discover, My Lists,
-  Settings) and only after the remote was idle for about 2.5 seconds, so the screen doesn't
-  move while you're going through a row. This TV then remembers the build; the banner stays
-  until you close it or leave the app, and doesn't come back for that build.
-- **Never during playback** and never on a page opened over the tabs (the player, an anime).
-- **Doesn't take focus.** Down from the navigation bar or Up from the top of the screen lands
-  on **See what's new** (the whole banner is one focus region); Left/Right move between its
-  buttons. **Later**, or **Back** while it has focus, hides it on this TV and moves focus down
-  to the screen; the build is still in Settings → Updates.
-- **See what's new** opens the list of changes, which has the Install button. The banner has no
-  Install button of its own.
+  server reports a new build), only after the remote was idle for about 2.5 seconds. This TV
+  then remembers the build; the banner stays until you close it or leave the app, and doesn't
+  come back for that build.
+- **Doesn't take focus.** The whole panel is one focus region whose first button is Install:
+  **Down** from the right end of the navigation bar (Settings or the profile picture) lands on
+  Install; Left/Right move between its buttons. **Later**, or **Back** while it has focus, hides
+  it on this TV and moves focus down to the screen; the build is still in Settings → Updates.
+
+| Focus on Install | Discover | Settings |
+|---|---|---|
+| ![Install focused](images/tv-update-banner-focused.webp) | ![The banner on Discover](images/tv-update-banner-discover.webp) | ![The banner on Settings](images/tv-update-banner-settings.webp) |
 
 ### See what's new
 
@@ -66,9 +74,8 @@ changes may be missing.
 
 ### Install
 
-**Install** (in See what's new or Settings) first asks to confirm: the app closes while the
-update installs and opens again by itself. Then the banner (on the tab screens) and See what's
-new say **"Installing the update… Garceslab Anime will close and open again by itself"**. The
+**Install** (on the banner, in See what's new or in Settings) first asks to confirm: the app closes while the
+update installs and opens again by itself. Then the banner and See what's new say **"Installing the update… Garceslab Anime will close and open again by itself"**. The
 updater reinstalls the app and relaunches it, so the app disappearing mid-way is expected:
 losing the server during this state is not treated as an error.
 
@@ -153,25 +160,25 @@ the update UI instead of showing an error. The banner's "seen" build is the pend
 
 | File | What |
 |---|---|
-| `src/lib/tv-updates/tv-updates.ts` | Pure logic: parsing the answers, grouping and counting changes, the banner's summary line, human build descriptions, the rows Settings shows, the banner's visibility rules and timing, polling intervals, the install watch |
+| `src/lib/tv-updates/tv-updates.ts` | Pure logic: parsing the answers, grouping and counting changes, the banner's content (lines and buttons) and the screens it may show on, its summary line, human build descriptions, the rows Settings shows, the banner's visibility rules and timing, polling intervals, the install watch |
 | `src/api/hooks/tv-updates.hooks.ts` | The status query, install / skip requests, the shared install state |
-| `src/components/tv/tv-update-banner.tsx` | The banner (`useTVUpdateBanner`, rendered by the TV tabs layout `app/(app)/(tabs)/_layout.tsx`, which moves the tab down by its height) and the host with the install confirmation (`app/(app)/_layout.tsx`) |
+| `src/components/tv/tv-update-banner.tsx` | The banner (`useTVUpdateBanner`, rendered by the TV tabs layout `app/(app)/(tabs)/_layout.tsx`) and the host with the install confirmation (`app/(app)/_layout.tsx`) |
 | `src/components/tv/tv-update-changes-screen.tsx` | See what's new (`app/(app)/tv-update-changes.tsx`) |
 | `src/components/tv/tv-settings-screen.tsx` | Settings → Updates |
-| `tests/tv-updates.test.ts` | Parsing, grouping and counting, the summary line with and without a change list or date, only-new / only-fixes builds, non-empty groups, Settings rows (unknown installed build, no install yet, up to date, installing), banner rules (not configured, unreachable, no pending, pending, seen, during playback, installing), timing, polling and install outcomes |
+| `tests/tv-updates.test.ts` | Parsing, grouping and counting, the summary line with and without a change list or date, only-new / only-fixes builds, non-empty groups, Settings rows (unknown installed build, no install yet, up to date, installing), banner content and screens, banner rules (not configured, unreachable, no pending, pending, seen, during playback, installing), timing, polling and install outcomes |
 
 ## Check on a real TV
 
 The banner's focus, Back and the restart after installing can only be checked on a TV with an
 updater set up; see [testing-on-tv.md](testing-on-tv.md). Things to check:
 
-1. With a pending build, open the app: after a few seconds the banner comes in under the
-   navigation bar and pushes the home screen down; focus stays where it was.
-2. Down from the navigation bar and Up from the hero land on **See what's new**; Left/Right
-   reach **Later**. Back (or Later) hides it and focus moves to the screen below.
-3. Close and reopen the app: the banner doesn't come back for the same build.
-4. Start a video: no banner in the player.
-5. See what's new: the list scrolls with the D-pad (or the short "No change list" line);
-   Install → confirm: "Installing…", the app closes, reinstalls and opens again on the new
-   build (Settings shows the new commit, no banner).
-6. Settings → Updates shows only rows with data; with the updater stopped: "Updater unreachable".
+1. With a pending build, open the app: after a few seconds the banner comes in at the top
+   right, over the hero's artwork, covering no text or button; focus stays where it was.
+2. Down from Settings or the profile picture in the navigation bar lands on **Install**;
+   Left/Right reach See what's new and Later. Back (or Later) hides it and focus moves down.
+3. Install → Cancel: the banner stays, focus on Install. Install → Install: "Installing…", the
+   app closes, reinstalls and opens again on the new build (no banner).
+4. Discover and Settings show it; Schedule and My Lists don't (it is back on Anime).
+5. Close and reopen the app: no banner for the same build. Start a video: no banner.
+6. See what's new and Settings → Updates as described above; with the updater stopped:
+   "Updater unreachable".
