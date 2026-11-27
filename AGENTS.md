@@ -195,6 +195,10 @@ on a real TV"* in the template ("n/a" on *"Tested on a real LG webOS TV"*), and 
 comments the result and swaps the label for **`tv-tested`**. With `needs-tv-test` the PR may be
 ready for review (no `(WIP)`), but the *PR ready* check fails, so it can't be merged; never
 remove the label yourself. Details: [CONTRIBUTING.md](CONTRIBUTING.md#testing-on-a-real-tv).
+PRs with `needs-tv-test` are tested on the TV in the **GA Test** app (`app.garceslab.anime.test`),
+built by CI as an artifact (`ga-test-pr<N>-<sha7>`, workflow `ga-test.yml`); never install a PR
+build over the main app (`app.seanime.tenji`). See
+[docs/testing-on-tv.md](docs/testing-on-tv.md#the-ga-test-app).
 
 ### Checks to run before "ready"
 
@@ -204,6 +208,7 @@ npx tsc --noEmit -p .       # only the known app/_layout.tsx TS2882 may remain
 npm run build:webos         # the .ipk must build
 bash .github/scripts/pr-ready_test.sh   # only if you changed the WIP rule
 bash .github/scripts/release-check_test.sh   # only if you changed release.yml or release-check.sh
+bash .github/scripts/ga-test-check_test.sh   # only if you changed ga-test.yml or ga-test-check.sh
 ```
 
 ### Before and after screenshots

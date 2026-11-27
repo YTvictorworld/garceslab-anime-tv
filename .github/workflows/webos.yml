@@ -31,6 +31,9 @@ jobs:
       # The rules of the nightly workflow (nightly.yml).
       - name: Nightly rules (nightly-check_test.sh)
         run: bash .github/scripts/nightly-check_test.sh
+      # When the GA Test workflow (ga-test.yml) builds the side-by-side test .ipk.
+      - name: GA Test rules (ga-test-check_test.sh)
+        run: bash .github/scripts/ga-test-check_test.sh
       # EXPO_PUBLIC_TV_TIME_ZONE is a local build option and is not set here:
       # the app uses the TV's own time zone.
       - run: npm run build:webos

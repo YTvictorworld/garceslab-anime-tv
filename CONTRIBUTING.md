@@ -96,6 +96,11 @@ and write the model and webOS version in the PR's "Tested on a real LG webOS TV"
    in the PR description and ask for a TV test, with what to check: the steps, the screens and
    the expected result. The template writes the handle in backticks so that opening a PR doesn't notify anyone; remove the backticks to send the mention.
 
+**PRs with `needs-tv-test` are tested on the TV in the GA Test app**
+(`app.garceslab.anime.test`), which CI builds as a workflow artifact (`ga-test-pr<N>-<sha7>`,
+see [docs/testing-on-tv.md](docs/testing-on-tv.md#the-ga-test-app)); **never install a PR
+build over the main app** (`app.seanime.tenji`).
+
 Whoever tests on the TV comments the result on the PR (device and webOS version, what was
 checked, photos or videos if useful), then **replaces `needs-tv-test` with `tv-tested`**. A PR
 with `needs-tv-test` can be ready for review, but it **must not be merged**: the *PR ready
