@@ -1,0 +1,155 @@
+name: GA Test build
+
+# Builds the side-by-side "GA Test" .ipk (app id app.garceslab.anime.test) for pull requests
+# labelled "needs-tv-test", so they are tried on a real TV next to the everyday app instead of
+# over it (docs/testing-on-tv.md, "The GA Test app"). It runs when such a PR is opened,
+# reopened or pushed to, and when the label is added; ga-test-check.sh decides (tested by
+# ga-test-check_test.sh, run in webos.yml). The artifact is ga-test-pr<N>-<sha7>.
+#
+# Safe for PRs from forks: plain pull_request (never pull_request_target), no secrets, and
+# the job that runs the PR's code has a read-only token. Only the comment job, which runs no
+# PR code, may write, and only on PRs from this repository (forks get a read-only token).
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+
+permissions:
+  contents: read
+
+concurrency:
+  # A newer push or a re-added label replaces a running build; adding any other label
+  # gets its own group, so it never cancels one.
+  group: ga-test-${{ github.event.pull_request.number }}-${{ (github.event.action != 'labeled' || github.event.label.name == 'needs-tv-test') && 'build' || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  ga-test:
+    name: GA Test .ipk
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      build: ${{ steps.plan.outputs.build }}
+      artifact: ${{ steps.plan.outputs.artifact }}
+      commit: ${{ steps.plan.outputs.commit }}
+      sha256: ${{ steps.hash.outputs.sha256 }}
+      ipk: ${{ steps.hash.outputs.ipk }}
+      url: ${{ steps.upload.outputs.artifact-url }}
+    steps:
+      # The PR's head commit, the one the artifact is named after (not the merge commit).
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Decide (ga-test-check.sh)
+        id: plan
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_ACTION: ${{ github.event.action }}
+          EVENT_LABEL: ${{ github.event.label.name }}
+          PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: bash .github/scripts/ga-test-check.sh
+      - uses: actions/setup-node@v7
+        if: steps.plan.outputs.build == 'true'
+        with:
+          node-version: 22
+          cache: npm
+      - if: steps.plan.outputs.build == 'true'
+        run: npm ci --no-fund
+      - name: Build GA Test
+        if: steps.plan.outputs.build == 'true'
+        env:
+          WEBOS_APP_ID: ${{ steps.plan.outputs.app_id }}
+          WEBOS_APP_TITLE: ${{ steps.plan.outputs.title }}
+          GARCESLAB_BUILD_CHANNEL: dev
+          GARCESLAB_BUILD_COMMIT: ${{ steps.plan.outputs.commit }}
+        run: npm run build:webos
+      - name: SHA256
+        id: hash
+        if: steps.plan.outputs.build == 'true'
+        env:
+          APP_ID: ${{ steps.plan.outputs.app_id }}
+        run: |
+          cd dist/webos
+          files=("$APP_ID"_*_all.ipk)
+          [ "${#files[@]}" = 1 ] && [ -f "${files[0]}" ] || { echo "::error::expected one $APP_ID .ipk, got: ${files[*]}"; exit 1; }
+          sha256sum "${files[0]}" >SHA256SUMS.txt
+          cat SHA256SUMS.txt
+          echo "ipk=${files[0]}" >>"$GITHUB_OUTPUT"
+          echo "sha256=$(cut -d' ' -f1 SHA256SUMS.txt)" >>"$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v7
+        id: upload
+        if: steps.plan.outputs.build == 'true'
+        with:
+          name: ${{ steps.plan.outputs.artifact }}
+          path: |
+            dist/webos/*.ipk
+            dist/webos/SHA256SUMS.txt
+          if-no-files-found: error
+      - name: Summary
+        if: steps.plan.outputs.build == 'true'
+        env:
+          ARTIFACT: ${{ steps.plan.outputs.artifact }}
+          IPK: ${{ steps.hash.outputs.ipk }}
+          SHA256: ${{ steps.hash.outputs.sha256 }}
+          URL: ${{ steps.upload.outputs.artifact-url }}
+        run: |
+          {
+            echo "### GA Test build: \`$ARTIFACT\`"
+            echo
+            echo "Install it as **GA Test** (\`app.garceslab.anime.test\`), never over the main app."
+            echo
+            echo "- Artifact: [$ARTIFACT]($URL)"
+            echo "- \`$IPK\` SHA256: \`$SHA256\`"
+            echo
+            echo '```sh'
+            echo "gh run download $GITHUB_RUN_ID -R $GITHUB_REPOSITORY -n $ARTIFACT -D $ARTIFACT"
+            echo "(cd $ARTIFACT && sha256sum -c SHA256SUMS.txt)"
+            echo "ares-install --device tv $ARTIFACT/$IPK"
+            echo '```'
+          } >>"$GITHUB_STEP_SUMMARY"
+
+  comment:
+    name: GA Test comment
+    needs: ga-test
+    # Forks get a read-only token, so they rely on the run page (see the summary there).
+    if: needs.ga-test.outputs.build == 'true' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    continue-on-error: true
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Post or update the GA Test comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          ARTIFACT: ${{ needs.ga-test.outputs.artifact }}
+          COMMIT: ${{ needs.ga-test.outputs.commit }}
+          IPK: ${{ needs.ga-test.outputs.ipk }}
+          SHA256: ${{ needs.ga-test.outputs.sha256 }}
+          URL: ${{ needs.ga-test.outputs.url }}
+        run: |
+          marker='<!-- ga-test-build -->'
+          run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          body="$marker
+          **GA Test build** for ${COMMIT:0:7}: [\`$ARTIFACT\`]($URL) ([run]($run_url))
+
+          Test it on the TV in the **GA Test** app (\`app.garceslab.anime.test\`), never over the main app ([docs/testing-on-tv.md]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/blob/main/docs/testing-on-tv.md#the-ga-test-app)).
+
+          \`\`\`sh
+          gh run download $GITHUB_RUN_ID -R $GITHUB_REPOSITORY -n $ARTIFACT -D $ARTIFACT
+          (cd $ARTIFACT && sha256sum -c SHA256SUMS.txt)
+          ares-install --device tv $ARTIFACT/$IPK
+          \`\`\`
+
+          SHA256 of \`$IPK\`: \`$SHA256\`"
+          id="$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" --paginate \
+            --jq ".[] | select(.user.login == \"github-actions[bot]\" and (.body | startswith(\"$marker\"))) | .id" | head -n1)"
+          if [ -n "$id" ]; then
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$id" -f body="$body" >/dev/null
+          else
+            gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" -f body="$body" >/dev/null
+          fi

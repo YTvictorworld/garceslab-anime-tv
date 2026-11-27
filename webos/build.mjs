@@ -16,7 +16,10 @@
  * package the app under another id, so it installs next to the daily app
  * instead of replacing it, e.g.
  *
- *   WEBOS_APP_ID=app.garceslab.anime.visualtest WEBOS_APP_TITLE="GA Visual Test" npm run build:webos
+ *   WEBOS_APP_ID=app.garceslab.anime.test WEBOS_APP_TITLE="GA Test" npm run build:webos
+ *
+ * (the fixed "GA Test" identity; .github/workflows/ga-test.yml builds it for PRs labelled
+ * needs-tv-test, docs/testing-on-tv.md)
  *
  * The relay service is renamed with it (`<id>.service`) and the app is told
  * its id at export time (EXPO_PUBLIC_WEBOS_APP_ID), so don't combine a custom
