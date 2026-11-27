@@ -8,6 +8,7 @@ import {
 } from "@/api/components/websocket-provider"
 import { API_ENDPOINTS } from "@/api/generated/endpoints"
 import { avatarImageUrl } from "@/api/hooks/profiles.hooks"
+import { TV_UPDATES_SUPPORTED, tvUpdateInstallAtom, useTVUpdateActions, useTVUpdates } from "@/api/hooks/tv-updates.hooks"
 import { useProfileSession } from "@/atoms/profile.atoms"
 import { useCurrentUser, useServerStatus, useServerUrl } from "@/atoms/server.atoms"
 import { useProfileSwitch } from "@/lib/profile/use-profile-switch"
@@ -28,6 +29,7 @@ import {
     setOfflineLoggingEnabled,
 } from "@/lib/offline-logger"
 import { checkForOtaUpdateManually, getOtaVersionInfo } from "@/lib/ota/updates"
+import { buildLabel, changeCountsLabel, lastResultLabel } from "@/lib/tv-updates/tv-updates"
 import { logger } from "@/lib/utils/logger"
 import { toast } from "@/lib/utils/toast"
 import { useDeviceSummary } from "@/lib/webos/use-device-summary"
@@ -407,6 +409,110 @@ function DiagnosticsSection({ onClearLogs }: { onClearLogs: () => void }) {
     )
 }
 
+/**
+ * Garceslab Anime: Settings → Updates (docs/tv-updates.md). Only when the server has a TV
+ * updater configured; "unreachable" when it can't reach it.
+ */
+function UpdatesSection() {
+    const query = useTVUpdates()
+    const state = query.data
+    const request = useAtomValue(tvUpdateInstallAtom)
+    const actions = useTVUpdateActions()
+    const isFocused = useIsFocused()
+    const [now, setNow] = React.useState(Date.now)
+    const refetch = query.refetch
+
+    // Fresh status each time Settings is opened (cheap: one request).
+    React.useEffect(() => {
+        if (!isFocused) return
+        setNow(Date.now())
+        void refetch()
+    }, [isFocused, refetch])
+
+    if (!state || state.kind === "not-configured") return null
+
+    if (state.kind === "unreachable") {
+        return (
+            <SectionCard title="Updates">
+                <SettingsRow
+                    label="Updater unreachable"
+                    detail={state.error}
+                    icon="cloud-offline-outline"
+                    onPress={noop}
+                    showChevron={false}
+                />
+                <Divider />
+                <SettingsRow
+                    label={query.isFetching ? "Checking…" : "Check again"}
+                    detail="Ask the server for the update status"
+                    icon="refresh-outline"
+                    disabled={query.isFetching}
+                    onPress={() => void refetch()}
+                    showChevron={false}
+                />
+            </SectionCard>
+        )
+    }
+
+    const { status } = state
+    const pending = status.pending
+    const installing = status.installing || request.phase === "sending" || request.phase === "installing"
+    const installDetail = installing
+        ? status.installPhase === "waiting-tv"
+            ? "Waiting for the updater to reach this TV"
+            : "The app will close and restart by itself"
+        : pending ? "Garceslab Anime closes and opens again by itself" : "Nothing to install"
+
+    return (
+        <SectionCard title="Updates">
+            <SettingsRow
+                label="Installed"
+                detail={`${buildLabel(status.installed, status.channel)}${status.channel ? ` · following ${status.channel}` : ""}`}
+                icon="tv-outline"
+                onPress={noop}
+                showChevron={false}
+            />
+            <Divider />
+            <SettingsRow
+                label={pending ? "Update available" : "Up to date"}
+                detail={pending
+                    ? `${buildLabel(pending, status.channel)} · ${changeCountsLabel(pending.changes)} · See changes`
+                    : "No newer build waiting"}
+                icon="sparkles-outline"
+                disabled={!pending}
+                onPress={() => router.push("/(app)/tv-update-changes" as never)}
+            />
+            <Divider />
+            <SettingsRow
+                label={installing ? "Installing…" : "Install update"}
+                detail={installDetail}
+                icon="download-outline"
+                disabled={!pending || installing}
+                onPress={actions.askToInstall}
+                trailing={installing ? <ActivityIndicator size="small" color="white" /> : undefined}
+                showChevron={false}
+            />
+            <Divider />
+            <SettingsRow
+                label={actions.skipping ? "Skipping…" : "Skip this build"}
+                detail="Not offered again until a newer build arrives"
+                icon="close-circle-outline"
+                disabled={!pending || installing || actions.skipping}
+                onPress={actions.skipBuild}
+                showChevron={false}
+            />
+            <Divider />
+            <SettingsRow
+                label="Last install"
+                detail={lastResultLabel(status.lastResult, now)}
+                icon="time-outline"
+                onPress={noop}
+                showChevron={false}
+            />
+        </SectionCard>
+    )
+}
+
 export function TVSettingsScreen() {
     const serverUrl = useServerUrl()
     const viewer = useCurrentUser()?.viewer
@@ -608,6 +714,8 @@ export function TVSettingsScreen() {
                             onPress={() => setConfirm("server")}
                         />
                     </SectionCard>
+
+                    {TV_UPDATES_SUPPORTED && <UpdatesSection />}
 
                     <DiagnosticsSection onClearLogs={() => setConfirm("clear-logs")} />
 

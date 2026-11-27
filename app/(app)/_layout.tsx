@@ -3,6 +3,7 @@ import { useServerUrl } from "@/atoms/server.atoms"
 import { useDownloadQueueResumeService } from "@/lib/downloads/download-queue-resume-service"
 import { useDownloadSnapshotRefreshService, useOfflineSyncService, useServerLocalSyncService } from "@/lib/offline"
 import { TVEntryRouteTracker } from "@/components/tv/tv-focus"
+import { TVUpdateHostMount } from "@/components/tv/tv-update-card"
 import { tvStackScreenLayout } from "@/components/tv/tv-screen-transition"
 import { usePlayerEventListener } from "@/lib/player"
 import { useWebOSLaunchParams } from "@/lib/webos/use-launch-params"
@@ -52,7 +53,10 @@ export default function AppLayout() {
                     }}
                 />
                 <Stack.Screen name="(media)" options={{ headerShown: false }} />
+                <Stack.Screen name="tv-update-changes" options={{ headerShown: false }} />
             </Stack>
+            {/* Garceslab Anime: the "New version" card and install progress (webOS only, docs/tv-updates.md) */}
+            {Platform.isTV && <TVUpdateHostMount />}
         </ServerDataWrapper>
     )
 }
