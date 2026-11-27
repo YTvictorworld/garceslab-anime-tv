@@ -30,11 +30,54 @@ merged**: the *PR ready (WIP rule)* check fails with *"Waiting for a real-TV tes
 needs-tv-test after testing"* until the label is gone, and adding or removing a label re-runs
 it. A ticked *"Not tested on a real TV"* without the label fails the check too.
 
+## The GA Test app
+
+A PR with `needs-tv-test` is tested on the TV in the **GA Test** app (app id
+`app.garceslab.anime.test`), a [side-by-side test build](building-webos.md#side-by-side-test-build)
+that installs next to the everyday app instead of replacing it. **Never install a PR build over
+the main app** (`app.seanime.tenji`): that one follows the nightly channel and is kept up to date
+by the self-hosted updater. Every PR uses the same GA Test id, so installing the next one simply
+replaces the previous test build and test apps don't pile up on the TV.
+
+CI builds it for you: the **GA Test build** workflow
+([`.github/workflows/ga-test.yml`](../.github/workflows/ga-test.yml)) runs for every pull
+request labelled `needs-tv-test`, when the label is added and on every new push, and uploads a
+workflow artifact named **`ga-test-pr<N>-<sha7>`** (PR number and the first 7 characters of the
+PR's head commit) with the `.ipk` and its `SHA256SUMS.txt`. The run's summary page shows the
+exact commands. For a PR from this repository the workflow also posts (and keeps updating) one
+comment on the PR with the link; PRs from forks get a read-only token, so for them open the
+run page instead (*Checks › GA Test build › Summary*). Other labels don't rebuild it, and the
+artifact is kept for the repository's artifact retention period (90 days by default).
+
+Download and install it (the [webOS CLI](building-webos.md#installing-on-the-tv)):
+
+```sh
+# the latest GA Test run of PR 27 (or take the run id from its "GA Test build" check)
+run=$(gh run list -R YTvictorworld/garceslab-anime-tv --workflow ga-test.yml \
+  --branch <pr-branch> --limit 1 --json databaseId --jq '.[0].databaseId')
+gh run download "$run" -R YTvictorworld/garceslab-anime-tv -n ga-test-pr27-<sha7> -D ga-test
+(cd ga-test && sha256sum -c SHA256SUMS.txt)
+ares-install --device tv ga-test/app.garceslab.anime.test_*.ipk
+ares-launch --device tv app.garceslab.anime.test
+```
+
+Check that the artifact's `<sha7>` is the PR's latest commit; Settings in GA Test shows the
+same short commit (`dev (<sha7>)`). To build it yourself instead:
+`WEBOS_APP_ID=app.garceslab.anime.test WEBOS_APP_TITLE="GA Test" npm run build:webos`.
+
+Good to know:
+
+- **GA Test keeps its own local data.** It has its own saved server URL, password and profile
+  (and its own relay service), separate from the main app. Set them once; installing a newer
+  GA Test build keeps them. Remove it with `ares-install --device tv --remove
+  app.garceslab.anime.test` when you want a clean start.
+- **The update card's Install button acts on the main app.** In GA Test the update card talks
+  to the same self-hosted updater, which updates `app.seanime.tenji`, not GA Test. That's
+  expected; GA Test itself is only ever replaced by the next GA Test build.
+
 ## Testing it on the TV
 
-Install the PR's `.ipk` (`npm run build:webos`), ideally as a
-[side-by-side test build](building-webos.md#side-by-side-test-build) so the everyday app stays
-untouched. Then check what the PR touches:
+Install the PR's GA Test build ([above](#the-ga-test-app)). Then check what the PR touches:
 
 - **Remote navigation and focus:** arrows reach every control of the changed screen, nothing is
   unreachable or skipped, focus is always visible, lists scroll to the focused card, focus lands

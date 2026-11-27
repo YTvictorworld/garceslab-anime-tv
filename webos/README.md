@@ -65,14 +65,16 @@ ways:
   from its settings.
 
 **Side-by-side test build.** To try a build without replacing the app you use every day,
-package it under another app id; it installs as a second app with its own tile, its own
-saved server and profile, and its own relay service (`<id>.service`):
+package it under another app id (`WEBOS_APP_ID`, `WEBOS_APP_TITLE`); it installs as a second
+app with its own tile, its own saved server and profile, and its own relay service
+(`<id>.service`). Use the fixed test identity **GA Test**, which CI also builds for PRs labelled
+`needs-tv-test` (`docs/testing-on-tv.md`, "The GA Test app"):
 
 ```bash
-WEBOS_APP_ID=app.garceslab.anime.visualtest WEBOS_APP_TITLE="GA Visual Test" npm run build:webos
-ares-install --device tv dist/webos/app.garceslab.anime.visualtest_*.ipk
-ares-launch --device tv app.garceslab.anime.visualtest
-ares-install --device tv --remove app.garceslab.anime.visualtest   # when done
+WEBOS_APP_ID=app.garceslab.anime.test WEBOS_APP_TITLE="GA Test" npm run build:webos
+ares-install --device tv dist/webos/app.garceslab.anime.test_*.ipk
+ares-launch --device tv app.garceslab.anime.test
+ares-install --device tv --remove app.garceslab.anime.test   # when done
 ```
 
 Without `WEBOS_APP_ID` the build is the usual `app.seanime.tenji`. Don't reuse a default

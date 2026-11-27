@@ -31,14 +31,20 @@ Build-time options: `EXPO_PUBLIC_TV_TIME_ZONE`, `EXPO_PUBLIC_TV_VISUAL_OFF`,
 
 ### Side-by-side test build
 
-To try a build without replacing the app you use every day, package it under another app id;
-it installs as a second app with its own saved server, profile and relay service:
+To try a build without replacing the app you use every day, package it under another app id
+with the `WEBOS_APP_ID` and `WEBOS_APP_TITLE` environment variables; it installs as a second app
+with its own saved server, profile and relay service. Use the one fixed test identity, **GA
+Test** (`app.garceslab.anime.test`), so test builds replace each other instead of piling up on
+the TV:
 
 ```sh
-WEBOS_APP_ID=app.garceslab.anime.visualtest WEBOS_APP_TITLE="GA Visual Test" npm run build:webos
-ares-install --device tv dist/webos/app.garceslab.anime.visualtest_*.ipk
-ares-install --device tv --remove app.garceslab.anime.visualtest   # when done
+WEBOS_APP_ID=app.garceslab.anime.test WEBOS_APP_TITLE="GA Test" npm run build:webos
+ares-install --device tv dist/webos/app.garceslab.anime.test_*.ipk
+ares-install --device tv --remove app.garceslab.anime.test   # when done
 ```
+
+For PRs labelled `needs-tv-test`, CI builds exactly this as an artifact
+([testing-on-tv.md](testing-on-tv.md#the-ga-test-app)).
 
 ## Installing on the TV
 
