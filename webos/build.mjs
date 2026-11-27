@@ -19,7 +19,8 @@
  *   WEBOS_APP_ID=app.garceslab.anime.test WEBOS_APP_TITLE="GA Test" npm run build:webos
  *
  * (the fixed "GA Test" identity; .github/workflows/ga-test.yml builds it for PRs labelled
- * needs-tv-test, docs/testing-on-tv.md)
+ * needs-tv-test, docs/testing-on-tv.md). Only that id shows the TEST ENVIRONMENT tag
+ * (src/lib/test-environment.ts); see webos/app-id.mjs.
  *
  * The relay service is renamed with it (`<id>.service`) and the app is told
  * its id at export time (EXPO_PUBLIC_WEBOS_APP_ID), so don't combine a custom
@@ -34,6 +35,7 @@
 import fs from "node:fs"
 import path from "node:path"
 import zlib from "node:zlib"
+import { applyEmbeddedAppId, resolveAppId } from "./app-id.mjs"
 import { buildIdentityEnv, gitHeadCommit, resolveBuildIdentity } from "./build-identity.mjs"
 import { buildService, SERVICE_NODE } from "./service-build.mjs"
 import { buildWebApp, pngSize, root, walk } from "./web-app.mjs"
@@ -213,20 +215,13 @@ async function main() {
     const pkg = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"))
     const appinfo = JSON.parse(fs.readFileSync(path.join(webosDir, "appinfo.json"), "utf8"))
     appinfo.version = pkg.version
-    const customId = process.env.WEBOS_APP_ID?.trim()
-    if (customId) {
-        // webOS ids: lowercase letters, digits, dots and dashes, starting with a letter.
-        if (!/^[a-z][a-z0-9.-]*$/.test(customId)) {
-            throw new Error(`WEBOS_APP_ID "${customId}" is not a valid webOS app id (lowercase letters, digits, "." and "-")`)
-        }
-        appinfo.id = customId
-        appinfo.title = process.env.WEBOS_APP_TITLE?.trim() || `${appinfo.title} (${customId})`
-        // Read by luna-websocket.ts, inlined by the Expo export.
-        process.env.EXPO_PUBLIC_WEBOS_APP_ID = customId
-        log(`Side-by-side build: ${appinfo.id} "${appinfo.title}"`)
-    } else {
-        delete process.env.EXPO_PUBLIC_WEBOS_APP_ID
-    }
+    // Main app or a side-by-side build (app-id.mjs); the app is told a custom id at export
+    // time, which also turns on GA Test's TEST ENVIRONMENT tag.
+    const app = resolveAppId({ appinfo, env: process.env })
+    appinfo.id = app.id
+    appinfo.title = app.title
+    applyEmbeddedAppId(process.env, app.embeddedAppId)
+    if (app.custom) log(`Side-by-side build: ${appinfo.id} "${appinfo.title}"`)
     // Embedded by the export and written next to appinfo.json for external tools. webOS
     // only takes a numeric appinfo.json version, so the channel and commit live here.
     const identity = resolveBuildIdentity({ version: pkg.version, env: process.env, gitCommit: () => gitHeadCommit(root) })
