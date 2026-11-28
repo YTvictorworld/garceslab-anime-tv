@@ -45,6 +45,8 @@ ares-install --device tv --remove app.garceslab.anime.test   # when done
 
 For PRs labelled `needs-tv-test`, CI builds exactly this as an artifact
 ([testing-on-tv.md](testing-on-tv.md#the-ga-test-app)).
+The GA Test build shows a **TEST ENVIRONMENT** tag on every screen
+([testing-on-tv.md](testing-on-tv.md#the-test-environment-tag)); other ids don't.
 
 ## Installing on the TV
 

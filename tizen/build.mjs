@@ -137,6 +137,10 @@ async function main() {
     const iconSize = pngSize(ICON)
     if (!iconSize) throw new Error(`${path.relative(root, ICON)} is not a PNG`)
 
+    // A webOS app id left in the shell (e.g. after a GA Test build) would rename the relay and
+    // show GA Test's TEST ENVIRONMENT tag (src/lib/test-environment.ts); Tizen has neither.
+    delete process.env.EXPO_PUBLIC_WEBOS_APP_ID
+
     await buildWebApp({ exportDir, appDir, skipExport: args.has("--skip-export"), chrome: CHROME, log })
 
     const config = fs.readFileSync(path.join(tizenDir, "config.xml"), "utf8").replace("{{VERSION}}", version)

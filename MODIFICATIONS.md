@@ -120,6 +120,16 @@ All for the LG webOS build:
   and pending build, install, skip, last result, "updater unreachable"; only rows with data),
   only when the server has an updater configured; `SettingsRow` gets a lilac `accent`. See `docs/tv-updates.md`.
 
+## 2026-11 (GA Test: TEST ENVIRONMENT tag)
+
+- **TEST ENVIRONMENT tag** (`src/lib/test-environment.ts`, mounted from
+  `src/lib/webos/install.ts`): the GA Test app (`app.garceslab.anime.test`) shows an amber tag
+  at the top right of every screen, outside the React tree, above everything and ignoring
+  focus and input. Decided at build time from the app id; the app-id handling of
+  `webos/build.mjs` moved to `webos/app-id.mjs`, and `tizen/build.mjs` drops a stray
+  `EXPO_PUBLIC_WEBOS_APP_ID`. Tests in `tests/test-environment.test.ts`; see
+  `docs/testing-on-tv.md`.
+
 ## 2026-11 (subtitle track at start)
 
 - **Subtitle and audio track choice** (`src/lib/player/track-matching.ts`, new; re-exported by
