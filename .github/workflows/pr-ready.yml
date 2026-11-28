@@ -1,8 +1,9 @@
 name: PR ready
 
 # Enforces the "(WIP)" rule from CONTRIBUTING.md: a pull request whose title doesn't start
-# with "(WIP)" needs a linked issue ("Closes #N"), every checklist box ticked and every
-# required CI job green. The logic is in .github/scripts/pr-ready.sh (tested by
+# with "(WIP)" needs a linked issue ("Closes #N"), every checklist box ticked, every
+# required CI job green and a Conventional Commit title (PRs are squash-merged, so the title
+# becomes the commit on main). The logic is in .github/scripts/pr-ready.sh (tested by
 # pr-ready_test.sh). It waits for the webOS build workflow's jobs on the same commit, so editing the
 # title or the description re-checks without running CI again. Adding or removing a label
 # re-checks too: while the PR has "needs-tv-test" the check fails (it can't be merged) without

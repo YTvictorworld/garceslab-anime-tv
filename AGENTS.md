@@ -124,7 +124,8 @@ script; match the surrounding style.
   behaviour unless asked.
 - Commits: one topic each, [Conventional Commits](https://www.conventionalcommits.org/)
   (`feat(tv): …`, `fix(webos): …`, `docs: …`, `test: …`); end with the attribution line the
-  session asks for. Document every change in `docs/` (and `webos/README.md` when webOS
+  session asks for. What reaches `main` is the PR title (squash merge), so that is the one
+  that must be right. Document every change in `docs/` (and `webos/README.md` when webOS
   behaviour changes).
 - Unit-test pure modules (no react-native imports) by importing the `.ts` file directly
   from `tests/`; node runs them with `--experimental-strip-types`.
@@ -184,6 +185,13 @@ script; match the surrounding style.
    `(WIP)` and mark it ready. The `PR ready (WIP rule)` workflow (`.github/workflows/pr-ready.yml`,
    logic in `.github/scripts/pr-ready.sh`, tests in `pr-ready_test.sh`) fails otherwise. Never
    tick a box you didn't verify; write "n/a" next to a box that doesn't apply.
+5. **The PR title is a Conventional Commit** (`type(scope): description`, imperative, English,
+   no `(WIP)` once ready). PRs are **squash-merged** only, so the title becomes the single
+   commit on `main` (GitHub appends ` (#N)`) and the nightly's `changes.json` entry; the
+   `PR ready` check validates it. Allowed types: `feat`, `fix`, `docs`, `test`, `ci`, `build`,
+   `chore`, `refactor`, `perf`, `style`, `revert`, `deps`. Commits inside the PR can be WIP; to
+   resolve conflicts, merge `main` into the branch (no rebase or force-push needed). Details:
+   [CONTRIBUTING.md](CONTRIBUTING.md#merging-squash-only).
 
 ### Testing on a real TV
 

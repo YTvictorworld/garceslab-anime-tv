@@ -115,6 +115,9 @@ The `nightly` pre-release always holds exactly these files of the newest build:
   `"internal"` (listed so nothing is lost, but meant to be hidden from TV users); anything
   else (`perf`, `revert`, no prefix) → `"other"`.
 - `title` is the PR title without the prefix (`feat(tv): Seasons tabs` → `Seasons tabs`).
+  PRs are squash-merged, so the PR's `merge_commit_sha` is its single commit on `main`, and
+  the *PR ready* check makes sure every title has a Conventional Commit prefix
+  ([Merging](../CONTRIBUTING.md#merging-squash-only)).
 - Only pull requests are listed; commits pushed to `main` directly have no entry. The first
   nightly (no previous one), a re-run on the same commit, or a previous commit that no longer
   exists give `[]`.

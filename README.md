@@ -150,7 +150,7 @@ move to its own id.
 
 - [docs/](docs/README.md): every doc, plus the roadmap.
 - [CONTRIBUTING.md](CONTRIBUTING.md): issue first, tests and docs in every pull request, the
-  "(WIP)" rule, running `npm test`, `npx tsc --noEmit` and `npm run build:webos`.
+  "(WIP)" rule, squash merges with a Conventional Commit PR title, running `npm test`, `npx tsc --noEmit` and `npm run build:webos`.
 - [AGENTS.md](AGENTS.md): guide for AI coding agents.
 - [webos/README.md](webos/README.md): the full webOS reference (playback, formats, relay
   service, what is not yet verified on a TV).
