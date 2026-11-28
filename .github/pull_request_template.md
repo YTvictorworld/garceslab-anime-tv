@@ -1,6 +1,8 @@
 <!--
 Title: start it with "(WIP)" and keep the PR as a draft until EVERY box below is ticked and
 CI is green. The "PR ready (WIP rule)" check enforces this (see CONTRIBUTING.md).
+After "(WIP)", the title is a Conventional Commit, e.g. "fix(scope): what it fixes": PRs are
+squash-merged and the title becomes the commit on main.
 For a box that doesn't apply, write "n/a" next to it and tick it.
 No LG TV to test a UI behaviour change on? Add the `needs-tv-test` label, tick "Not tested on a
 real TV" and list below what to check (see "Testing on a real TV" in CONTRIBUTING.md).
@@ -33,6 +35,7 @@ Commands you ran, and what you checked by hand (desktop Chromium at 1920×1080, 
 ## Checklist
 
 - [ ] Linked issue: `Closes #N` above.
+- [ ] PR title is a Conventional Commit (`type(scope): description`, imperative, English); it becomes the squash commit on `main`.
 - [ ] Tests added or updated in `tests/`: a regression test that fails before a bug fix and passes after it, or tests that lock a new feature's behaviour.
 - [ ] `npm test` passes.
 - [ ] `npx tsc --noEmit -p .` passes (only the known `app/_layout.tsx` global.css TS2882 remains).

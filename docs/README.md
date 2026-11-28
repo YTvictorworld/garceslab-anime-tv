@@ -30,7 +30,7 @@ It is published only for self-hosting with LG webOS TVs: there is no hosted serv
 | [releasing.md](releasing.md) | Versions (1.0.0 onwards, server and TV together), the nightly and stable channels (nightly assets and their JSON formats for updaters), cutting a release with the workflow, verifying it, rolling back |
 | [../webos/README.md](../webos/README.md) | The full webOS reference: playback and formats, relay service, device info, debug logs, what is not yet verified on a TV |
 | [../tizen/README.md](../tizen/README.md) | Samsung Tizen build (untested on a TV) |
-| [../CONTRIBUTING.md](../CONTRIBUTING.md) | Issue first, the pull request checklist and the "(WIP)" rule, running the checks |
+| [../CONTRIBUTING.md](../CONTRIBUTING.md) | Issue first, the pull request checklist and the "(WIP)" rule, squash merges and Conventional Commit PR titles, running the checks |
 | [../AGENTS.md](../AGENTS.md) | Guide for AI coding agents: layout, commands, checks, screenshots, privacy |
 | [../MODIFICATIONS.md](../MODIFICATIONS.md) | Every change compared with Seanime Tenji 0.4.0, with dates (GPL-3.0 §5a) |
 | [../LICENSES.md](../LICENSES.md) and [../NOTICE](../NOTICE) | Licences of the app and its modules, third-party data |

@@ -5,7 +5,9 @@
 #   1. a linked issue in its body ("Closes #N", "Fixes #N" or "Resolves #N"),
 #   2. every checkbox of the PR template ticked ("- [x]"; write "n/a" next to the ones that
 #      don't apply and tick them),
-#   3. every required CI job finished with success.
+#   3. every required CI job finished with success,
+#   4. a Conventional Commit title ("type(scope): description"): it becomes the squash
+#      commit on main, the only merge method allowed.
 # If one of them is missing, this script fails. A "(WIP)" title always passes, and the
 # script lists what is still missing.
 #
@@ -101,6 +103,19 @@ while IFS= read -r name; do
     fi
 done <<<"${REQUIRED_CHECKS:-}"
 
+# 4. The title. Only squash merge is allowed and the PR title becomes the commit on main, so
+# it must be a Conventional Commit: "type(scope): description" (scope and "!" optional).
+# A "(WIP)" title is checked without its prefix, so the list shows what is still missing.
+title_types="feat|fix|docs|test|ci|build|chore|refactor|perf|style|revert|deps"
+title_re="^(${title_types})(\([A-Za-z0-9][A-Za-z0-9._/-]*\))?!?: [^[:space:]]"
+commit_title="${title#"(WIP)"}"
+commit_title="${commit_title#"${commit_title%%[![:space:]]*}"}"
+if [[ "$commit_title" == *"(WIP)"* ]]; then
+    problems+=("the title has \"(WIP)\" in it: \"(WIP)\" only counts at the start, and the title becomes the commit on main")
+elif ! [[ "$commit_title" =~ $title_re ]]; then
+    problems+=("the title is not a Conventional Commit (\"type(scope): description\", type one of ${title_types//|/, }); it becomes the squash commit on main")
+fi
+
 is_wip=0
 if [[ "$title" == "(WIP)"* ]]; then is_wip=1; fi
 needs_tv_test=0
@@ -123,7 +138,7 @@ if [ "${#problems[@]}" -eq 0 ]; then
     if [ "$is_wip" -eq 1 ]; then
         echo "Everything is in place: remove \"(WIP)\" from the title and mark the PR ready for review."
     else
-        echo "Ready: linked issue, checklist ticked and every required check passed."
+        echo "Ready: linked issue, checklist ticked, every required check passed and a Conventional Commit title."
     fi
     exit 0
 fi
