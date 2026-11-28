@@ -12,6 +12,7 @@ import {
     type WyzieSource,
     type WyzieSubtitleResult,
 } from "@/lib/player/subtitle-search"
+import { normalizeLanguage } from "@/lib/player/track-matching"
 import { cn } from "@/lib/utils"
 import type { MpvVideoOutput } from "expo-mpv-player"
 import Activity from "lucide-react-native/icons/activity"
@@ -891,9 +892,10 @@ function ExternalSubtitleSearchContent({
     const [showApiKeyInput, setShowApiKeyInput] = React.useState(!wyzieApiKey.trim())
 
     const initialLanguage = React.useMemo(() => {
+        // Garceslab Anime: "es-419" or "spa" opens the search on Spanish (the options use ISO 639-1).
         const firstPreference = preferredSubtitleLanguages
             .split(",")
-            .map(value => value.trim().toLowerCase())
+            .map(value => normalizeLanguage(value))
             .find(Boolean)
         return SUBTITLE_LANGUAGE_OPTIONS.some(option => option.value === firstPreference)
             ? firstPreference ?? "all"

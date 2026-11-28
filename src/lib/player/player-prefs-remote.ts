@@ -1,7 +1,14 @@
 import { buildSeaQuery } from "@/api/client/requests"
 import { API_ENDPOINTS } from "@/api/generated/endpoints"
 import type { PlayerPrefs, TVPlayerPrefs } from "@/api/generated/types"
-import { getPlayerPreferences, type PlayerPreferences, setPlayerPreferences, subscribePlayerPreferences } from "@/lib/player/player-preferences"
+import {
+    getPlayerPreferences,
+    isProfileSubtitleDefaultChecked,
+    markProfileSubtitleDefaultChecked,
+    type PlayerPreferences,
+    setPlayerPreferences,
+    subscribePlayerPreferences,
+} from "@/lib/player/player-preferences"
 import { createPlayerPrefsSync } from "@/lib/player/player-prefs-sync"
 import { getProfileSession, subscribeProfileSession } from "@/lib/profile/profile-session"
 
@@ -22,6 +29,8 @@ function stopActive() {
 
 export function startProfilePlayerPrefsSync(serverUrl: string | null, profileId: number) {
     stopActive()
+    // Profile ids are per server.
+    const migrationKey = `${serverUrl ?? ""}#${profileId}`
     const sync = createPlayerPrefsSync({
         fetchPrefs: () => buildSeaQuery<PlayerPrefs>({
             serverUrl,
@@ -38,6 +47,10 @@ export function startProfilePlayerPrefsSync(serverUrl: string | null, profileId:
         }),
         getLocal: () => getPlayerPreferences() as unknown as Record<string, unknown>,
         setLocal: next => setPlayerPreferences(next as unknown as Partial<PlayerPreferences>),
+        subtitleDefault: {
+            isChecked: () => isProfileSubtitleDefaultChecked(migrationKey),
+            markChecked: () => markProfileSubtitleDefaultChecked(migrationKey),
+        },
     })
     active = { profileId, sync }
     unsubscribePrefs ??= subscribePlayerPreferences(() => active?.sync.localChanged())

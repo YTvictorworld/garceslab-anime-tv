@@ -49,6 +49,7 @@ type SubtitleEntry = {
     title?: string
     lang?: string
     codec?: string
+    forced?: boolean
     /** In-band (or hls.js) track exposed by the browser. */
     textTrack?: TextTrack
     /** Sidecar file fetched and parsed by us. */
@@ -850,6 +851,7 @@ export class WebVideoPlayer {
             title: entry.title,
             lang: entry.lang,
             codec: entry.codec,
+            forced: entry.forced,
             selected: index + 1 === this.selectedSubtitle,
         }))
     }
@@ -1103,6 +1105,7 @@ export class WebVideoPlayer {
                 title: track.title,
                 lang: track.lang,
                 codec: track.codec,
+                forced: track.forced,
                 cues: [],
                 ass: ASS_CODECS.has(track.codec ?? "") ? { header, chunks: [] } : undefined,
                 streamed: { number: track.number, topStyles: parseAssStyles(header), seen: new Set(), readOrder: 0 },

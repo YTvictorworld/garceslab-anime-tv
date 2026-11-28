@@ -15,7 +15,8 @@ import type {
 } from "expo-mpv-player"
 import { useAtomValue, useSetAtom } from "jotai/react"
 import React from "react"
-import { findFallbackTrack, findPreferredTrack, getPlayerPreferences, setPlayerPreferences } from "./player-preferences"
+import { findPreferredTrack, getPlayerPreferences, setPlayerPreferences, subscribePlayerPreferences } from "./player-preferences"
+import { createSubtitleAutoSelect } from "./track-matching"
 import { useActivePlaybackSource } from "./session"
 import { useWebPlaybackPlan } from "./web-playback-plan"
 
@@ -73,6 +74,12 @@ function sameItems<T extends object>(a: readonly T[], b: readonly T[]) {
     return true
 }
 
+/** The preferences the subtitle choice depends on; a change makes it run again. */
+function subtitlePreferenceKey() {
+    const prefs = getPlayerPreferences()
+    return `${prefs.showSubtitles}\n${prefs.preferredSubtitleLanguages}\n${prefs.ignoredSubtitleLabels}`
+}
+
 const INITIAL_STATE: PlayerState = {
     status: "idle",
     paused: true,
@@ -123,9 +130,12 @@ export function useMpvPlayer() {
     // track whether we've applied auto-track + auto-play for the current source
     const hasAppliedDefaultTracks = React.useRef(false)
     const hasAppliedPrefs = React.useRef(false)
-    // external subtitles are added after the file loads, so the preferred track is checked again as they appear
-    const checkedSubtitleTrackCount = React.useRef(0)
-    const hasUserChosenSubtitle = React.useRef(false)
+    // Garceslab Anime: when the subtitle track is chosen (track-matching.ts): again as more
+    // tracks appear (external subtitles after the file loads) and when the profile's
+    // preferences arrive, never after the viewer picked one.
+    const [subtitleAutoSelect] = React.useState(createSubtitleAutoSelect)
+    // Bumped when the synced subtitle preferences change during playback.
+    const [subtitlePrefsKey, setSubtitlePrefsKey] = React.useState(subtitlePreferenceKey)
 
     // debounce isLoading -> "buffering" to avoid spinner flashing during seeks
     const bufferingTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -209,8 +219,7 @@ export function useMpvPlayer() {
         tracksLogRef.current = null
         hasAppliedDefaultTracks.current = false
         hasAppliedPrefs.current = false
-        checkedSubtitleTrackCount.current = 0
-        hasUserChosenSubtitle.current = false
+        subtitleAutoSelect.reset()
         if (bufferingTimerRef.current !== null) {
             clearTimeout(bufferingTimerRef.current)
             bufferingTimerRef.current = null
@@ -241,8 +250,10 @@ export function useMpvPlayer() {
         tracksLogRef.current = null
         hasAppliedDefaultTracks.current = false
         hasAppliedPrefs.current = false
+        // The new URL lists its tracks again with none selected: choose again.
+        subtitleAutoSelect.reset()
         setState(s => ({ ...s, status: "loading", audioTracks: [], subtitleTracks: [], chapters: [] }))
-    }, [source, videoSource])
+    }, [source, subtitleAutoSelect, videoSource])
 
     // cleanup buffering debounce timer on unmount
     React.useEffect(() => {
@@ -426,6 +437,7 @@ export function useMpvPlayer() {
                 title: t.title,
                 language: t.lang,
                 codec: t.codec,
+                forced: t.forced,
                 selected: t.selected,
             }))
             const mappedAudio = audioTracks.map(t => ({
@@ -555,22 +567,27 @@ export function useMpvPlayer() {
             }
         }
 
-        if (!prefs.showSubtitles || hasUserChosenSubtitle.current) return
-        if (state.subtitleTracks.length <= checkedSubtitleTrackCount.current) return
-        checkedSubtitleTrackCount.current = state.subtitleTracks.length
-
-        const currentSub = state.subtitleTracks.find(t => t.selected)
         // mpv selects the file's default track by itself; the web player selects none.
-        // So when no track is in a preferred language, show the first one that isn't signs & songs.
-        const preferredSub = findPreferredTrack(state.subtitleTracks, prefs.preferredSubtitleLanguages, prefs.ignoredSubtitleLabels)
-            ?? (currentSub ? null : findFallbackTrack(state.subtitleTracks, prefs.ignoredSubtitleLabels))
+        // The preferred full track replaces either (track-matching.ts); with none, the web
+        // player shows the first track that isn't forced or signs & songs.
+        const preferredSub = subtitleAutoSelect.decide(state.subtitleTracks, prefs)
         if (preferredSub === null) return
 
-        if (currentSub?.id !== preferredSub) {
-            log.info(`Auto-selecting preferred subtitle track: ${preferredSub}`)
-            runNativeCommand("setSubtitleTrack", nativeRef => nativeRef.setSubtitleTrack(preferredSub))
-        }
-    }, [runNativeCommand, state.audioTracks, state.subtitleTracks])
+        const track = state.subtitleTracks.find(t => t.id === preferredSub)
+        log.info(`Auto-selecting preferred subtitle track: ${preferredSub}`, { language: track?.language, title: track?.title, preference: prefs.preferredSubtitleLanguages })
+        runNativeCommand("setSubtitleTrack", nativeRef => nativeRef.setSubtitleTrack(preferredSub))
+        setState(s => ({
+            ...s,
+            activeSubtitleTrackId: preferredSub,
+            subtitleTracks: s.subtitleTracks.map(t => ({ ...t, selected: t.id === preferredSub })),
+        }))
+    }, [runNativeCommand, state.audioTracks, state.subtitleTracks, subtitleAutoSelect, subtitlePrefsKey])
+
+    // The profile's preferences may arrive after the episode started (profile sync):
+    // the subtitle choice above runs again with them.
+    React.useEffect(() => subscribePlayerPreferences(() => {
+        setSubtitlePrefsKey(subtitlePreferenceKey())
+    }), [])
 
     // ---------------------------------------------------------------------------
     // Control callbacks
@@ -620,7 +637,7 @@ export function useMpvPlayer() {
 
     const setSubtitleTrack = React.useCallback((trackId: number) => {
         const visible = trackId >= 0
-        hasUserChosenSubtitle.current = true
+        subtitleAutoSelect.userChose()
         if (trackId < 0) {
             runNativeCommand("disableSubtitles", ref => ref.disableSubtitles())
         } else {
@@ -654,8 +671,7 @@ export function useMpvPlayer() {
         durationRef.current = 0
         hasAppliedDefaultTracks.current = false
         hasAppliedPrefs.current = false
-        checkedSubtitleTrackCount.current = 0
-        hasUserChosenSubtitle.current = false
+        subtitleAutoSelect.reset()
         if (bufferingTimerRef.current !== null) {
             clearTimeout(bufferingTimerRef.current)
             bufferingTimerRef.current = null
@@ -723,7 +739,7 @@ export function useMpvPlayer() {
         const ref = viewRef.current
         if (!ref) return
 
-        hasUserChosenSubtitle.current = true
+        subtitleAutoSelect.userChose()
         try {
             await ref.addSubtitleFile(url, select)
             // re-fetch tracks so the UI reflects the newly added subtitle
@@ -732,7 +748,7 @@ export function useMpvPlayer() {
         catch (error) {
             handleNativeCommandError("addSubtitleFile", error)
         }
-    }, [handleNativeCommandError, onNativeTracksReady])
+    }, [handleNativeCommandError, onNativeTracksReady, subtitleAutoSelect])
 
     return {
         // view integration

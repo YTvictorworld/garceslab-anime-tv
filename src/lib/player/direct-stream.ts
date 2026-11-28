@@ -7,7 +7,7 @@ import { logger } from "@/lib/utils/logger"
 import type { MpvChapter, MpvMediaEvent, MpvStreamedSubtitleLine, MpvStreamedSubtitles } from "expo-mpv-player"
 import { Platform } from "react-native"
 import { takeDirectPlayForDebridStart } from "./direct-play-mode"
-import { eventsOf, newLines, toLines } from "./direct-stream-format"
+import { eventsOf, newLines, streamedSubtitleTracks, toLines } from "./direct-stream-format"
 import { probeStreamUrl } from "./kept-direct-stream"
 import type { MobilePlaybackSource } from "./types"
 
@@ -154,14 +154,7 @@ export function createDirectStreamSession(source: MobilePlaybackSource): DirectS
 
     const { clientId } = getClientIdentity()
     const playbackType = source.serverStreamType ?? "torrent"
-    const tracks = (source.mkvMetadata?.subtitleTracks ?? []).map(track => ({
-        number: track.number,
-        title: track.name || undefined,
-        lang: track.language || undefined,
-        codec: track.codecID,
-        // CodecPrivate is the script header; Matroska muxers often end it with a NUL.
-        header: track.codecPrivate?.replace(/\u0000+$/, "") || undefined,
-    }))
+    const tracks = streamedSubtitleTracks(source.mkvMetadata)
 
     const lines: MpvStreamedSubtitleLine[] = []
     /** Keys of the lines in `lines`: the server sends them again after every seek. */

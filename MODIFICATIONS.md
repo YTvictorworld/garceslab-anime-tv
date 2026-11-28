@@ -130,6 +130,29 @@ All for the LG webOS build:
   `EXPO_PUBLIC_WEBOS_APP_ID`. Tests in `tests/test-environment.test.ts`; see
   `docs/testing-on-tv.md`.
 
+## 2026-11 (subtitle track at start)
+
+- **Subtitle and audio track choice** (`src/lib/player/track-matching.ts`, new; re-exported by
+  `src/lib/player/player-preferences.ts`): languages are compared by canonical code (ISO 639-1
+  from 639-2 codes, IETF tags and names, whole words only) instead of substrings, so `es` no
+  longer matches "Portuguese" or "Japanese"; a regional tag (`es-419`) prefers that region;
+  forced tracks (flag or name) are skipped like signs & songs, in the fallback too.
+- **When it runs** (`src/lib/player/use-mpv-player.ts`): again when the profile's preferences
+  change during playback (the profile sync may finish late) and after the source URL changes
+  (direct play -> transcode), never after a track was picked by hand.
+- **Forced flag** passed from the MKV to the web player (`modules/expo-mpv-player/src/MpvPlayer.types.ts`,
+  `web/web-video-player.ts`, `src/lib/player/direct-play-session.ts`), and relayed play lists the
+  server's tracks with their IETF tag (`streamedSubtitleTracks` in
+  `src/lib/player/direct-stream-format.ts`).
+- **Default subtitle languages** (`src/lib/player/subtitle-defaults.ts`, `player-preferences.ts`):
+  `es-419, spa, es, spanish, eng, en, english` instead of Seanime Tenji's `eng, en, english`. A
+  device or profile whose saved value is exactly the old default is moved to the new one once
+  (`player-preferences.ts` for the device, `player-prefs-sync.ts` / `player-prefs-remote.ts` for
+  profiles, written back through the profile sync). The subtitle search opens on the first
+  preferred language's ISO 639-1 code (`player-panel.tsx`).
+- Tests in `tests/track-matching.test.ts` and `tests/subtitle-defaults.test.ts`; doc in
+  `docs/subtitles.md`.
+
 ## GPL-3.0 compliance checklist
 
 - [x] **Prominent modification notices with dates (§5a):** this file, `NOTICE`, the README's

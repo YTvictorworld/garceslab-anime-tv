@@ -485,8 +485,14 @@ The built-in player is the TV's HTML5 video engine, not libmpv.
     reads its subtitle lines as it goes, sending them over the websocket once the player
     has loaded the file, and again from the new position after a seek. All embedded
     tracks are listed from the start; their lines fill in as the episode plays.
-  - A subtitle track is turned on by the preferred languages (`eng, en, english` by
-    default), or else the first track that isn't signs & songs. Choosing *Off* in the
+  - A subtitle track is turned on by the preferred languages (`es-419, spa, es, spanish,
+    eng, en, english` by default: Spanish first; profiles with the old English-only default
+    are moved to it once), or else the first track that isn't forced or signs & songs. Languages are
+    compared by code (`spa`, `es`, `es-419` and "Spanish (Latin America)" are all Spanish;
+    `es` never matches "Portuguese"), the file's default flag doesn't win over the
+    preference, and the choice is made again when the profile's preferences arrive after the
+    episode started, unless a track was picked by hand. See
+    [docs/subtitles.md](../docs/subtitles.md). Choosing *Off* in the
     player keeps subtitles off for later episodes until a track is chosen again.
 - **Not available:** downloads and offline mode (as on the other TV builds), external
   players, picture-in-picture, audio delay.

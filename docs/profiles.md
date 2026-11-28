@@ -52,7 +52,11 @@ which goes back to "Who's watching?". Settings also has **Switch profile**.
   autoplay, auto next episode, auto skip, seek steps, speed and *Skip filler and recaps*.
   Entering a profile replaces the TV's values; changes are saved about 1.5 s after the last
   one, only to the profile in use. Device settings (video output, external player, per-file
-  delays, stats) stay on the TV.
+  delays, stats) stay on the TV. A profile seen for the first time takes this TV's current
+  values (the defaults on a new TV: Spanish subtitles first, then English). A profile still
+  saved with the old default subtitle languages (`eng, en, english`) is moved to the new
+  default once, the first time it is entered on a TV with this version, and saved back to the
+  server; other values are never changed. Details in [subtitles.md](subtitles.md).
 - **Favourites:** the *Favourite* pill on the anime page; *Add to list* / *Edit entry* save to
   the profile's list.
 

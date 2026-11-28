@@ -92,6 +92,8 @@ export type MpvStreamedSubtitleTrack = {
     title?: string
     lang?: string
     codec?: string
+    /** Matroska's forced flag (signs or foreign lines only): never auto-selected as the full track. */
+    forced?: boolean
     /** ASS header ([Script Info], [V4+ Styles]) for the style alignments. */
     header?: string
 }
@@ -190,6 +192,8 @@ export type SubtitleTrack = {
     title?: string
     lang?: string
     codec?: string
+    /** Web player: the file flags it forced (mpv doesn't report it). */
+    forced?: boolean
     selected: boolean
 }
 
